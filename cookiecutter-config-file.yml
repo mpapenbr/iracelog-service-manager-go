@@ -1,0 +1,15 @@
+# This project was generated using a Cookiecutter template:
+#       https://github.com/notsatan/go-template
+
+cookiecutter_inputs:
+  project_name: "iracelog-service-manager-go"
+  go_module_path: "github.com/mpapenbr/iracelog-service-manager-go"
+  license_owner: "Markus Papenbrock"
+  base_branch: "main"
+  contact_email: ""
+  project_description: "IracelogServiceManagerGo sample description"
+  github_specific_features: "y"
+  use_codecov: "n"
+  use_precommit: "y"
+  go_version: "1.20"
+  license: "MIT"

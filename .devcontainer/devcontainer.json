@@ -1,0 +1,52 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.231.2/containers/go
+{
+  "name": "Go",
+
+  "image": "mcr.microsoft.com/devcontainers/go:1.20",
+  // alternative: use the bullseye image
+  // "image": "mcr.microsoft.com/devcontainers/go:1.20-bullseye",
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined",
+    "--network=host"
+  ],
+
+  // Set *default* container specific settings.json values on container create.
+  "settings": {
+    "go.toolsManagement.checkForUpdates": "local",
+    "go.useLanguageServer": true,
+    "go.gopath": "/go",
+    "[go]": {
+      "editor.rulers": [90]
+    }
+  },
+
+  // Add the IDs of extensions you want installed when the container is created.
+  "extensions": [
+    "golang.Go",
+    "eamodio.gitlens",
+    "esbenp.prettier-vscode",
+    "github.vscode-pull-request-github",
+    "EditorConfig.EditorConfig",
+    "cschleiden.vscode-github-actions"
+  ],
+
+  "containerEnv": {
+    "TZ": "Europe/Berlin"
+  },
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": "./devinit.sh",
+
+  // Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker": "20.10",
+    "ghcr.io/devcontainers-contrib/features/pre-commit": "latest"
+  }
+}
