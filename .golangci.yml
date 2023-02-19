@@ -281,8 +281,8 @@ linters-settings:
     #   - atomicalign
     enable-all: true
 
-    # disable:
-    #   - shadow
+    disable:
+      - fieldalignment
     disable-all: false
 
   depguard:
@@ -495,7 +495,7 @@ linters:
     - gofumpt
     - funlen
     - goimports
-    - gomnd
+    # - gomnd too noisy
     - goprintffuncname
     - gosec
     - ifshort
@@ -506,17 +506,17 @@ linters:
     - nestif
     - nilerr
     - noctx
-    - nolintlint
+    # - nolintlint
     - predeclared
     - revive
-    - stylecheck
+    # - stylecheck too noisy
     - tagliatelle
     - thelper
     - unconvert
     - unparam
     - wastedassign
     - whitespace
-    - wrapcheck
+    # - wrapcheck too noisy
 
   # Interesting linters - enable if they fit your needs
   # - maintidx
