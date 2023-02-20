@@ -13,25 +13,32 @@
     "--network=host"
   ],
 
-  // Set *default* container specific settings.json values on container create.
-  "settings": {
-    "go.toolsManagement.checkForUpdates": "local",
-    "go.useLanguageServer": true,
-    "go.gopath": "/go",
-    "[go]": {
-      "editor.rulers": [90]
+  "customizations": {
+    "vscode": {
+      // Set *default* container specific settings.json values on container create.
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "go.gopath": "/go",
+        "go.lintTool": "golangci-lint",
+        "gopls": {
+          "formatting.gofumpt": true
+        },
+        "[go]": {
+          "editor.rulers": [90]
+        }
+      },
+      // Add the IDs of extensions you want installed when the container is created.
+      "extensions": [
+        "golang.Go",
+        "eamodio.gitlens",
+        "esbenp.prettier-vscode",
+        "github.vscode-pull-request-github",
+        "EditorConfig.EditorConfig",
+        "cschleiden.vscode-github-actions"
+      ]
     }
   },
-
-  // Add the IDs of extensions you want installed when the container is created.
-  "extensions": [
-    "golang.Go",
-    "eamodio.gitlens",
-    "esbenp.prettier-vscode",
-    "github.vscode-pull-request-github",
-    "EditorConfig.EditorConfig",
-    "cschleiden.vscode-github-actions"
-  ],
 
   "containerEnv": {
     "TZ": "Europe/Berlin"
