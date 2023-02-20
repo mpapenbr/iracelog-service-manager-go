@@ -45,6 +45,7 @@ func WithInitialDatabase(user, password, dbName string) PostgresContainerOption 
 func SetupPostgres(ctx context.Context, opts ...PostgresContainerOption) (
 	*PostgresContainer, error,
 ) {
+	// setup the container
 	req := testcontainers.ContainerRequest{
 		Image:        "postgres:15",
 		Env:          map[string]string{},
