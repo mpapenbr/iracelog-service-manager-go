@@ -61,14 +61,16 @@ func (tracer *myQueryTracer) TraceQueryStart(
 	_ *pgx.Conn,
 	data pgx.TraceQueryStartData,
 ) context.Context {
+	// do the logging
 	tracer.log.Infow("Executing command", "sql", data.SQL, "args", data.Args)
 
 	return ctx
 }
 
+//nolint:whitespace // can't make the linters happy
 func (tracer *myQueryTracer) TraceQueryEnd(
 	ctx context.Context,
 	conn *pgx.Conn,
-	data pgx.TraceQueryEndData) {
-
+	data pgx.TraceQueryEndData,
+) {
 }
