@@ -1,3 +1,4 @@
+//nolint:errcheck // testsetup
 package tcpostgres
 
 import (
@@ -45,4 +46,43 @@ func SetupTestDb() *pgxpool.Pool {
 
 	pool := database.InitWithUrl(dbUrl)
 	return pool
+}
+
+func ClearEventTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from event_ext")
+	pool.Exec(context.Background(), "delete from event")
+}
+
+func ClearCarTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from car")
+}
+
+func ClearTrackTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from track")
+}
+
+func ClearDriverTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from driver")
+}
+
+func ClearSpeedmapTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from speedmap")
+}
+
+func ClearAnalysisTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from analysis")
+}
+
+func ClearWampDataTable(pool *pgxpool.Pool) {
+	pool.Exec(context.Background(), "delete from wampdata")
+}
+
+func ClearAllTables(pool *pgxpool.Pool) {
+	ClearWampDataTable(pool)
+	ClearSpeedmapTable(pool)
+	ClearAnalysisTable(pool)
+	ClearCarTable(pool)
+	ClearDriverTable(pool)
+	ClearTrackTable(pool)
+	ClearEventTable(pool)
 }
