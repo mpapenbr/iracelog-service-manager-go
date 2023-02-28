@@ -9,7 +9,7 @@ repos:
       # Verify syntax
       - id: check-yaml
       - id: check-json
-        exclude: .devcontainer/
+        exclude: (\.devcontainer/|\.vscode/)
       - id: check-xml
 
       # Checkers
@@ -26,7 +26,7 @@ repos:
 
       # Pretty format JSON files implicitly
       - id: pretty-format-json
-        exclude: .devcontainer/
+        exclude: (\.devcontainer/|\.vscode/)
         args: ["--autofix"]
 
       # Debatable -- for most projects adding files larger than 10 MB is likely to be

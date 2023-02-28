@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/gammazero/nexus/v3/client"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
@@ -13,29 +15,37 @@ import (
 
 type ProviderService struct {
 	pool   *pgxpool.Pool
-	active ProviderLookup
+	Lookup ProviderLookup
 }
 
 type (
 	ProviderLookup map[string]*ProviderData
 	ProviderData   struct {
-		Event      *model.DbEvent
-		Registered time.Time
+		Event        *model.DbEvent
+		Registered   time.Time
+		Clients      []*Client
+		ActiveClient *Client
+	}
+	// contains informations about the connected Provider Client
+	Client struct {
+		WampClient *client.Client
+		CancelFunc context.CancelFunc
+		// chan for state message processor
 	}
 )
 
 var providerService ProviderService
 
 func InitProviderService(pool *pgxpool.Pool) *ProviderService {
-	providerService = ProviderService{pool: pool, active: ProviderLookup{}}
+	providerService = ProviderService{pool: pool, Lookup: ProviderLookup{}}
 	return &providerService
 }
 
-//nolint:whitespace //can't make bot the linter and editor happy :(
+//nolint:whitespace //can't make both the linter and editor happy :(
 func (s *ProviderService) RegisterEvent(req *RegisterEventRequest) (
 	*ProviderData, error,
 ) {
-	if data, ok := s.active[req.EventKey]; ok {
+	if data, ok := s.Lookup[req.EventKey]; ok {
 		return data, nil
 	}
 	dbEvent, err := s.registerEventInDb(req)
@@ -43,11 +53,11 @@ func (s *ProviderService) RegisterEvent(req *RegisterEventRequest) (
 		return nil, err
 	}
 	data := &ProviderData{Event: dbEvent, Registered: time.Now()}
-	s.active[req.EventKey] = data
+	s.Lookup[req.EventKey] = data
 	return data, nil
 }
 
-//nolint:whitespace //can't make bot the linter and editor happy :(
+//nolint:whitespace //can't make both the linter and editor happy :(
 func (s *ProviderService) registerEventInDb(req *RegisterEventRequest) (
 	*model.DbEvent,
 	error,
@@ -63,12 +73,16 @@ func (s *ProviderService) registerEventInDb(req *RegisterEventRequest) (
 	defer tx.Rollback(context.Background())
 
 	// if there is already an event registered with that key, return that one
+
 	existing, err := event.LoadByKey(tx.Conn(), req.EventKey)
 	if err == nil {
 		return existing, nil
 	}
 
-	newEvent := model.DbEvent{Key: req.EventKey}
+	newEvent := model.DbEvent{
+		Key: req.EventKey, Name: req.EventInfo.Name, Description: req.EventInfo.Description,
+		Data: model.EventData{Info: req.EventInfo, Manifests: req.Manifests},
+	}
 	result, err = event.Create(tx.Conn(), &newEvent)
 	if err != nil {
 		return nil, err
@@ -90,4 +104,28 @@ func (s *ProviderService) registerEventInDb(req *RegisterEventRequest) (
 	}
 
 	return result, nil
+}
+
+func (s *ProviderService) StoreEventExtra(entry *model.DbEventExtra) error {
+	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
+		var trackEntry *model.DbTrack
+
+		if err := event.CreateExtra(tx.Conn(), entry); err != nil {
+			return err
+		}
+		trackEntry, err := track.LoadById(tx.Conn(), entry.Data.Track.ID)
+		if err != nil {
+			return err
+		}
+		if trackEntry.Data.Pit == nil &&
+			entry.Data.Track.Pit != nil &&
+			entry.Data.Track.Pit.LaneLength > 0 {
+
+			trackEntry.Data.Pit = entry.Data.Track.Pit
+			_, err := track.Update(tx.Conn(), trackEntry)
+			return err
+		}
+
+		return nil
+	})
 }
