@@ -1,0 +1,3 @@
+realm: racelog
+url: ws://localhost:8091/ws
+db: postgresql://postgres:secret@db:5432/iracelog

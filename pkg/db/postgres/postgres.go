@@ -42,7 +42,10 @@ func InitWithUrl(url string, opts ...PoolConfigOption) *pgxpool.Pool {
 
 	DbPool, err = pgxpool.NewWithConfig(context.Background(), dbConfig)
 	if err != nil {
-		log.Fatalf("Unable to connect to database %v\n", err)
+		log.Fatalf("Unable to create the database pool %v\n", err)
+	}
+	if err := DbPool.Ping(context.Background()); err != nil {
+		log.Fatalf("Unable to get a valid database connection %v\n", err)
 	}
 	return DbPool
 }
@@ -62,7 +65,7 @@ func (tracer *myQueryTracer) TraceQueryStart(
 	data pgx.TraceQueryStartData,
 ) context.Context {
 	// do the logging
-	tracer.log.Infow("Executing command", "sql", data.SQL, "args", data.Args)
+	tracer.log.Debugw("Executing", "sql", data.SQL, "args", data.Args)
 
 	return ctx
 }
