@@ -47,9 +47,9 @@ func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 			{name: "get_event_speedmap_by_key", handler: getSpeemapByKey},
 			{name: "get_track_info", handler: getTrackInfoByIdHandler},
 			{name: "archive.get_event_analysis", handler: getEventAnalysisById},
-			{name: "archive.avglap_over_time", handler: dummy},
+			{name: "archive.avglap_over_time", handler: getAvgLapOverTime},
 			{name: "archive.state.delta", handler: dummy},
-			{name: "archive.speedmap", handler: dummy},
+			{name: "archive.speedmap", handler: getArchivedSpeedmap},
 			{name: "get_version", handler: getVersion},
 		},
 	}
@@ -131,6 +131,34 @@ func getEventAnalysisById(pool *pgxpool.Pool) client.InvocationHandler {
 		func(entry *model.DbAnalysis) *model.AnalysisData { return &entry.Data })
 }
 
+func getArchivedSpeedmap(pool *pgxpool.Pool) client.InvocationHandler {
+	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
+		param, err := utils.ExtractRangeTuple(i)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		data, err := speedmap.LoadRange(pool, param.EventID, param.TsBegin, param.Num)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		return client.InvokeResult{Args: wamp.List{data}}
+	}
+}
+
+func getAvgLapOverTime(pool *pgxpool.Pool) client.InvocationHandler {
+	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
+		param, err := utils.ExtractParamAvgLap(i)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		data, err := speedmap.LoadAvgLapOverTime(pool, param.EventID, param.IntervalSecs)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		return client.InvokeResult{Args: wamp.List{data}}
+	}
+}
+
 type (
 	keyExtractor[K any]         func(i *wamp.Invocation) (K, error)
 	loader[K any, T any]        func(c repository.Querier, key K) (*T, error)
@@ -141,16 +169,19 @@ type (
 func getGeneric[K, T any](
 	pool *pgxpool.Pool,
 	extractor keyExtractor[K],
-	l loader[K, T],
+	loaderFunc loader[K, T],
 ) client.InvocationHandler {
-	return getGenericWithConvert(pool, extractor, l, func(entry *T) *T { return entry })
+	return getGenericWithConvert(pool,
+		extractor,
+		loaderFunc,
+		func(entry *T) *T { return entry })
 }
 
 //nolint:whitespace // can't make editor and linters both happy
 func getGenericWithConvert[K, T, R any](
 	pool *pgxpool.Pool,
 	extractor keyExtractor[K],
-	l loader[K, T],
+	loaderFunc loader[K, T],
 	postProc postProcessor[T, R],
 ) client.InvocationHandler {
 	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
@@ -159,7 +190,7 @@ func getGenericWithConvert[K, T, R any](
 			log.Logger.Error("Error extracting key", zap.Any("key", key), zap.Error(err))
 			return client.InvokeResult{Args: wamp.List{}}
 		}
-		e, err := l(pool, key)
+		e, err := loaderFunc(pool, key)
 		if err != nil {
 			log.Logger.Error("Load data", zap.Any("key", key), zap.Error(err))
 			return client.InvokeResult{Args: wamp.List{}}
