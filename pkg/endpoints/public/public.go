@@ -17,6 +17,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/car"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/speedmap"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
@@ -39,6 +40,7 @@ func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 	ret := PublicManager{
 		wampClient: wampClient,
 		endpoints: []endpointHandler{
+			{name: "get_events", handler: getEventList},
 			{name: "get_event_info_by_key", handler: getEventInfoByKeyHandler},
 			{name: "get_event_info", handler: getEventInfoByIdHandler},
 			{name: "get_event_cars", handler: getEventCarsById},
@@ -48,7 +50,7 @@ func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 			{name: "get_track_info", handler: getTrackInfoByIdHandler},
 			{name: "archive.get_event_analysis", handler: getEventAnalysisById},
 			{name: "archive.avglap_over_time", handler: getAvgLapOverTime},
-			{name: "archive.state.delta", handler: dummy},
+			{name: "archive.state.delta", handler: getStatesWithDiff},
 			{name: "archive.speedmap", handler: getArchivedSpeedmap},
 			{name: "get_version", handler: getVersion},
 		},
@@ -78,12 +80,6 @@ func getVersion(pool *pgxpool.Pool) client.InvocationHandler {
 		return client.InvokeResult{Args: wamp.List{
 			map[string]string{"ownVersion": version.Version},
 		}}
-	}
-}
-
-func dummy(pool *pgxpool.Pool) client.InvocationHandler {
-	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
-		return client.InvokeResult{Args: wamp.List{}}
 	}
 }
 
@@ -131,6 +127,16 @@ func getEventAnalysisById(pool *pgxpool.Pool) client.InvocationHandler {
 		func(entry *model.DbAnalysis) *model.AnalysisData { return &entry.Data })
 }
 
+func getEventList(pool *pgxpool.Pool) client.InvocationHandler {
+	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
+		data, err := event.LoadAll(pool)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		return client.InvokeResult{Args: wamp.List{data}}
+	}
+}
+
 func getArchivedSpeedmap(pool *pgxpool.Pool) client.InvocationHandler {
 	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
 		param, err := utils.ExtractRangeTuple(i)
@@ -156,6 +162,31 @@ func getAvgLapOverTime(pool *pgxpool.Pool) client.InvocationHandler {
 			return client.InvokeResult{Args: wamp.List{err}}
 		}
 		return client.InvokeResult{Args: wamp.List{data}}
+	}
+}
+
+func getStatesWithDiff(pool *pgxpool.Pool) client.InvocationHandler {
+	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
+		param, err := utils.ExtractRangeTuple(i)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		first, delta, err := state.LoadByEventIdWithDelta(
+			pool, param.EventID, param.TsBegin, param.Num)
+		if err != nil {
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+
+		if first == nil {
+			return client.InvokeResult{Args: wamp.List{}}
+		}
+
+		combined := make([]any, 1+len(delta))
+		combined[0] = first
+		for i, v := range delta {
+			combined[i+1] = v
+		}
+		return client.InvokeResult{Args: wamp.List{combined}}
 	}
 }
 

@@ -16,7 +16,18 @@ type StateData struct {
 
 // these attributes contain generic data according to event manifests
 type StatePayload struct {
-	Cars     []interface{} `json:"cars"`
-	Session  []interface{} `json:"session"`
-	Messages []interface{} `json:"messages"`
+	Cars     [][]interface{} `json:"cars"`
+	Session  []interface{}   `json:"session"`
+	Messages []interface{}   `json:"messages"`
+}
+
+type StateDelta struct {
+	Type      int          `json:"type"`
+	Payload   DeltaPayload `json:"payload"`
+	Timestamp float64      `json:"timestamp"`
+}
+
+type DeltaPayload struct {
+	Cars    [][3]interface{} `json:"cars"`
+	Session [][2]interface{} `json:"session"`
 }

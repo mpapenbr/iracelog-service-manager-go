@@ -51,6 +51,20 @@ func LoadById(conn repository.Querier, id int) (*model.DbEvent, error) {
 	return &event, nil
 }
 
+func LoadAll(conn repository.Querier) (ret []*model.DbEvent, err error) {
+	var rows pgx.Rows
+	if rows, err = conn.Query(context.Background(),
+		fmt.Sprintf("%s order by record_stamp desc ", selector)); err != nil {
+		return nil, err
+	}
+
+	ret, err = pgx.CollectRows[*model.DbEvent](rows,
+		func(row pgx.CollectableRow) (*model.DbEvent, error) {
+			return pgx.RowToAddrOfStructByPos[model.DbEvent](row)
+		})
+	return ret, err
+}
+
 func LoadByKey(conn repository.Querier, eventKey string) (*model.DbEvent, error) {
 	row := conn.QueryRow(context.Background(),
 		fmt.Sprintf("%s where event_key=$1", selector), eventKey)
