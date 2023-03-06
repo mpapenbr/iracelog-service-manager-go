@@ -13,16 +13,24 @@ type SpeedmapData struct {
 }
 
 type SpeedmapPayload struct {
-	Data        map[string]ClassSpeedmapData `json:"data"`
-	ChunkSize   int                          `json:"chunkSize"`
-	TimeOfDay   float64                      `json:"timeOfDay"`
-	TrackTemp   float64                      `json:"trackTemp"`
-	TrackLength float64                      `json:"trackLength"`
-	SessionTime float64                      `json:"sessionTime"`
-	CurrentPos  float64                      `json:"currentPos"`
+	Data        map[string]*ClassSpeedmapData `json:"data"`
+	ChunkSize   int                           `json:"chunkSize"`
+	TimeOfDay   float64                       `json:"timeOfDay"`
+	TrackTemp   float64                       `json:"trackTemp"`
+	TrackLength float64                       `json:"trackLength"`
+	SessionTime float64                       `json:"sessionTime"`
+	CurrentPos  float64                       `json:"currentPos"`
 }
 
 type ClassSpeedmapData struct {
 	Laptime     float64   `json:"laptime"`
 	ChunkSpeeds []float64 `json:"chunkSpeeds"`
+}
+
+type AvgLapOverTime struct {
+	Timestamp   float64            `json:"timestamp"`
+	SessionTime float64            `json:"sessionTime"`
+	TimeOfDay   float64            `json:"timeOfDay"`
+	TrackTemp   float64            `json:"trackTemp"`
+	Laptimes    map[string]float64 `json:"laptimes"`
 }
