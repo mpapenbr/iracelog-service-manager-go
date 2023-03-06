@@ -41,15 +41,12 @@ func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbSpeedmap, e
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]*model.DbSpeedmap, 0)
-	for rows.Next() {
-		var item model.DbSpeedmap
-		if err := scan(&item, rows); err != nil {
-			return nil, err
-		}
-		ret = append(ret, &item)
-	}
-	return ret, nil
+
+	ret, err := pgx.CollectRows[*model.DbSpeedmap](rows,
+		func(row pgx.CollectableRow) (*model.DbSpeedmap, error) {
+			return pgx.RowToAddrOfStructByPos[model.DbSpeedmap](row)
+		})
+	return ret, err
 }
 
 //nolint:lll //ok
@@ -75,23 +72,20 @@ func LoadLatestByEventKey(conn repository.Querier, eventKey string) (*model.DbSp
 
 //nolint:whitespace // can't make both editor and linter happy
 func LoadRange(conn repository.Querier, eventID int, tsBegin float64, num int) (
-	[]*model.SpeedmapData, error,
+	ret []*model.SpeedmapData, err error,
 ) {
-	if rows, err := conn.Query(context.Background(), `
+	var rows pgx.Rows
+	if rows, err = conn.Query(context.Background(), `
 	select data from speedmap
     where event_id=$1 and (data->'timestamp')::numeric > $2
     order by (data->'timestamp')::numeric asc
     limit $3`,
 		eventID, tsBegin, num); err == nil {
-		ret := make([]*model.SpeedmapData, 0)
-		for rows.Next() {
-			var item model.SpeedmapData
-			if scanErr := rows.Scan(&item); scanErr != nil {
-				return nil, scanErr
-			}
-			ret = append(ret, &item)
-		}
-		return ret, nil
+		ret, err = pgx.CollectRows[*model.SpeedmapData](rows,
+			func(row pgx.CollectableRow) (*model.SpeedmapData, error) {
+				return pgx.RowToAddrOfStructByPos[model.SpeedmapData](row)
+			})
+		return ret, err
 	} else {
 		return nil, err
 	}
@@ -184,7 +178,3 @@ ORDER BY s.id ASC
 
 // little helper
 const selector = string(`select id,event_id, data from speedmap`)
-
-func scan(e *model.DbSpeedmap, rows pgx.Rows) error {
-	return rows.Scan(&e.ID, &e.EventID, &e.Data)
-}
