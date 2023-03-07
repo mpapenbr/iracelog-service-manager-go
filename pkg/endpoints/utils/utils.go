@@ -6,17 +6,15 @@ import (
 
 	"github.com/gammazero/nexus/v3/client"
 	"github.com/gammazero/nexus/v3/wamp"
-	"go.uber.org/zap"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 )
 
 func NewClient() (*client.Client, error) {
-	logger := zap.NewStdLog(log.Logger)
 	cfg := client.Config{
-		Realm:        config.Realm,
-		Logger:       logger,
+		Realm: config.Realm,
+		// Logger:       logger,
 		HelloDetails: wamp.Dict{"authid": "backend"},
 		AuthHandlers: map[string]client.AuthFunc{
 			"ticket": func(*wamp.Challenge) (string, wamp.Dict) {
@@ -24,7 +22,7 @@ func NewClient() (*client.Client, error) {
 			},
 		},
 	}
-	log.Logger.Info("Connecting to", zap.String("url", config.URL))
+	log.Info("Connecting to", log.String("url", config.URL))
 	return client.ConnectNet(context.Background(), config.URL, cfg)
 }
 

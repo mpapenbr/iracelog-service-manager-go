@@ -35,7 +35,7 @@ type endpointHandler struct {
 func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 	wampClient, err := utils.NewClient()
 	if err != nil {
-		log.Logger.Fatal("Could not connect wamp client", zap.Error(err))
+		log.Fatal("Could not connect wamp client", log.ErrorField(err))
 	}
 	ret := PublicManager{
 		wampClient: wampClient,
@@ -58,7 +58,7 @@ func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 	for _, endpoint := range ret.endpoints {
 		name := fmt.Sprintf("racelog.public.%s", endpoint.name)
 		if err := wampClient.Register(name, endpoint.handler(pool), wamp.Dict{}); err != nil {
-			log.Logger.Error("Register", zap.String("endpoint", name), zap.Error(err))
+			log.Error("Register", zap.String("endpoint", name), log.ErrorField(err))
 		}
 	}
 	return &ret, nil
@@ -67,16 +67,17 @@ func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 func (pub *PublicManager) Shutdown() {
 	for _, endpoint := range pub.endpoints {
 		name := fmt.Sprintf("racelog.public.%s", endpoint.name)
-		log.Logger.Info("Unregistering ", zap.String("endpoint", name))
+		log.Info("Unregistering ", zap.String("endpoint", name))
 		err := pub.wampClient.Unregister(name)
 		if err != nil {
-			log.Logger.Error("Failed to unregister procedure:", zap.Error(err))
+			log.Error("Failed to unregister procedure:", log.ErrorField(err))
 		}
 	}
 }
 
 func getVersion(pool *pgxpool.Pool) client.InvocationHandler {
 	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
+		log.Info("get_version")
 		return client.InvokeResult{Args: wamp.List{
 			map[string]string{"ownVersion": version.Version},
 		}}
@@ -218,12 +219,12 @@ func getGenericWithConvert[K, T, R any](
 	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
 		key, err := extractor(i)
 		if err != nil {
-			log.Logger.Error("Error extracting key", zap.Any("key", key), zap.Error(err))
+			log.Error("Error extracting key", zap.Any("key", key), log.ErrorField(err))
 			return client.InvokeResult{Args: wamp.List{}}
 		}
 		e, err := loaderFunc(pool, key)
 		if err != nil {
-			log.Logger.Error("Load data", zap.Any("key", key), zap.Error(err))
+			log.Error("Load data", zap.Any("key", key), log.ErrorField(err))
 			return client.InvokeResult{Args: wamp.List{}}
 		}
 		result := postProc(e)

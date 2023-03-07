@@ -5,7 +5,6 @@ import (
 	"os/signal"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
@@ -27,40 +26,79 @@ func NewServerCmd() *cobra.Command {
 		"p",
 		"",
 		"Password for backend user in realm")
+	cmd.Flags().StringVar(&config.LogLevel,
+		"logLevel",
+		"info",
+		"controls the log level (debug, info, warn, error, fatal)")
+	cmd.Flags().StringVar(&config.SQLLogLevel,
+		"sqlLogLevel",
+		"debug",
+		"controls the log level for sql methods")
+	cmd.Flags().StringVar(&config.LogFormat,
+		"logFormat",
+		"json",
+		"controls the log output format")
 	return cmd
 }
 
-func startServer() error {
-	log.InitDevelopmentLogger()
+func parseLogLevel(l string, defaultVal log.Level) log.Level {
+	level, err := log.ParseLevel(l)
+	if err != nil {
+		return defaultVal
+	}
+	return level
+}
 
-	log.Logger.Debug("Config:",
-		zap.String("url", config.URL),
-		zap.String("db", config.DB),
-		zap.String("realm", config.Realm),
-		zap.String("password", config.Password),
+//nolint:funlen // by design
+func startServer() error {
+	var logger *log.Logger
+	switch config.LogFormat {
+	case "json":
+		logger = log.New(
+			os.Stderr,
+			parseLogLevel(config.LogLevel, log.InfoLevel),
+			log.WithCaller(true),
+			log.AddCallerSkip(1))
+	default:
+		logger = log.DevLogger(
+			os.Stderr,
+			parseLogLevel(config.LogLevel, log.DebugLevel),
+			log.WithCaller(true),
+			log.AddCallerSkip(1))
+	}
+
+	log.ResetDefault(logger)
+
+	log.Debug("Config:",
+		log.String("url", config.URL),
+		log.String("db", config.DB),
+		log.String("realm", config.Realm),
+		log.String("password", config.Password),
 	)
 
-	log.Logger.Info("Starting server")
-	pool := postgres.InitWithUrl(config.DB, postgres.WithTracer(log.Logger.Sugar()))
+	log.Info("Starting server")
+	pool := postgres.InitWithUrl(
+		config.DB,
+		postgres.WithTracer(logger, parseLogLevel(config.SQLLogLevel, log.DebugLevel)))
 
 	pm, err := provider.InitProviderEndpoints(pool)
 	if err != nil {
-		log.Logger.Error("server could not be started", zap.Error(err))
+		log.Error("server could not be started", log.ErrorField(err))
 		return err
 	}
 
 	pub, err := public.InitPublicEndpoints(pool)
 	if err != nil {
-		log.Logger.Error("server could not be started", zap.Error(err))
+		log.Error("server could not be started", log.ErrorField(err))
 		return err
 	}
 
-	log.Logger.Info("Server started")
+	log.Info("Server started")
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 	v := <-sigChan
-	log.Logger.Debug("Got signal ", zap.Any("signal", v))
+	log.Debug("Got signal ", log.Any("signal", v))
 	pm.Shutdown()
 	pub.Shutdown()
 
@@ -71,6 +109,6 @@ func startServer() error {
 	// 	pm.Shutdown()
 	// }
 
-	log.Logger.Info("Server terminated")
+	log.Info("Server terminated")
 	return nil
 }
