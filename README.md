@@ -372,3 +372,5 @@ The remaining labels can be created as needed!
 [creating-secrets]: https://docs.github.com/en/actions/security-guides/encrypted-secrets#creating-encrypted-secrets-for-a-repository
 [iracelog-service-manager]: https://github.com/mpapenbr/iracelog-service-manager
 [iracelog-documentation-link]: https://github.com/mpapenbr/iracelog-documentation
+[zap-package-log]: https://www.sobyte.net/post/2022-03/uber-zap-advanced-usage/
+[go-logging]: https://betterstack.com/community/guides/logging/logging-in-go/

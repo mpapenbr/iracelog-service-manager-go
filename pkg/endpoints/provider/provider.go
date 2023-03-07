@@ -9,7 +9,6 @@ import (
 	"github.com/gammazero/nexus/v3/client"
 	"github.com/gammazero/nexus/v3/wamp"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go.uber.org/zap"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/utils"
@@ -37,7 +36,7 @@ type ProviderResponseData struct {
 func InitProviderEndpoints(pool *pgxpool.Pool) (*ProviderManager, error) {
 	wampClient, err := utils.NewClient()
 	if err != nil {
-		log.Logger.Fatal("Could not connect wamp client", zap.Error(err))
+		log.Fatal("Could not connect wamp client", log.ErrorField(err))
 	}
 
 	ret := &ProviderManager{
@@ -63,16 +62,16 @@ func InitProviderEndpoints(pool *pgxpool.Pool) (*ProviderManager, error) {
 }
 
 func (pm *ProviderManager) Shutdown() {
-	log.Logger.Info("Unregister provider manager")
+	log.Info("Unregister provider manager")
 	for _, endpoint := range []string{
 		"racelog.dataprovider.register_provider",
 		"racelog.dataprovider.remove_provider",
 		"racelog.public.list_providers",
 	} {
-		log.Logger.Info("Unregistering ", zap.String("endpoint", endpoint))
+		log.Info("Unregistering ", log.String("endpoint", endpoint))
 		err := pm.wampClient.Unregister(endpoint)
 		if err != nil {
-			log.Logger.Error("Failed to unregister procedure:", zap.Error(err))
+			log.Error("Failed to unregister procedure:", log.ErrorField(err))
 		}
 	}
 }
@@ -80,7 +79,7 @@ func (pm *ProviderManager) Shutdown() {
 func (pm *ProviderManager) handleListProvider() error {
 	return pm.wampClient.Register("racelog.public.list_providers",
 		func(ctx context.Context, inv *wamp.Invocation) client.InvokeResult {
-			log.Logger.Sugar().Info("Received list provider request")
+			log.Info("Received list provider request")
 
 			ret := make([]*ProviderResponseData, len(pm.pService.Lookup))
 			idx := 0
@@ -96,13 +95,13 @@ func (pm *ProviderManager) handleListProvider() error {
 func (pm *ProviderManager) handleRegisterProvider() error {
 	return pm.wampClient.Register("racelog.dataprovider.register_provider",
 		func(ctx context.Context, inv *wamp.Invocation) client.InvokeResult {
-			log.Logger.Sugar().Info("Received register provider request")
+			log.Info("Received register provider request")
 
 			req, err := extractRegisterRequest(inv)
 			if err != nil {
 				return client.InvokeResult{Args: wamp.List{"invalid registration request"}}
 			}
-			log.Logger.Debug("reveiced data", zap.Any("data", req))
+			log.Debug("reveiced data", log.Any("data", req))
 			providerData, err := pm.pService.RegisterEvent(req)
 			if err != nil {
 				return client.InvokeResult{Args: wamp.List{"could not register event"}}
@@ -116,7 +115,7 @@ func (pm *ProviderManager) handleRegisterProvider() error {
 
 // publish the new provider on the internal manager topic
 func (pm *ProviderManager) publishNewProvider(pd *service.ProviderData) {
-	log.Logger.Debug("publish new provider", zap.String("eventKey", pd.Event.Key))
+	log.Debug("publish new provider", log.String("eventKey", pd.Event.Key))
 	msg := PublishNew{Type: Register, Payload: NewProviderPayload{
 		EventKey:  pd.Event.Key,
 		Info:      pd.Event.Data.Info,
@@ -124,16 +123,16 @@ func (pm *ProviderManager) publishNewProvider(pd *service.ProviderData) {
 	}}
 	err := pm.wampClient.Publish("racelog.manager.provider", nil, wamp.List{msg}, nil)
 	if err != nil {
-		log.Logger.Warn("Publish new provider", zap.Error(err))
+		log.Warn("Publish new provider", log.ErrorField(err))
 	}
 }
 
 func (pm *ProviderManager) publishRemovedProvider(pd *service.ProviderData) {
-	log.Logger.Debug("publish removed provider", zap.String("eventKey", pd.Event.Key))
+	log.Debug("publish removed provider", log.String("eventKey", pd.Event.Key))
 	msg := PublishRemoved{Type: Removed, Payload: pd.Event.Key}
 	err := pm.wampClient.Publish("racelog.manager.provider", nil, wamp.List{msg}, nil)
 	if err != nil {
-		log.Logger.Warn("Publish removed provider", zap.Error(err))
+		log.Warn("Publish removed provider", log.ErrorField(err))
 	}
 }
 
@@ -141,8 +140,8 @@ func (pm *ProviderManager) publishRemovedProvider(pd *service.ProviderData) {
 func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 	cli, err := utils.NewClient()
 	if err != nil {
-		log.Logger.Error("Could not establish data handlers for event",
-			zap.Error(err))
+		log.Error("Could not establish data handlers for event",
+			log.ErrorField(err))
 		return
 	}
 
@@ -166,25 +165,25 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 	}
 
 	for _, t := range topics {
-		log.Logger.Debug("Subscribing", zap.String("topic", t.topic))
+		log.Debug("Subscribing", log.String("topic", t.topic))
 		if err := cli.Subscribe(t.topic, t.handler, wamp.Dict{}); err != nil {
-			log.Logger.Error("Could not subscribe",
-				zap.String("topic", t.topic),
-				zap.Error(err))
+			log.Error("Could not subscribe",
+				log.String("topic", t.topic),
+				log.ErrorField(err))
 			return
 		}
 	}
 
-	log.Logger.Debug("Creating guard", zap.String("eventKey", pd.Event.Key))
+	log.Debug("Creating guard", log.String("eventKey", pd.Event.Key))
 	go func() {
 		done := <-ctx.Done()
-		log.Logger.Debug("ctx.Done() received.", zap.Any("ctxDone", done))
+		log.Debug("ctx.Done() received.", log.Any("ctxDone", done))
 		for _, t := range topics {
 			if err := cli.Unsubscribe(t.topic); err != nil {
-				log.Logger.Error("Error unsubscribing",
-					zap.String("topic", t.topic), zap.Error(err))
+				log.Error("Error unsubscribing",
+					log.String("topic", t.topic), log.ErrorField(err))
 			} else {
-				log.Logger.Debug("Unsubscribed", zap.String("topic", t.topic))
+				log.Debug("Unsubscribed", log.String("topic", t.topic))
 			}
 		}
 	}()
@@ -193,19 +192,19 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 //nolint:lll,dupl //by design
 func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
-		log.Logger.Debug("received message", zap.Any("msg", event.Arguments))
+		log.Debug("received message", log.Any("msg", event.Arguments))
 		stateData, err := prepareStateData(event)
 		if err != nil {
-			log.Logger.Error("Error preparing stateData",
-				zap.Error(err))
+			log.Error("Error preparing stateData",
+				log.ErrorField(err))
 			return
 		}
 		if err := pm.stateService.AddState(&model.DbState{
 			EventID: pd.Event.ID,
 			Data:    *stateData,
 		}); err != nil {
-			log.Logger.Error("Error storing stateData",
-				zap.Error(err))
+			log.Error("Error storing stateData",
+				log.ErrorField(err))
 			return
 		}
 	}
@@ -214,19 +213,19 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 //nolint:lll,dupl //by design
 func (pm *ProviderManager) speedmapMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
-		log.Logger.Debug("received message", zap.Any("msg", event.Arguments))
+		log.Debug("received message", log.Any("msg", event.Arguments))
 		speedmapData, err := prepareSpeedmapData(event)
 		if err != nil {
-			log.Logger.Error("Error preparing speedmapData",
-				zap.Error(err))
+			log.Error("Error preparing speedmapData",
+				log.ErrorField(err))
 			return
 		}
 		if err := pm.speedmapService.AddSpeedmap(&model.DbSpeedmap{
 			EventID: pd.Event.ID,
 			Data:    *speedmapData,
 		}); err != nil {
-			log.Logger.Error("Error storing speedmapData",
-				zap.Error(err))
+			log.Error("Error storing speedmapData",
+				log.ErrorField(err))
 			return
 		}
 	}
@@ -235,19 +234,19 @@ func (pm *ProviderManager) speedmapMessageHandler(pd *service.ProviderData) clie
 //nolint:lll,dupl //by design
 func (pm *ProviderManager) carMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
-		log.Logger.Debug("received message", zap.Any("msg", event.Arguments))
+		log.Debug("received message", log.Any("msg", event.Arguments))
 		carData, err := prepareCarData(event)
 		if err != nil {
-			log.Logger.Error("Error preparing carData",
-				zap.Error(err))
+			log.Error("Error preparing carData",
+				log.ErrorField(err))
 			return
 		}
 		if err := pm.carService.AddCar(&model.DbCar{
 			EventID: pd.Event.ID,
 			Data:    *carData,
 		}); err != nil {
-			log.Logger.Error("Error storing carData",
-				zap.Error(err))
+			log.Error("Error storing carData",
+				log.ErrorField(err))
 			return
 		}
 	}
@@ -310,7 +309,7 @@ func prepareCarData(event *wamp.Event) (
 func (pm *ProviderManager) handleRemoveProvider() error {
 	return pm.wampClient.Register("racelog.dataprovider.remove_provider",
 		func(ctx context.Context, inv *wamp.Invocation) client.InvokeResult {
-			log.Logger.Sugar().Info("Received remove provider request")
+			log.Info("Received remove provider request")
 
 			req, err := utils.ExtractEventKey(inv)
 			if err != nil {
@@ -318,9 +317,9 @@ func (pm *ProviderManager) handleRemoveProvider() error {
 					Args: wamp.List{"invalid remove registration request"},
 				}
 			}
-			log.Logger.Debug("received data", zap.String("eventKey", req))
+			log.Debug("received data", log.String("eventKey", req))
 			if pd, ok := pm.pService.Lookup[req]; ok {
-				log.Logger.Debug("Calling cancel func", zap.String("eventKey", req))
+				log.Debug("Calling cancel func", log.String("eventKey", req))
 				pd.ActiveClient.CancelFunc()
 				pm.publishRemovedProvider(pd)
 				delete(pm.pService.Lookup, req)
@@ -338,7 +337,7 @@ func (pm *ProviderManager) handleRemoveProvider() error {
 func (pm *ProviderManager) handleEventExtraData() error {
 	return pm.wampClient.Register("racelog.dataprovider.store_event_extra_data",
 		func(ctx context.Context, inv *wamp.Invocation) client.InvokeResult {
-			log.Logger.Info("Received extra event data ", zap.Any("inv", inv))
+			log.Info("Received extra event data ", log.Any("inv", inv))
 			eventKey, extData, err := extractExtraData(inv)
 			if err != nil {
 				return client.InvokeResult{
@@ -350,9 +349,9 @@ func (pm *ProviderManager) handleEventExtraData() error {
 					EventID: pd.Event.ID,
 					Data:    *extData,
 				}); err != nil {
-					log.Logger.Error("store extra data",
-						zap.Error(err),
-						zap.Any("extraData", inv.Arguments))
+					log.Error("store extra data",
+						log.ErrorField(err),
+						log.Any("extraData", inv.Arguments))
 					return client.InvokeResult{
 						Args: wamp.List{"error processing extra data"},
 					}

@@ -2,22 +2,22 @@ package postgres
 
 import (
 	"context"
-	"log"
 	"os"
 
 	pgxuuid "github.com/jackc/pgx-gofrs-uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go.uber.org/zap"
+
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
 )
 
 var DbPool *pgxpool.Pool
 
 type PoolConfigOption func(cfg *pgxpool.Config)
 
-func WithTracer(logger *zap.SugaredLogger) PoolConfigOption {
+func WithTracer(logger *log.Logger, level log.Level) PoolConfigOption {
 	return func(cfg *pgxpool.Config) {
-		cfg.ConnConfig.Tracer = &myQueryTracer{log: logger}
+		cfg.ConnConfig.Tracer = &myQueryTracer{log: logger, level: level}
 	}
 }
 
@@ -28,7 +28,7 @@ func InitDB() *pgxpool.Pool {
 func InitWithUrl(url string, opts ...PoolConfigOption) *pgxpool.Pool {
 	dbConfig, err := pgxpool.ParseConfig(url)
 	if err != nil {
-		log.Fatalf("Unable to parse database config %v\n", err)
+		log.Fatal("Unable to parse database config %v\n", log.ErrorField(err))
 	}
 
 	//nolint:all  dbConfig.ConnConfig.Tracer = &myQueryTracer{log: mylog.Logger.Sugar()}
@@ -42,10 +42,10 @@ func InitWithUrl(url string, opts ...PoolConfigOption) *pgxpool.Pool {
 
 	DbPool, err = pgxpool.NewWithConfig(context.Background(), dbConfig)
 	if err != nil {
-		log.Fatalf("Unable to create the database pool %v\n", err)
+		log.Fatal("Unable to create the database pool %v\n", log.ErrorField(err))
 	}
 	if err := DbPool.Ping(context.Background()); err != nil {
-		log.Fatalf("Unable to get a valid database connection %v\n", err)
+		log.Fatal("Unable to get a valid database connection %v\n", log.ErrorField(err))
 	}
 	return DbPool
 }
@@ -55,8 +55,8 @@ func CloseDb() {
 }
 
 type myQueryTracer struct {
-	log *zap.SugaredLogger
-	// level zapcore.Level
+	log   *log.Logger
+	level log.Level
 }
 
 func (tracer *myQueryTracer) TraceQueryStart(
@@ -65,7 +65,9 @@ func (tracer *myQueryTracer) TraceQueryStart(
 	data pgx.TraceQueryStartData,
 ) context.Context {
 	// do the logging
-	tracer.log.Debugw("Executing", "sql", data.SQL, "args", data.Args)
+	tracer.log.Log(tracer.level, "Executing",
+		log.String("sql", data.SQL),
+		log.Any("args", data.Args))
 
 	return ctx
 }
