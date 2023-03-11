@@ -39,6 +39,9 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--platform=linux/amd64"
 
+    extra_files:
+      - pkg/db/migrate/migrations
+
 docker_manifests:
   - name_template: "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
     image_templates:

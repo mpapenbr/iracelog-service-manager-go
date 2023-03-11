@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
 	serverCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
@@ -61,8 +62,13 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.Realm, "realm",
 		"racelog",
 		"Realm to use for WAMP server")
+	rootCmd.PersistentFlags().StringVar(&config.WaitForServices,
+		"wait-for-services",
+		"15s",
+		"Duration to wait for other services to be ready")
 
 	// add commands here
+	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())
 	rootCmd.AddCommand(serverCmd.NewServerCmd())
 }
 

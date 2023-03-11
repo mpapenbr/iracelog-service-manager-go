@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"regexp"
 	"sync"
 	"time"
 
@@ -31,10 +30,7 @@ func NewServerCmd() *cobra.Command {
 		"p",
 		"",
 		"Password for backend user in realm")
-	cmd.Flags().StringVar(&config.WaitForServices,
-		"wait-for-services",
-		"15s",
-		"Duration to wait for other services to be ready")
+
 	cmd.Flags().StringVar(&config.LogLevel,
 		"logLevel",
 		"info",
@@ -143,7 +139,7 @@ func waitForRequiredServices() {
 		}
 		wg.Done()
 	}
-	if wsAddr, proto := extractFromWebsocketUrl(config.URL); wsAddr != "" {
+	if wsAddr, proto := utils.ExtractFromWebsocketUrl(config.URL); wsAddr != "" {
 		wg.Add(1)
 		go checkTcp(wsAddr)
 		wg.Add(1)
@@ -155,53 +151,11 @@ func waitForRequiredServices() {
 		}
 		go checkHttp(url)
 	}
-	if postgresAddr := extractFromDBUrl(config.DB); postgresAddr != "" {
+	if postgresAddr := utils.ExtractFromDBUrl(config.DB); postgresAddr != "" {
 		wg.Add(1)
 		go checkTcp(postgresAddr)
 	}
 	log.Debug("Waiting for connection checks to return")
 	wg.Wait()
 	log.Debug("Required services are available")
-}
-
-func extractFromWebsocketUrl(url string) (string, string) {
-	param := resolveRegex(
-		"^(?P<proto>ws|wss)://(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
-	if len(param) == 0 {
-		return "", ""
-	}
-	if port, ok := param["port"]; ok && len(port) > 0 {
-		// if port is found, the addr contains our wanted value
-		return param["addr"], param["proto"]
-	} else if proto := param["proto"]; proto == "wss" {
-		return fmt.Sprintf("%s:443", param["addr"]), proto
-	} else {
-		return fmt.Sprintf("%s:80", param["addr"]), proto
-	}
-}
-
-func extractFromDBUrl(url string) string {
-	param := resolveRegex(
-		"^postgresql://(.*@)(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
-	if len(param) == 0 {
-		return ""
-	}
-	if port, ok := param["port"]; ok && len(port) > 0 {
-		return param["addr"] // if port is found, the addr contains our wanted value
-	} else {
-		return fmt.Sprintf("%s:5432", param["addr"])
-	}
-}
-
-func resolveRegex(regEx, url string) (paramsMap map[string]string) {
-	compRegEx := regexp.MustCompile(regEx)
-	match := compRegEx.FindStringSubmatch(url)
-
-	paramsMap = make(map[string]string)
-	for i, name := range compRegEx.SubexpNames() {
-		if i > 0 && i <= len(match) {
-			paramsMap[name] = match[i]
-		}
-	}
-	return paramsMap
 }
