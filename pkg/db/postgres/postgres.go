@@ -28,10 +28,9 @@ func InitDB() *pgxpool.Pool {
 func InitWithUrl(url string, opts ...PoolConfigOption) *pgxpool.Pool {
 	dbConfig, err := pgxpool.ParseConfig(url)
 	if err != nil {
-		log.Fatal("Unable to parse database config %v\n", log.ErrorField(err))
+		log.Fatal("Unable to parse database config", log.ErrorField(err))
 	}
 
-	//nolint:all  dbConfig.ConnConfig.Tracer = &myQueryTracer{log: mylog.Logger.Sugar()}
 	dbConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		pgxuuid.Register(conn.TypeMap())
 		return nil
@@ -42,10 +41,10 @@ func InitWithUrl(url string, opts ...PoolConfigOption) *pgxpool.Pool {
 
 	DbPool, err = pgxpool.NewWithConfig(context.Background(), dbConfig)
 	if err != nil {
-		log.Fatal("Unable to create the database pool %v\n", log.ErrorField(err))
+		log.Fatal("Unable to create the database pool", log.ErrorField(err))
 	}
 	if err := DbPool.Ping(context.Background()); err != nil {
-		log.Fatal("Unable to get a valid database connection %v\n", log.ErrorField(err))
+		log.Fatal("Unable to get a valid database connection", log.ErrorField(err))
 	}
 	return DbPool
 }
