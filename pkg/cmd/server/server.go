@@ -1,8 +1,12 @@
 package server
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
+	"regexp"
+	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -11,6 +15,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/public"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 func NewServerCmd() *cobra.Command {
@@ -26,6 +31,10 @@ func NewServerCmd() *cobra.Command {
 		"p",
 		"",
 		"Password for backend user in realm")
+	cmd.Flags().StringVar(&config.WaitForServices,
+		"wait-for-services",
+		"15s",
+		"Duration to wait for other services to be ready")
 	cmd.Flags().StringVar(&config.LogLevel,
 		"logLevel",
 		"info",
@@ -75,6 +84,7 @@ func startServer() error {
 		log.String("realm", config.Realm),
 		log.String("password", config.Password),
 	)
+	waitForRequiredServices()
 
 	log.Info("Starting server")
 	pool := postgres.InitWithUrl(
@@ -111,4 +121,87 @@ func startServer() error {
 
 	log.Info("Server terminated")
 	return nil
+}
+
+func waitForRequiredServices() {
+	timeout, err := time.ParseDuration(config.WaitForServices)
+	if err != nil {
+		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
+		timeout = 60 * time.Second
+	}
+
+	wg := sync.WaitGroup{}
+	checkTcp := func(addr string) {
+		if err = utils.WaitForTCP(addr, timeout); err != nil {
+			log.Fatal("required services not ready", log.ErrorField(err))
+		}
+		wg.Done()
+	}
+	checkHttp := func(url string) {
+		if err = utils.WaitForHttpResponse(url, timeout); err != nil {
+			log.Fatal("required services not ready", log.ErrorField(err))
+		}
+		wg.Done()
+	}
+	if wsAddr, proto := extractFromWebsocketUrl(config.URL); wsAddr != "" {
+		wg.Add(1)
+		go checkTcp(wsAddr)
+		wg.Add(1)
+		var url string
+		if proto == "wss" {
+			url = fmt.Sprintf("https://%s/info", wsAddr)
+		} else {
+			url = fmt.Sprintf("http://%s/info", wsAddr)
+		}
+		go checkHttp(url)
+	}
+	if postgresAddr := extractFromDBUrl(config.DB); postgresAddr != "" {
+		wg.Add(1)
+		go checkTcp(postgresAddr)
+	}
+	log.Debug("Waiting for connection checks to return")
+	wg.Wait()
+	log.Debug("Required services are available")
+}
+
+func extractFromWebsocketUrl(url string) (string, string) {
+	param := resolveRegex(
+		"^(?P<proto>ws|wss)://(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
+	if len(param) == 0 {
+		return "", ""
+	}
+	if port, ok := param["port"]; ok && len(port) > 0 {
+		// if port is found, the addr contains our wanted value
+		return param["addr"], param["proto"]
+	} else if proto := param["proto"]; proto == "wss" {
+		return fmt.Sprintf("%s:443", param["addr"]), proto
+	} else {
+		return fmt.Sprintf("%s:80", param["addr"]), proto
+	}
+}
+
+func extractFromDBUrl(url string) string {
+	param := resolveRegex(
+		"^postgresql://(.*@)(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
+	if len(param) == 0 {
+		return ""
+	}
+	if port, ok := param["port"]; ok && len(port) > 0 {
+		return param["addr"] // if port is found, the addr contains our wanted value
+	} else {
+		return fmt.Sprintf("%s:5432", param["addr"])
+	}
+}
+
+func resolveRegex(regEx, url string) (paramsMap map[string]string) {
+	compRegEx := regexp.MustCompile(regEx)
+	match := compRegEx.FindStringSubmatch(url)
+
+	paramsMap = make(map[string]string)
+	for i, name := range compRegEx.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			paramsMap[name] = match[i]
+		}
+	}
+	return paramsMap
 }
