@@ -52,9 +52,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
 		"config file (default is $HOME/.ism.yml)")
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().StringVar(&config.DB, "db",
 		"postgresql://DB_USERNAME:DB_USER_PASSWORD@DB_HOST:5432/iracelog",
 		"Connection string for the database")
@@ -92,10 +89,11 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-		bindFlags(rootCmd, viper.GetViper())
-		for _, cmd := range rootCmd.Commands() {
-			bindFlags(cmd, viper.GetViper())
-		}
+	}
+
+	bindFlags(rootCmd, viper.GetViper())
+	for _, cmd := range rootCmd.Commands() {
+		bindFlags(cmd, viper.GetViper())
 	}
 }
 
