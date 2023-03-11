@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -52,4 +53,46 @@ func WaitForHttpResponse(url string, timeout time.Duration) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 	return fmt.Errorf("%s could not be reached after %v", url, timeout)
+}
+
+func ExtractFromWebsocketUrl(url string) (addr, proto string) {
+	param := resolveRegex(
+		"^(?P<proto>ws|wss)://(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
+	if len(param) == 0 {
+		return "", ""
+	}
+	if port, ok := param["port"]; ok && len(port) > 0 {
+		// if port is found, the addr contains our wanted value
+		return param["addr"], param["proto"]
+	} else if proto := param["proto"]; proto == "wss" {
+		return fmt.Sprintf("%s:443", param["addr"]), proto
+	} else {
+		return fmt.Sprintf("%s:80", param["addr"]), proto
+	}
+}
+
+func ExtractFromDBUrl(url string) string {
+	param := resolveRegex(
+		"^postgresql://(.*@)(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
+	if len(param) == 0 {
+		return ""
+	}
+	if port, ok := param["port"]; ok && len(port) > 0 {
+		return param["addr"] // if port is found, the addr contains our wanted value
+	} else {
+		return fmt.Sprintf("%s:5432", param["addr"])
+	}
+}
+
+func resolveRegex(regEx, url string) (paramsMap map[string]string) {
+	compRegEx := regexp.MustCompile(regEx)
+	match := compRegEx.FindStringSubmatch(url)
+
+	paramsMap = make(map[string]string)
+	for i, name := range compRegEx.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			paramsMap[name] = match[i]
+		}
+	}
+	return paramsMap
 }

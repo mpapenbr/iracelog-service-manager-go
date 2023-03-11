@@ -13,6 +13,14 @@
       "args": ["server", "--logFormat", "text", "--logLevel", "info"]
     },
     {
+      "name": "Migrate",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "args": ["migrate"]
+    },
+    {
       "name": "Launch Package",
       "type": "go",
       "request": "launch",
