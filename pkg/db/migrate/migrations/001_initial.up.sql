@@ -51,7 +51,7 @@ ALTER TABLE analysis
 
 CREATE TABLE IF NOT EXISTS car
 (
-   id        integer,
+   id        serial,
    event_id  integer   NOT NULL,
    data      jsonb
 );
