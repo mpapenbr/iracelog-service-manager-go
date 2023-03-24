@@ -13,11 +13,11 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-func Create(conn repository.Querier, state *model.DbSpeedmap) error {
+func Create(conn repository.Querier, sm *model.DbSpeedmap) error {
 	_, err := conn.Exec(
 		context.Background(),
 		"insert into speedmap (event_id, data) values ($1,$2)",
-		state.EventID, state.Data)
+		sm.EventID, sm.Data)
 	if err != nil {
 		return err
 	}
@@ -76,16 +76,24 @@ func LoadRange(conn repository.Querier, eventID int, tsBegin float64, num int) (
 ) {
 	var rows pgx.Rows
 	if rows, err = conn.Query(context.Background(), `
-	select data from speedmap
+	select id,event_id,data from speedmap
     where event_id=$1 and (data->'timestamp')::numeric > $2
     order by (data->'timestamp')::numeric asc
     limit $3`,
 		eventID, tsBegin, num); err == nil {
-		ret, err = pgx.CollectRows[*model.SpeedmapData](rows,
-			func(row pgx.CollectableRow) (*model.SpeedmapData, error) {
-				return pgx.RowToAddrOfStructByPos[model.SpeedmapData](row)
+		tmp, collErr := pgx.CollectRows[*model.DbSpeedmap](rows,
+			func(row pgx.CollectableRow) (*model.DbSpeedmap, error) {
+				return pgx.RowToAddrOfStructByPos[model.DbSpeedmap](row)
 			})
-		return ret, err
+		if collErr == nil {
+			ret = make([]*model.SpeedmapData, len(tmp))
+			for i, v := range tmp {
+				ret[i] = &v.Data
+			}
+		} else {
+			ret = nil
+		}
+		return ret, collErr
 	} else {
 		return nil, err
 	}
