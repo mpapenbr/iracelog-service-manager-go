@@ -46,7 +46,7 @@ template: |
   ---
 
 footer: |
-  Current Release: [v$RESOLVED_VERSION](../tag/v$RESOLVED_VERSION)
-  Previous Release: [$PREVIOUS_TAG](../tag/$PREVIOUS_TAG)
+  Current Release: [v$RESOLVED_VERSION]($REPOSITORY/tag/v$RESOLVED_VERSION)
+  Previous Release: [$PREVIOUS_TAG]($REPOSITORY/tag/$PREVIOUS_TAG)
 
-  [Detailed comparison](../../compare/$PREVIOUS_TAG...v$RESOLVED_VERSION)
+  [Detailed comparison]($REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION)
