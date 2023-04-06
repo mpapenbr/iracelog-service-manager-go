@@ -17,8 +17,8 @@ type TrackInfo struct {
 }
 
 type Sector struct {
-	SectorNum      int     `json:"sectorNum"`
-	SectorStartPct float64 `json:"sectorStartPct"`
+	SectorNum      int
+	SectorStartPct float64
 }
 type PitInfo struct {
 	Exit       float64 `json:"exit"`
