@@ -32,6 +32,16 @@ func CreateExtra(conn repository.Querier, event *model.DbEventExtra) error {
 	return err
 }
 
+// deletes the extra event data, returns number of rows deleted.
+func DeleteExtraById(conn repository.Querier, id int) (int, error) {
+	cmdTag, err := conn.Exec(context.Background(),
+		"delete from event_ext where event_id=$1", id)
+	if err != nil {
+		return 0, err
+	}
+	return int(cmdTag.RowsAffected()), nil
+}
+
 // deletes an entry from the database, returns number of rows deleted.
 func DeleteById(conn repository.Querier, id int) (int, error) {
 	cmdTag, err := conn.Exec(context.Background(), "delete from event where id=$1", id)
