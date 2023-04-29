@@ -12,6 +12,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/admin"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/public"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -99,6 +100,12 @@ func startServer() error {
 		return err
 	}
 
+	adm, err := admin.InitAdminEndpoints(pool)
+	if err != nil {
+		log.Error("server could not be started", log.ErrorField(err))
+		return err
+	}
+
 	log.Info("Server started")
 
 	sigChan := make(chan os.Signal, 1)
@@ -107,6 +114,7 @@ func startServer() error {
 	log.Debug("Got signal ", log.Any("signal", v))
 	pm.Shutdown()
 	pub.Shutdown()
+	adm.Shutdown()
 
 	//nolint:all // keeping by design
 	// select {
