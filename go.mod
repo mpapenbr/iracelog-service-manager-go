@@ -10,7 +10,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
-	github.com/testcontainers/testcontainers-go v0.19.0
+	github.com/testcontainers/testcontainers-go v0.20.1
 	go.uber.org/zap v1.24.0
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v23.0.3+incompatible // indirect
+	github.com/docker/docker v23.0.5+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/gofrs/uuid/v5 v5.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -31,6 +31,7 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.0 // indirect
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa // indirect
