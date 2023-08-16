@@ -18,7 +18,7 @@ type StateData struct {
 type StatePayload struct {
 	Cars     [][]interface{} `json:"cars"`
 	Session  []interface{}   `json:"session"`
-	Messages []interface{}   `json:"messages"`
+	Messages [][]interface{} `json:"messages"`
 }
 
 type StateDelta struct {

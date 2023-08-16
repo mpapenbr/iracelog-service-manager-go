@@ -24,26 +24,28 @@ type EventData struct {
 }
 
 type EventDataInfo struct {
-	TrackId               int      `json:"trackId"`
-	TrackDisplayName      string   `json:"trackDisplayName"`
-	TrackDisplayShortName string   `json:"trackDisplayShortName"`
-	TrackConfigName       string   `json:"trackConfigName"`
-	TrackLength           float64  `json:"trackLength"`
-	TrackPitSpeed         float64  `json:"trackPitSpeed"`
-	Name                  string   `json:"name"`
-	Description           string   `json:"description"`
-	EventTime             string   `json:"eventTime"`
-	RaceloggerVersion     string   `json:"raceloggerVersion"`
-	TeamRacing            int      `json:"teamRacing"` // 0: false
-	MultiClass            bool     `json:"multiClass"`
-	NumCarTypes           int      `json:"numCarTypes"`
-	NumCarClasses         int      `json:"numCarClasses"`
-	IrSessionId           int      `json:"irSessionId"`
-	Sectors               []Sector `json:"sectors"`
-	Sessions              []struct {
-		Num  int    `json:"num"`
-		Name string `json:"name"`
-	} `json:"sessions"`
+	TrackId               int            `json:"trackId"`
+	TrackDisplayName      string         `json:"trackDisplayName"`
+	TrackDisplayShortName string         `json:"trackDisplayShortName"`
+	TrackConfigName       string         `json:"trackConfigName"`
+	TrackLength           float64        `json:"trackLength"`
+	TrackPitSpeed         float64        `json:"trackPitSpeed"`
+	Name                  string         `json:"name"`
+	Description           string         `json:"description"`
+	EventTime             string         `json:"eventTime"`
+	RaceloggerVersion     string         `json:"raceloggerVersion"`
+	TeamRacing            int            `json:"teamRacing"` // 0: false
+	MultiClass            bool           `json:"multiClass"`
+	NumCarTypes           int            `json:"numCarTypes"`
+	NumCarClasses         int            `json:"numCarClasses"`
+	IrSessionId           int            `json:"irSessionId"`
+	Sectors               []Sector       `json:"sectors"`
+	Sessions              []EventSession `json:"sessions"`
+}
+
+type EventSession struct {
+	Num  int    `json:"num"`
+	Name string `json:"name"`
 }
 
 type Manifests struct {
