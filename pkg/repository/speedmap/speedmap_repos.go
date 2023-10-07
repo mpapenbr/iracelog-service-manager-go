@@ -87,8 +87,8 @@ func LoadRange(conn repository.Querier, eventID int, tsBegin float64, num int) (
 			})
 		if collErr == nil {
 			ret = make([]*model.SpeedmapData, len(tmp))
-			for i, v := range tmp {
-				ret[i] = &v.Data
+			for i := range tmp {
+				ret[i] = &tmp[i].Data
 			}
 		} else {
 			ret = nil

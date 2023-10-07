@@ -186,6 +186,7 @@ func TestProviderService_StoreEventExtra(t *testing.T) {
 			s := &ProviderService{
 				pool: tt.fields.pool, Lookup: ProviderLookup{},
 			}
+			//nolint:gosec //ignoring G601: implicit memory aliasing of items in for range loop
 			if pd, err := s.RegisterEvent(&tt.args.reqEvent); err != nil {
 				t.Errorf("ProviderService.StoreEventExtra() error = %v", err)
 			} else {
