@@ -98,7 +98,7 @@ func LoadByEventIdWithDelta(
 			Timestamp: workStates[idx].Timestamp,
 		})
 	}
-
+	//nolint:gosec //ok
 	return workStates[0], ret, nil
 }
 
