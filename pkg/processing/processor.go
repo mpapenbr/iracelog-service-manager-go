@@ -73,8 +73,17 @@ func (p *Processor) composeAnalysisData() {
 		CarComputeState: flattenByReference(p.carProcessor.ComputeState, raceOrder),
 		CarStints:       flattenByReference(p.carProcessor.StintLookup, raceOrder),
 		CarPits:         flattenByReference(p.carProcessor.PitLookup, raceOrder),
-		RaceGraph:       p.CurrentData.RaceGraph,
+		CarInfo:         flattenByReference(p.carProcessor.CarInfoLookup, raceOrder),
+		RaceGraph:       flatten(p.raceProcessor.RaceGraph),
 	}
+}
+
+func flatten[E any](data map[string][]E) []E {
+	arr := make([]E, 0, len(data))
+	for _, v := range data {
+		arr = append(arr, v...)
+	}
+	return arr
 }
 
 func flattenByReference[E any](data map[string]E, sortReference []string) []E {

@@ -93,7 +93,7 @@ func (p *RaceProcessor) processOverallRaceGraph(payload *model.StatePayload) {
 			Pos:    p.getInt(carMsgEntry, "pos"),
 			Gap:    p.getFloat(carMsgEntry, "gap"),
 		}
-		if pic := p.payloadExtractor.ExtractCarValue(carMsgEntry, "pic"); pic != nil {
+		if p.payloadExtractor.HasCarKey("pic") {
 			gapInfo.Pic = p.getInt(carMsgEntry, "pic")
 		}
 		raceGraphLapEntry.Gaps = append(raceGraphLapEntry.Gaps, gapInfo)

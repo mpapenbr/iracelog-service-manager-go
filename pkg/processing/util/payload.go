@@ -27,6 +27,11 @@ func NewPayloadExtractor(manifests *model.Manifests) *PayloadExtractor {
 	return ret
 }
 
+func (p *PayloadExtractor) HasCarKey(key string) bool {
+	_, ok := p.CarKeyLookup[key]
+	return ok
+}
+
 //nolint:whitespace // can't make the linters happy
 func (p *PayloadExtractor) ExtractCarValue(
 	rawData []interface{}, key string,
