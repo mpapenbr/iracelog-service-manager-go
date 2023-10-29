@@ -16,6 +16,10 @@ type CarPayload struct {
 	Cars       []CarInfo  `json:"cars"`
 	CarClasses []CarClass `json:"carClasses"`
 	Entries    []CarEntry `json:"entries"`
+	// map of carIdx to driver name (for current driver)
+	// TODO: racelogger must be changed to send this data
+	CurrentDrivers map[int]string `json:"currentDrivers"`
+	SessionTime    float64        `json:"sessionTime"`
 }
 
 type CarInfo struct {

@@ -466,16 +466,14 @@ linters:
   disable-all: true # disable all, selectively enable what is needed
   enable:
     # Defaults
-    - deadcode
     - errcheck
     - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - structcheck
     - typecheck
     - unused
-    - varcheck
+
 
     # Additional
     - cyclop
@@ -498,7 +496,6 @@ linters:
     # - gomnd too noisy
     - goprintffuncname
     - gosec
-    - ifshort
     - lll
     - makezero
     - misspell

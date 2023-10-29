@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/gammazero/nexus/v3/client"
@@ -9,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/analysis"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/track"
 )
@@ -22,9 +25,12 @@ type (
 	ProviderLookup map[string]*ProviderData
 	ProviderData   struct {
 		Event        *model.DbEvent
+		Analysis     *model.DbAnalysis
 		Registered   time.Time
-		Clients      []*Client
+		Clients      []*Client // currently not used
 		ActiveClient *Client
+		Processor    *processing.Processor
+		StopChan     chan struct{} // used to stop background tasks
 	}
 	// contains informations about the connected Provider Client
 	Client struct {
@@ -52,7 +58,11 @@ func (s *ProviderService) RegisterEvent(req *RegisterEventRequest) (
 	if err != nil {
 		return nil, err
 	}
-	data := &ProviderData{Event: dbEvent, Registered: time.Now()}
+	data := &ProviderData{
+		Event:      dbEvent,
+		Registered: time.Now(),
+		StopChan:   make(chan struct{}),
+	}
 	s.Lookup[req.EventKey] = data
 	return data, nil
 }
@@ -126,6 +136,36 @@ func (s *ProviderService) StoreEventExtra(entry *model.DbEventExtra) error {
 			return err
 		}
 
+		return nil
+	})
+}
+
+func (s *ProviderService) UpdateAnalysisData(eventKey string) error {
+	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
+		providerData, ok := s.Lookup[eventKey]
+		if !ok {
+			return nil
+		}
+		var newData model.AnalysisDataGeneric
+		inRec, _ := json.Marshal(providerData.Processor.CurrentData)
+		err := json.Unmarshal(inRec, &newData)
+		if err != nil {
+			return err
+		}
+
+		if providerData.Analysis == nil {
+			newEntry := model.DbAnalysis{
+				EventID: providerData.Event.ID,
+				Data:    newData,
+			}
+			providerData.Analysis, err = analysis.Create(tx.Conn(), &newEntry)
+			return err
+		} else {
+			providerData.Analysis.Data = newData
+			if _, err := analysis.Update(tx.Conn(), providerData.Analysis); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }

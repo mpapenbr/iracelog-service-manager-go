@@ -125,7 +125,7 @@ func getTrackInfoByIdHandler(pool *pgxpool.Pool) client.InvocationHandler {
 func getEventAnalysisById(pool *pgxpool.Pool) client.InvocationHandler {
 	return getGenericWithConvert(
 		pool, utils.ExtractId, analysis.LoadByEventId,
-		func(entry *model.DbAnalysis) *model.AnalysisData { return &entry.Data })
+		func(entry *model.DbAnalysis) *model.AnalysisDataGeneric { return &entry.Data })
 }
 
 func getEventList(pool *pgxpool.Pool) client.InvocationHandler {

@@ -10,6 +10,23 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
+//nolint:whitespace //can't make both the linter and editor happy :(
+func Create(conn repository.Querier, entry *model.DbAnalysis) (
+	*model.DbAnalysis, error,
+) {
+	row := conn.QueryRow(context.Background(), `
+	insert into analysis (event_id, data)
+	values ($1,$2)
+	returning id
+	`, entry.EventID, entry.Data)
+
+	if err := row.Scan(&entry.ID); err != nil {
+		return nil, err
+	}
+
+	return entry, nil
+}
+
 // deletes all entries for an event with eventID
 func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
 	cmdTag, err := conn.Exec(context.Background(),
@@ -28,6 +45,15 @@ func LoadByEventId(conn repository.Querier, eventID int) (*model.DbAnalysis, err
 		return nil, err
 	}
 	return &item, nil
+}
+
+func Update(conn repository.Querier, analysis *model.DbAnalysis) (int, error) {
+	cmdTag, err := conn.Exec(context.Background(),
+		"update analysis set data=$1 where id=$2", analysis.Data, analysis.ID)
+	if err != nil {
+		return 0, err
+	}
+	return int(cmdTag.RowsAffected()), nil
 }
 
 // little helper
