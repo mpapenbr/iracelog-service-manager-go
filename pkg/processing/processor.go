@@ -8,23 +8,29 @@ import (
 )
 
 type Processor struct {
-	Manifests     *model.Manifests
-	CurrentData   *model.AnalysisData
-	carProcessor  *car.CarProcessor
-	raceProcessor *race.RaceProcessor
+	Manifests        *model.Manifests
+	CurrentData      *model.AnalysisData
+	payloadExtractor *util.PayloadExtractor
+	carProcessor     *car.CarProcessor
+	raceProcessor    *race.RaceProcessor
+	latestState      *model.StateData
+	allInfoMsgs      []model.AnalysisMessage
+	ReplayInfo       model.ReplayInfo
 }
 type ProcessorOption func(proc *Processor)
 
 // entry point for ism when registering a new event.
 // carProcessor and raceProcessor are created here
-func WithManifests(manifests *model.Manifests) ProcessorOption {
+
+func WithManifests(manifests *model.Manifests, raceSession int) ProcessorOption {
 	return func(proc *Processor) {
 		proc.Manifests = manifests
-		pe := util.NewPayloadExtractor(manifests)
+		proc.payloadExtractor = util.NewPayloadExtractor(manifests)
 		proc.carProcessor = car.NewCarProcessor(car.WithManifests(manifests))
 		proc.raceProcessor = race.NewRaceProcessor(
 			race.WithCarProcessor(proc.carProcessor),
-			race.WithPayloadExtractor(pe),
+			race.WithPayloadExtractor(proc.payloadExtractor),
+			race.WithRaceSession(raceSession),
 		)
 	}
 }
@@ -43,7 +49,10 @@ func WithCarProcessor(carProcessor *car.CarProcessor) ProcessorOption {
 }
 
 func NewProcessor(opts ...ProcessorOption) *Processor {
-	ret := &Processor{}
+	ret := &Processor{
+		allInfoMsgs: make([]model.AnalysisMessage, 0),
+		ReplayInfo:  model.ReplayInfo{},
+	}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -53,7 +62,15 @@ func NewProcessor(opts ...ProcessorOption) *Processor {
 // ProcessState processes the given stateMsg
 func (p *Processor) ProcessState(stateMsg *model.StateData) {
 	p.carProcessor.ProcessStatePayload(&stateMsg.Payload)
-	p.raceProcessor.ProcessStatePayload(&stateMsg.Payload)
+	p.raceProcessor.ProcessStatePayload(stateMsg)
+	p.latestState = stateMsg
+	if len(stateMsg.Payload.Messages) > 0 {
+		p.allInfoMsgs = append(p.allInfoMsgs, model.AnalysisMessage{
+			Type: model.MessageType(stateMsg.Type),
+			Data: stateMsg.Payload.Messages,
+		})
+	}
+	p.ReplayInfo = p.raceProcessor.ReplayInfo
 	p.composeAnalysisData()
 }
 
@@ -75,6 +92,17 @@ func (p *Processor) composeAnalysisData() {
 		CarPits:         flattenByReference(p.carProcessor.PitLookup, raceOrder),
 		CarInfo:         flattenByReference(p.carProcessor.CarInfoLookup, raceOrder),
 		RaceGraph:       flatten(p.raceProcessor.RaceGraph),
+		Cars: model.AnalysisMessage{
+			Type:      model.MessageType(p.latestState.Type),
+			Timestamp: p.latestState.Timestamp,
+			Data:      p.latestState.Payload.Cars,
+		},
+		Session: model.AnalysisMessage{
+			Type:      model.MessageType(p.latestState.Type),
+			Timestamp: p.latestState.Timestamp,
+			Data:      p.latestState.Payload.Session,
+		},
+		InfoMsgs: p.allInfoMsgs,
 	}
 }
 

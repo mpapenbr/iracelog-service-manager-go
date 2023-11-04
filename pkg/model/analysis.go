@@ -16,10 +16,17 @@ type AnalysisData struct {
 	CarStints       []AnalysisCarStints       `json:"carStints"`
 	CarComputeState []AnalysisCarComputeState `json:"carComputeState"`
 	RaceGraph       []AnalysisRaceGraph       `json:"raceGraph"`
+	Cars            AnalysisMessage           `json:"cars"`     // latest StateData.Cars
+	Session         AnalysisMessage           `json:"session"`  // latest StateData.Session
+	InfoMsgs        []AnalysisMessage         `json:"infoMsgs"` // all info messages
 	// carNum ordered by race position
 	RaceOrder []string `json:"raceOrder"`
 }
-
+type AnalysisMessage struct {
+	Type      MessageType `json:"type"`
+	Data      any         `json:"data"`
+	Timestamp float64     `json:"timestamp"`
+}
 type AnalysisCarInfo struct {
 	Name     string               `json:"name"`
 	CarNum   string               `json:"carNum"`

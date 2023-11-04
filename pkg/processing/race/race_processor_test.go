@@ -15,7 +15,8 @@ import (
 func sampleManifests() *model.Manifests {
 	return &model.Manifests{
 		Car:     []string{"carIdx", "state", "pos", "pic", "lap", "lc", "gap", "last", "best"},
-		Session: []string{"sessionTime", "flagState"},
+		Session: []string{"sessionTime", "flagState", "sessionNum"},
+		Message: []string{"type", "subType", "msg"},
 	}
 }
 
@@ -71,39 +72,47 @@ func TestRaceProcessor_ProcessStatePayload(t *testing.T) {
 		WithPayloadExtractor(util.NewPayloadExtractor(sampleManifests())),
 	)
 	//[]string{"carIdx", "state", "pos", "pic", "lap", "lc", "gap", "last", "best"},
-	payloads := []*model.StatePayload{
+	stateMsgs := []*model.StateData{
 		{
-			Session: []interface{}{100.0, "GREEN"},
-			Cars: [][]interface{}{
-				{1, "RUN", 1, 1, 1, 1, 0, -1, 0},
-				{2, "RUN", 2, 2, 1, 1, 0, -1, 0},
+			Type: int(model.MTState), Timestamp: 10, Payload: model.StatePayload{
+				Session: []interface{}{100.0, "GREEN", 0},
+				Cars: [][]interface{}{
+					{1, "RUN", 1, 1, 1, 1, 0, -1, 0},
+					{2, "RUN", 2, 2, 1, 1, 0, -1, 0},
+				},
 			},
 		},
 		{
-			Session: []interface{}{200.0, "GREEN"},
-			Cars: [][]interface{}{
-				{1, "RUN", 1, 1, 2, 1, 0, 14, 0},
-				{2, "RUN", 2, 2, 2, 1, 10, -1, 0},
+			Type: int(model.MTState), Timestamp: 20, Payload: model.StatePayload{
+				Session: []interface{}{200.0, "GREEN", 0},
+				Cars: [][]interface{}{
+					{1, "RUN", 1, 1, 2, 1, 0, 14, 0},
+					{2, "RUN", 2, 2, 2, 1, 10, -1, 0},
+				},
 			},
 		},
 		{
-			Session: []interface{}{300.0, "GREEN"},
-			Cars: [][]interface{}{
-				{1, "RUN", 1, 1, 3, 2, 0, 10.0, 0},
-				{2, "RUN", 2, 2, 3, 2, 10, 11.0, 0},
+			Type: int(model.MTState), Timestamp: 30, Payload: model.StatePayload{
+				Session: []interface{}{300.0, "GREEN", 0},
+				Cars: [][]interface{}{
+					{1, "RUN", 1, 1, 3, 2, 0, 10.0, 0},
+					{2, "RUN", 2, 2, 3, 2, 10, 11.0, 0},
+				},
 			},
 		},
 		{
-			Session: []interface{}{400.0, "GREEN"},
-			Cars: [][]interface{}{
-				{1, "RUN", 1, 1, 4, 3, 0, []interface{}{8, "ob"}, 0},
-				{2, "RUN", 2, 2, 4, 3, 20, 12, 0},
+			Type: int(model.MTState), Timestamp: 40, Payload: model.StatePayload{
+				Session: []interface{}{400.0, "GREEN", 0},
+				Cars: [][]interface{}{
+					{1, "RUN", 1, 1, 4, 3, 0, []interface{}{8, "ob"}, 0},
+					{2, "RUN", 2, 2, 4, 3, 20, 12, 0},
+				},
 			},
 		},
 	}
-	for i := range payloads {
-		cp.ProcessStatePayload(payloads[i])
-		p.ProcessStatePayload(payloads[i])
+	for i := range stateMsgs {
+		cp.ProcessStatePayload(&stateMsgs[i].Payload)
+		p.ProcessStatePayload(stateMsgs[i])
 	}
 
 	// check race order
@@ -136,4 +145,104 @@ func TestRaceProcessor_ProcessStatePayload(t *testing.T) {
 			{LapNo: 1, LapTime: -1}, {LapNo: 2, LapTime: 11.0}, {LapNo: 3, LapTime: 12},
 		}},
 	}, p.CarLaps)
+}
+
+func TestRaceProcessor_UpdateReplayInfo(t *testing.T) {
+	cp := car.NewCarProcessor(car.WithManifests(sampleManifests()))
+
+	cp.ProcessCarPayload(sampleCarPayload())
+	p := NewRaceProcessor(
+		WithCarProcessor(cp),
+		WithPayloadExtractor(util.NewPayloadExtractor(sampleManifests())),
+		WithRaceSession(1),
+	)
+
+	type stepData struct {
+		name   string
+		input  model.StateData
+		expect model.ReplayInfo
+	}
+	steps := []stepData{
+		{
+			name: "not race session",
+			input: model.StateData{
+				Type: int(model.MTState), Timestamp: 10, Payload: model.StatePayload{
+					Session:  []interface{}{100.0, "GREEN", 0},
+					Cars:     [][]interface{}{},
+					Messages: [][]interface{}{},
+				},
+			},
+			expect: model.ReplayInfo{},
+		},
+		{
+			name: "pre race start",
+			input: model.StateData{
+				Type: int(model.MTState), Timestamp: 20, Payload: model.StatePayload{
+					Session:  []interface{}{200.0, "PREP", 1},
+					Cars:     [][]interface{}{},
+					Messages: [][]interface{}{},
+				},
+			},
+			expect: model.ReplayInfo{
+				MinTimestamp:   20,
+				MinSessionTime: 200,
+				MaxSessionTime: 200,
+			},
+		},
+		{
+			name: "still pre race",
+			input: model.StateData{
+				Type: int(model.MTState), Timestamp: 30, Payload: model.StatePayload{
+					Session:  []interface{}{300.0, "PREP", 1},
+					Cars:     [][]interface{}{},
+					Messages: [][]interface{}{},
+				},
+			},
+			expect: model.ReplayInfo{
+				MinTimestamp:   20,
+				MinSessionTime: 200,
+				MaxSessionTime: 300,
+			},
+		},
+		{
+			name: "race start message",
+			input: model.StateData{
+				Type: int(model.MTState), Timestamp: 40, Payload: model.StatePayload{
+					Session: []interface{}{400.0, "GREEN", 1},
+					Cars:    [][]interface{}{},
+					Messages: [][]interface{}{
+						{"Dummy", "Dummy", "Dummy"},
+						{"Timing", "RaceControl", "Race start"},
+					},
+				},
+			},
+			expect: model.ReplayInfo{
+				MinTimestamp:   40,
+				MinSessionTime: 400,
+				MaxSessionTime: 400,
+			},
+		},
+		{
+			name: "after start",
+			input: model.StateData{
+				Type: int(model.MTState), Timestamp: 50, Payload: model.StatePayload{
+					Session:  []interface{}{500.0, "GREEN", 1},
+					Cars:     [][]interface{}{},
+					Messages: [][]interface{}{},
+				},
+			},
+			expect: model.ReplayInfo{
+				MinTimestamp:   40,
+				MinSessionTime: 400,
+				MaxSessionTime: 500,
+			},
+		},
+	}
+
+	for i, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			p.processReplayInfo(&steps[i].input, step.input.Payload.Session[0].(float64))
+			assert.Equal(t, step.expect, p.ReplayInfo)
+		})
+	}
 }

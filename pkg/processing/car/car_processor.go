@@ -88,6 +88,7 @@ func (p *CarProcessor) updateCarInfo(payload *model.CarPayload) {
 		if !ok {
 			item = model.AnalysisCarInfo{
 				CarNum: p.NumByIdx[carIdx],
+				Name:   p.ByCarIdx[carIdx].Team.Name,
 				Drivers: []model.AnalysisDriverInfo{
 					p.newDriverEntry(name, payload.SessionTime),
 				},
@@ -207,6 +208,10 @@ func (p *CarProcessor) handleComputeState(
 	sessionTime float64,
 ) {
 	curCarLap, _ := p.getIntVal(p.payloadExtractor.ExtractCarValue(carMsg, "lap"))
+	// we don't want data for cars that are not yet active (lap < 1)
+	if curCarLap < 1 {
+		return
+	}
 	curCarState := p.payloadExtractor.ExtractCarValue(carMsg, "state").(string)
 
 	switch carComputeState.State {

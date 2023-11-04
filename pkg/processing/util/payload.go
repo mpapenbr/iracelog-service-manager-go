@@ -8,6 +8,7 @@ type PayloadExtractor struct {
 	Manifests        *model.Manifests
 	CarKeyLookup     map[string]int
 	SessionKeyLookup map[string]int
+	MessageKeyLookup map[string]int
 }
 
 func NewPayloadExtractor(manifests *model.Manifests) *PayloadExtractor {
@@ -23,6 +24,7 @@ func NewPayloadExtractor(manifests *model.Manifests) *PayloadExtractor {
 		Manifests:        manifests,
 		CarKeyLookup:     createLookup(manifests.Car),
 		SessionKeyLookup: createLookup(manifests.Session),
+		MessageKeyLookup: createLookup(manifests.Message),
 	}
 	return ret
 }
@@ -44,4 +46,11 @@ func (p *PayloadExtractor) ExtractSessionValue(
 	rawData []interface{}, key string,
 ) interface{} {
 	return rawData[p.SessionKeyLookup[key]]
+}
+
+//nolint:whitespace // can't make the linters happy
+func (p *PayloadExtractor) ExtractMessageValue(
+	rawData []interface{}, key string,
+) interface{} {
+	return rawData[p.MessageKeyLookup[key]]
 }

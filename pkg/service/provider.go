@@ -169,3 +169,21 @@ func (s *ProviderService) UpdateAnalysisData(eventKey string) error {
 		return nil
 	})
 }
+
+func (s *ProviderService) UpdateReplayInfo(eventKey string) error {
+	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
+		providerData, ok := s.Lookup[eventKey]
+		if !ok {
+			return nil
+		}
+
+		if _, err := event.UpdateReplayInfo(
+			tx.Conn(),
+			eventKey,
+			providerData.Processor.ReplayInfo); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}

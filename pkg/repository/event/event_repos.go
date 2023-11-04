@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -83,6 +84,30 @@ func LoadByKey(conn repository.Querier, eventKey string) (*model.DbEvent, error)
 		return nil, err
 	}
 	return &event, nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func UpdateReplayInfo(
+	conn repository.Querier,
+	eventKey string,
+	replayInfo model.ReplayInfo) (
+	int, error,
+) {
+	// we need this tmp struct for the jsonb_merge function
+	// it will provide a nice {"replayInfo": { ... }} structure
+	type tmp struct {
+		ReplayInfo model.ReplayInfo `json:"replayInfo"`
+	}
+	jsonStr, _ := json.Marshal(tmp{ReplayInfo: replayInfo})
+	sql := fmt.Sprintf(`
+	update event set data=mgm_jsonb_merge(data, '%s'::jsonb) where event_key=$1
+	`, jsonStr)
+
+	cmdTag, err := conn.Exec(context.Background(), sql, eventKey)
+	if err != nil {
+		return 0, err
+	}
+	return int(cmdTag.RowsAffected()), nil
 }
 
 // little helper

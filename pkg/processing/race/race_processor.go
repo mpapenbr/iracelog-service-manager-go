@@ -12,11 +12,15 @@ import (
 
 type RaceProcessor struct {
 	// carNum
-	RaceOrder        []string
-	CarLaps          map[string]model.AnalysisCarLaps     // key carNum
-	RaceGraph        map[string][]model.AnalysisRaceGraph // key: "overall", carClass names
-	carProcessor     *car.CarProcessor
-	payloadExtractor *util.PayloadExtractor
+	RaceOrder  []string
+	CarLaps    map[string]model.AnalysisCarLaps     // key carNum
+	RaceGraph  map[string][]model.AnalysisRaceGraph // key: "overall", carClass names
+	ReplayInfo model.ReplayInfo
+	// internal
+	carProcessor         *car.CarProcessor
+	payloadExtractor     *util.PayloadExtractor
+	raceSession          int
+	raceStartMarkerFound bool
 }
 
 type RaceProcessorOption func(rp *RaceProcessor)
@@ -33,11 +37,19 @@ func WithPayloadExtractor(pe *util.PayloadExtractor) RaceProcessorOption {
 	}
 }
 
+func WithRaceSession(raceSession int) RaceProcessorOption {
+	return func(rp *RaceProcessor) {
+		rp.raceSession = raceSession
+	}
+}
+
 func NewRaceProcessor(opts ...RaceProcessorOption) *RaceProcessor {
 	ret := &RaceProcessor{
-		RaceOrder: make([]string, 0),
-		RaceGraph: make(map[string][]model.AnalysisRaceGraph),
-		CarLaps:   make(map[string]model.AnalysisCarLaps),
+		RaceOrder:            make([]string, 0),
+		RaceGraph:            make(map[string][]model.AnalysisRaceGraph),
+		CarLaps:              make(map[string]model.AnalysisCarLaps),
+		ReplayInfo:           model.ReplayInfo{},
+		raceStartMarkerFound: false,
 	}
 	for _, opt := range opts {
 		opt(ret)
@@ -47,27 +59,68 @@ func NewRaceProcessor(opts ...RaceProcessorOption) *RaceProcessor {
 
 // processes the given state message.
 // This message must be already processed by the CarProcessor
-func (p *RaceProcessor) ProcessStatePayload(payload *model.StatePayload) {
-	_, ok := p.payloadExtractor.ExtractSessionValue(
-		payload.Session, "sessionTime").(float64)
+func (p *RaceProcessor) ProcessStatePayload(stateMsg *model.StateData) {
+	sessionTime, ok := p.payloadExtractor.ExtractSessionValue(
+		stateMsg.Payload.Session, "sessionTime").(float64)
 	if !ok {
 		return
 	}
 
-	if !p.checkValidData(payload) {
+	if !p.checkValidData(&stateMsg.Payload) {
 		return
 	}
 
 	// race order
 	p.RaceOrder = make([]string, 0)
-	for i := range payload.Cars {
-		carNum := p.carProcessor.NumByIdx[p.getInt(payload.Cars[i], "carIdx")]
+	for i := range stateMsg.Payload.Cars {
+		carNum := p.carProcessor.NumByIdx[p.getInt(stateMsg.Payload.Cars[i], "carIdx")]
 		p.RaceOrder = append(p.RaceOrder, carNum)
 	}
 	// car laps
-	p.processCarLaps(payload)
+	p.processCarLaps(&stateMsg.Payload)
 	// race graph
-	p.processOverallRaceGraph(payload)
+	p.processOverallRaceGraph(&stateMsg.Payload)
+
+	// TODO: compute the replayInfo.
+	// Therefore we need to know if we are in a race session.
+	// Check against eventInfo.sessions
+
+	p.processReplayInfo(stateMsg, sessionTime)
+}
+
+//nolint:whitespace // can't make the linters happy
+func (p *RaceProcessor) processReplayInfo(
+	stateMsg *model.StateData,
+	sessionTime float64,
+) {
+	if sessionNum, ok := p.payloadExtractor.ExtractSessionValue(
+		stateMsg.Payload.Session, "sessionNum").(int); ok {
+		if sessionNum != p.raceSession {
+			return
+		}
+	}
+
+	p.ReplayInfo.MaxSessionTime = sessionTime
+	if !p.raceStartMarkerFound {
+		foundIndex := slices.IndexFunc(stateMsg.Payload.Messages,
+			func(i []interface{}) bool {
+				msgType := p.getString(i, "type")
+				subType := p.getString(i, "subType")
+				msg := p.getString(i, "msg")
+				return msg == "Race start" &&
+					msgType == "Timing" &&
+					subType == "RaceControl"
+			})
+		if foundIndex != -1 {
+			p.ReplayInfo.MinTimestamp = stateMsg.Timestamp
+			p.ReplayInfo.MinSessionTime = sessionTime
+			p.raceStartMarkerFound = true
+		} else if p.ReplayInfo.MinTimestamp == 0 {
+			p.ReplayInfo.MinTimestamp = stateMsg.Timestamp
+			p.ReplayInfo.MinSessionTime = sessionTime
+		}
+
+	}
 }
 
 func (p *RaceProcessor) processOverallRaceGraph(payload *model.StatePayload) {
@@ -119,8 +172,8 @@ func (p *RaceProcessor) processCarLaps(payload *model.StatePayload) {
 		carNum := p.carProcessor.NumByIdx[p.getInt(carMsgEntry, "carIdx")]
 		lap := p.getInt(carMsgEntry, "lc")
 		laptime := p.getLaptime(carMsgEntry, "last")
-		if lap == -1 {
-			continue // do not process invalid laps
+		if lap < 1 {
+			continue // we are not interested in laps >=1
 		}
 		carEntry, ok := p.CarLaps[carNum]
 		if !ok {
@@ -198,6 +251,17 @@ func (p *RaceProcessor) getFloat(carMsgEntry []interface{}, key string) float64 
 		return float64(val)
 	}
 	return -1
+}
+
+func (p *RaceProcessor) getString(infoMsgEntry []interface{}, key string) string {
+	rawVal := p.payloadExtractor.ExtractMessageValue(infoMsgEntry, key)
+	switch val := rawVal.(type) {
+	case string:
+		return val
+	default:
+		fmt.Printf("Error extracting string val %s: %v %T\n", key, rawVal, rawVal)
+	}
+	return ""
 }
 
 func (p *RaceProcessor) getLaptime(carMsgEntry []interface{}, key string) float64 {

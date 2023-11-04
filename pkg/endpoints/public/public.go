@@ -170,11 +170,13 @@ func getStatesWithDiff(pool *pgxpool.Pool) client.InvocationHandler {
 	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
 		param, err := utils.ExtractRangeTuple(i)
 		if err != nil {
+			log.Error("Error extracting range tuple", log.ErrorField(err))
 			return client.InvokeResult{Args: wamp.List{err}}
 		}
 		first, delta, err := state.LoadByEventIdWithDelta(
 			pool, param.EventID, param.TsBegin, param.Num)
 		if err != nil {
+			log.Error("Error loading states", log.ErrorField(err))
 			return client.InvokeResult{Args: wamp.List{err}}
 		}
 
