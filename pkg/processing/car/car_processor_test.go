@@ -556,7 +556,7 @@ func TestCarProcessor_ProcessCarPayload_SeatTime(t *testing.T) {
 	}
 	assert.Equal(t, map[string]model.AnalysisCarInfo{
 		"10": {
-			CarNum: "10", Drivers: []model.AnalysisDriverInfo{
+			CarNum: "10", Name: "Team A", Drivers: []model.AnalysisDriverInfo{
 				{DriverName: "A1", SeatTime: []model.AnalysisSeatTime{
 					{EnterCarTime: 100, LeaveCarTime: 300},
 					{EnterCarTime: 400, LeaveCarTime: 500},
@@ -567,7 +567,7 @@ func TestCarProcessor_ProcessCarPayload_SeatTime(t *testing.T) {
 			},
 		},
 		"20": {
-			CarNum: "20", Drivers: []model.AnalysisDriverInfo{
+			CarNum: "20", Name: "Team B", Drivers: []model.AnalysisDriverInfo{
 				{DriverName: "B1", SeatTime: []model.AnalysisSeatTime{
 					{EnterCarTime: 100, LeaveCarTime: 200},
 					{EnterCarTime: 500, LeaveCarTime: 500},
