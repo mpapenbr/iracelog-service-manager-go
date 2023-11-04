@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gammazero/nexus/v3/client"
@@ -150,8 +151,15 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 	ctx, cancel := context.WithCancel(context.Background())
 	pd.ActiveClient = &service.Client{WampClient: cli, CancelFunc: cancel}
 
+	raceSession := -1
+	if found := slices.IndexFunc(pd.Event.Data.Info.Sessions,
+		func(item model.EventSession) bool {
+			return item.Name == "RACE"
+		}); found != -1 {
+		raceSession = pd.Event.Data.Info.Sessions[found].Num
+	}
 	pd.Processor = processing.NewProcessor(
-		processing.WithManifests(&pd.Event.Data.Manifests),
+		processing.WithManifests(&pd.Event.Data.Manifests, raceSession),
 	)
 
 	go pm.storeAnalysisData(pd, time.NewTicker(15*time.Second))
@@ -273,10 +281,12 @@ func (pm *ProviderManager) storeAnalysisData(
 		select {
 		case <-pd.StopChan:
 			ticker.Stop()
+
 			return
 		case <-ticker.C:
 			log.Debug("Storing analysis data", log.String("eventKey", pd.Event.Key))
 			pm.pService.UpdateAnalysisData(pd.Event.Key)
+			pm.pService.UpdateReplayInfo(pd.Event.Key)
 		}
 	}
 }
@@ -349,6 +359,12 @@ func (pm *ProviderManager) handleRemoveProvider() error {
 			log.Debug("received data", log.String("eventKey", req))
 			if pd, ok := pm.pService.Lookup[req]; ok {
 				log.Debug("Calling cancel func", log.String("eventKey", req))
+				if err := pm.pService.UpdateAnalysisData(req); err != nil {
+					log.Warn("Error updating analysis data", log.ErrorField(err))
+				}
+				if err := pm.pService.UpdateReplayInfo(req); err != nil {
+					log.Warn("Error updating replay info", log.ErrorField(err))
+				}
 				pd.ActiveClient.CancelFunc()
 				pm.publishRemovedProvider(pd)
 				delete(pm.pService.Lookup, req)
