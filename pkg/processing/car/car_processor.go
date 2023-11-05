@@ -62,6 +62,22 @@ func NewCarProcessor(opts ...CarProcessorOption) *CarProcessor {
 	return cp
 }
 
+//nolint:lll // by design
+func (p *CarProcessor) ProcessAnalysisData(analysisData *model.AnalysisData) {
+	for i := range analysisData.CarComputeState {
+		p.ComputeState[analysisData.CarComputeState[i].CarNum] = analysisData.CarComputeState[i]
+	}
+	for i := range analysisData.CarInfo {
+		p.CarInfoLookup[analysisData.CarInfo[i].CarNum] = analysisData.CarInfo[i]
+	}
+	for i := range analysisData.CarStints {
+		p.StintLookup[analysisData.CarStints[i].CarNum] = analysisData.CarStints[i]
+	}
+	for i := range analysisData.CarPits {
+		p.PitLookup[analysisData.CarPits[i].CarNum] = analysisData.CarPits[i]
+	}
+}
+
 // gets called when a car message is received via "...live.cardata" topic
 func (p *CarProcessor) ProcessCarPayload(payload *model.CarPayload) {
 	for i := range payload.Entries {

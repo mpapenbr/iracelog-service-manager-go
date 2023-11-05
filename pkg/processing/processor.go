@@ -1,6 +1,8 @@
 package processing
 
 import (
+	"fmt"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing/car"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing/race"
@@ -21,7 +23,6 @@ type ProcessorOption func(proc *Processor)
 
 // entry point for ism when registering a new event.
 // carProcessor and raceProcessor are created here
-
 func WithManifests(manifests *model.Manifests, raceSession int) ProcessorOption {
 	return func(proc *Processor) {
 		proc.Manifests = manifests
@@ -32,12 +33,6 @@ func WithManifests(manifests *model.Manifests, raceSession int) ProcessorOption 
 			race.WithPayloadExtractor(proc.payloadExtractor),
 			race.WithRaceSession(raceSession),
 		)
-	}
-}
-
-func WithCurrentData(currentData *model.AnalysisData) ProcessorOption {
-	return func(proc *Processor) {
-		proc.CurrentData = currentData
 	}
 }
 
@@ -57,6 +52,16 @@ func NewProcessor(opts ...ProcessorOption) *Processor {
 		opt(ret)
 	}
 	return ret
+}
+
+// takes analysis data and initializes the carProcessor and raceProcessor with it
+// Note: this is called by webfrontend when connecting to an existing event
+// The processor is already initialized with  manifests and CarPayload.
+func (p *Processor) ProcessAnalysisData(analysisData *model.AnalysisData) {
+	fmt.Printf("received analysisData: %+v\n", analysisData)
+	p.carProcessor.ProcessAnalysisData(analysisData)
+	p.raceProcessor.ProcessAnalysisData(analysisData)
+	p.allInfoMsgs = analysisData.InfoMsgs
 }
 
 // ProcessState processes the given stateMsg

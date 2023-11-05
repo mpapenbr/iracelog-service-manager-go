@@ -60,6 +60,7 @@ func InitProviderEndpoints(pool *pgxpool.Pool) (*ProviderManager, error) {
 	if err := ret.handleEventExtraData(); err != nil {
 		return nil, err
 	}
+
 	return ret, nil
 }
 
@@ -76,6 +77,10 @@ func (pm *ProviderManager) Shutdown() {
 			log.Error("Failed to unregister procedure:", log.ErrorField(err))
 		}
 	}
+}
+
+func (pm *ProviderManager) ProviderLookupFunc(key string) *service.ProviderData {
+	return pm.pService.Lookup[key]
 }
 
 func (pm *ProviderManager) handleListProvider() error {

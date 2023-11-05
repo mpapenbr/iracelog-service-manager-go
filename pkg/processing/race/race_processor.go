@@ -57,6 +57,24 @@ func NewRaceProcessor(opts ...RaceProcessorOption) *RaceProcessor {
 	return ret
 }
 
+func (p *RaceProcessor) ProcessAnalysisData(analysisData *model.AnalysisData) {
+	p.RaceOrder = analysisData.RaceOrder
+	for i := range analysisData.CarLaps {
+		p.CarLaps[analysisData.CarLaps[i].CarNum] = analysisData.CarLaps[i]
+	}
+	for i := range analysisData.RaceGraph {
+		var entries []model.AnalysisRaceGraph
+		var ok bool
+		if entries, ok = p.RaceGraph[analysisData.RaceGraph[i].CarClass]; !ok {
+			entries = make([]model.AnalysisRaceGraph, 0)
+			entries = append(entries, analysisData.RaceGraph[i])
+		} else {
+			entries = append(entries, analysisData.RaceGraph[i])
+		}
+		p.RaceGraph[analysisData.RaceGraph[i].CarClass] = entries
+	}
+}
+
 // processes the given state message.
 // This message must be already processed by the CarProcessor
 func (p *RaceProcessor) ProcessStatePayload(stateMsg *model.StateData) {
@@ -81,10 +99,7 @@ func (p *RaceProcessor) ProcessStatePayload(stateMsg *model.StateData) {
 	// race graph
 	p.processOverallRaceGraph(&stateMsg.Payload)
 
-	// TODO: compute the replayInfo.
-	// Therefore we need to know if we are in a race session.
-	// Check against eventInfo.sessions
-
+	// replay info
 	p.processReplayInfo(stateMsg, sessionTime)
 }
 

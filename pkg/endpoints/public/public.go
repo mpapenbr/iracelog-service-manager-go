@@ -19,26 +19,36 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/speedmap"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/service"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
 
-type PublicManager struct {
-	endpoints  []endpointHandler
-	wampClient *client.Client
-}
+type (
+	ProviderLookupFunc func(key string) *service.ProviderData
+	PublicManager      struct {
+		endpoints    []endpointHandler
+		wampClient   *client.Client
+		providerFunc ProviderLookupFunc
+	}
+)
 
 type endpointHandler struct {
 	name    string
 	handler func(*pgxpool.Pool) client.InvocationHandler
 }
 
-func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
+//nolint:whitespace //can't make both the linter and editor happy :(
+func InitPublicEndpoints(
+	pool *pgxpool.Pool,
+	providerLookup ProviderLookupFunc,
+) (*PublicManager, error) {
 	wampClient, err := utils.NewClient()
 	if err != nil {
 		log.Fatal("Could not connect wamp client", log.ErrorField(err))
 	}
 	ret := PublicManager{
-		wampClient: wampClient,
+		wampClient:   wampClient,
+		providerFunc: providerLookup,
 		endpoints: []endpointHandler{
 			{name: "get_events", handler: getEventList},
 			{name: "get_event_info_by_key", handler: getEventInfoByKeyHandler},
@@ -61,6 +71,12 @@ func InitPublicEndpoints(pool *pgxpool.Pool) (*PublicManager, error) {
 			log.Error("Register", zap.String("endpoint", name), log.ErrorField(err))
 		}
 	}
+
+	name := "racelog.public.live.get_event_analysis_by_key"
+	if err := wampClient.Register(name,
+		getLiveEventAnalysisByKey(ret.providerFunc), wamp.Dict{}); err != nil {
+		log.Error("Register", zap.String("endpoint", name), log.ErrorField(err))
+	}
 	return &ret, nil
 }
 
@@ -80,6 +96,22 @@ func getVersion(pool *pgxpool.Pool) client.InvocationHandler {
 		log.Info("get_version")
 		return client.InvokeResult{Args: wamp.List{
 			map[string]string{"ownVersion": version.Version},
+		}}
+	}
+}
+
+func getLiveEventAnalysisByKey(lookupFunc ProviderLookupFunc) client.InvocationHandler {
+	return func(ctx context.Context, i *wamp.Invocation) client.InvokeResult {
+		log.Info("live.get_event_analysis_by_key")
+		eventKey, err := utils.ExtractEventKey(i)
+		if err != nil {
+			log.Error("Error extracting event key", log.ErrorField(err))
+			return client.InvokeResult{Args: wamp.List{err}}
+		}
+		pd := lookupFunc(eventKey)
+		return client.InvokeResult{Kwargs: wamp.Dict{
+			"processedData": pd.Processor.GetData(),
+			"manifests":     pd.Processor.Manifests,
 		}}
 	}
 }
