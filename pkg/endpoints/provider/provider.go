@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gammazero/nexus/v3/client"
@@ -13,6 +14,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/service"
 )
 
@@ -58,6 +60,7 @@ func InitProviderEndpoints(pool *pgxpool.Pool) (*ProviderManager, error) {
 	if err := ret.handleEventExtraData(); err != nil {
 		return nil, err
 	}
+
 	return ret, nil
 }
 
@@ -74,6 +77,10 @@ func (pm *ProviderManager) Shutdown() {
 			log.Error("Failed to unregister procedure:", log.ErrorField(err))
 		}
 	}
+}
+
+func (pm *ProviderManager) ProviderLookupFunc(key string) *service.ProviderData {
+	return pm.pService.Lookup[key]
 }
 
 func (pm *ProviderManager) handleListProvider() error {
@@ -106,6 +113,7 @@ func (pm *ProviderManager) handleRegisterProvider() error {
 			if err != nil {
 				return client.InvokeResult{Args: wamp.List{"could not register event"}}
 			}
+
 			pm.addHandlers(providerData)
 			pm.publishNewProvider(providerData)
 
@@ -148,6 +156,19 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 	ctx, cancel := context.WithCancel(context.Background())
 	pd.ActiveClient = &service.Client{WampClient: cli, CancelFunc: cancel}
 
+	raceSession := -1
+	if found := slices.IndexFunc(pd.Event.Data.Info.Sessions,
+		func(item model.EventSession) bool {
+			return item.Name == "RACE"
+		}); found != -1 {
+		raceSession = pd.Event.Data.Info.Sessions[found].Num
+	}
+	pd.Processor = processing.NewProcessor(
+		processing.WithManifests(&pd.Event.Data.Manifests, raceSession),
+	)
+
+	go pm.storeAnalysisData(pd, time.NewTicker(15*time.Second))
+
 	topics := []struct {
 		topic   string
 		handler client.EventHandler
@@ -178,6 +199,8 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 	go func() {
 		done := <-ctx.Done()
 		log.Debug("ctx.Done() received.", log.Any("ctxDone", done))
+		close(pd.StopChan) // signal to stop background tasks
+		log.Debug("stopChan closed")
 		for _, t := range topics {
 			if err := cli.Unsubscribe(t.topic); err != nil {
 				log.Error("Error unsubscribing",
@@ -207,6 +230,7 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 				log.ErrorField(err))
 			return
 		}
+		pd.Processor.ProcessState(stateData)
 	}
 }
 
@@ -248,6 +272,26 @@ func (pm *ProviderManager) carMessageHandler(pd *service.ProviderData) client.Ev
 			log.Error("Error storing carData",
 				log.ErrorField(err))
 			return
+		}
+		pd.Processor.ProcessCarData(carData)
+	}
+}
+
+//nolint:whitespace,errcheck //can't make both editor and linter happy
+func (pm *ProviderManager) storeAnalysisData(
+	pd *service.ProviderData,
+	ticker *time.Ticker,
+) {
+	for {
+		select {
+		case <-pd.StopChan:
+			ticker.Stop()
+
+			return
+		case <-ticker.C:
+			log.Debug("Storing analysis data", log.String("eventKey", pd.Event.Key))
+			pm.pService.UpdateAnalysisData(pd.Event.Key)
+			pm.pService.UpdateReplayInfo(pd.Event.Key)
 		}
 	}
 }
@@ -320,6 +364,12 @@ func (pm *ProviderManager) handleRemoveProvider() error {
 			log.Debug("received data", log.String("eventKey", req))
 			if pd, ok := pm.pService.Lookup[req]; ok {
 				log.Debug("Calling cancel func", log.String("eventKey", req))
+				if err := pm.pService.UpdateAnalysisData(req); err != nil {
+					log.Warn("Error updating analysis data", log.ErrorField(err))
+				}
+				if err := pm.pService.UpdateReplayInfo(req); err != nil {
+					log.Warn("Error updating replay info", log.ErrorField(err))
+				}
 				pd.ActiveClient.CancelFunc()
 				pm.publishRemovedProvider(pd)
 				delete(pm.pService.Lookup, req)

@@ -216,3 +216,24 @@ func TestEventRepository_DeleteEventById(t *testing.T) {
 		})
 	}
 }
+
+func TestEventRepository_UpdateReplayInfo(t *testing.T) {
+	db := initTestDb()
+	sample := createSampleEntry(db)
+	replayInfo := model.ReplayInfo{
+		MinTimestamp:   1.0,
+		MinSessionTime: 2.0,
+		MaxSessionTime: 3.0,
+	}
+
+	err := pgx.BeginFunc(context.Background(), db, func(tx pgx.Tx) error {
+		numUpdated, err := UpdateReplayInfo(tx.Conn(), sample.Key, replayInfo)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, numUpdated)
+		return err
+	})
+	assert.Nil(t, err)
+	event, err := LoadByKey(db, sample.Key)
+	assert.Nil(t, err)
+	assert.Equal(t, replayInfo, event.Data.ReplayInfo)
+}

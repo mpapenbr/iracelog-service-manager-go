@@ -1,0 +1,30 @@
+{
+  "car": [
+    "state",
+    "carNum",
+    "userName",
+    "teamName",
+    "carClass",
+    "pos",
+    "pic",
+    "lap",
+    "lc",
+    "gap",
+    "last",
+    "best"
+  ],
+  "message": [
+    "type",
+    "subType",
+    "carNum",
+    "carClass",
+    "msg"
+  ],
+  "pit": [],
+  "session": [
+    "sessionTime",
+    "timeRemain",
+    "lapsRemain",
+    "flagState"
+  ]
+}

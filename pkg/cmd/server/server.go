@@ -94,7 +94,7 @@ func startServer() error {
 		return err
 	}
 
-	pub, err := public.InitPublicEndpoints(pool)
+	pub, err := public.InitPublicEndpoints(pool, pm.ProviderLookupFunc)
 	if err != nil {
 		log.Error("server could not be started", log.ErrorField(err))
 		return err

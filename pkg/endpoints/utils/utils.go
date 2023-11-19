@@ -128,6 +128,12 @@ func extractFloat(val any) (float64, error) {
 		return float64(t), nil
 	case float64:
 		return t, nil
+	case int:
+		return float64(t), nil
+	case int64:
+		return float64(t), nil
+	case uint64:
+		return float64(t), nil
 	}
 	return -1, fmt.Errorf("not a float or compatible value")
 }
