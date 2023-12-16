@@ -6,7 +6,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/google/go-cmp v0.6.0
-	github.com/jackc/pgx/v5 v5.5.0
+	github.com/jackc/pgx/v5 v5.5.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.1
