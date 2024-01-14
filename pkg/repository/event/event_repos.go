@@ -1,3 +1,4 @@
+//nolint:whitespace // can't make both editor and linter happy
 package event
 
 import (
@@ -11,8 +12,10 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-func Create(conn repository.Querier, event *model.DbEvent) (*model.DbEvent, error) {
-	row := conn.QueryRow(context.Background(), `
+func Create(ctx context.Context, conn repository.Querier, event *model.DbEvent) (
+	*model.DbEvent, error,
+) {
+	row := conn.QueryRow(ctx, `
 	insert into event (event_key,name,description, data)
 	values ($1,$2,$3,$4)
 	returning id,record_stamp
@@ -25,8 +28,12 @@ func Create(conn repository.Querier, event *model.DbEvent) (*model.DbEvent, erro
 	return event, nil
 }
 
-func CreateExtra(conn repository.Querier, event *model.DbEventExtra) error {
-	_, err := conn.Exec(context.Background(), `
+func CreateExtra(
+	ctx context.Context,
+	conn repository.Querier,
+	event *model.DbEventExtra,
+) error {
+	_, err := conn.Exec(ctx, `
 	insert into event_ext (event_id, data)	values ($1,$2)`,
 		event.EventID, event.Data)
 
@@ -34,8 +41,12 @@ func CreateExtra(conn repository.Querier, event *model.DbEventExtra) error {
 }
 
 // deletes the extra event data, returns number of rows deleted.
-func DeleteExtraById(conn repository.Querier, id int) (int, error) {
-	cmdTag, err := conn.Exec(context.Background(),
+func DeleteExtraById(
+	ctx context.Context,
+	conn repository.Querier,
+	id int,
+) (int, error) {
+	cmdTag, err := conn.Exec(ctx,
 		"delete from event_ext where event_id=$1", id)
 	if err != nil {
 		return 0, err
@@ -44,16 +55,20 @@ func DeleteExtraById(conn repository.Querier, id int) (int, error) {
 }
 
 // deletes an entry from the database, returns number of rows deleted.
-func DeleteById(conn repository.Querier, id int) (int, error) {
-	cmdTag, err := conn.Exec(context.Background(), "delete from event where id=$1", id)
+func DeleteById(ctx context.Context, conn repository.Querier, id int) (int, error) {
+	cmdTag, err := conn.Exec(ctx, "delete from event where id=$1", id)
 	if err != nil {
 		return 0, err
 	}
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func LoadById(conn repository.Querier, id int) (*model.DbEvent, error) {
-	row := conn.QueryRow(context.Background(),
+func LoadById(
+	ctx context.Context,
+	conn repository.Querier,
+	id int,
+) (*model.DbEvent, error) {
+	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where id=$1", selector), id)
 	var event model.DbEvent
 	if err := scan(&event, row); err != nil {
@@ -62,9 +77,13 @@ func LoadById(conn repository.Querier, id int) (*model.DbEvent, error) {
 	return &event, nil
 }
 
-func LoadAll(conn repository.Querier) (ret []*model.DbEvent, err error) {
+func LoadAll(
+	ctx context.Context,
+	conn repository.Querier) (
+	ret []*model.DbEvent, err error,
+) {
 	var rows pgx.Rows
-	if rows, err = conn.Query(context.Background(),
+	if rows, err = conn.Query(ctx,
 		fmt.Sprintf("%s order by record_stamp desc ", selector)); err != nil {
 		return nil, err
 	}
@@ -76,8 +95,12 @@ func LoadAll(conn repository.Querier) (ret []*model.DbEvent, err error) {
 	return ret, err
 }
 
-func LoadByKey(conn repository.Querier, eventKey string) (*model.DbEvent, error) {
-	row := conn.QueryRow(context.Background(),
+func LoadByKey(
+	ctx context.Context,
+	conn repository.Querier,
+	eventKey string,
+) (*model.DbEvent, error) {
+	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where event_key=$1", selector), eventKey)
 	var event model.DbEvent
 	if err := scan(&event, row); err != nil {
@@ -86,8 +109,8 @@ func LoadByKey(conn repository.Querier, eventKey string) (*model.DbEvent, error)
 	return &event, nil
 }
 
-//nolint:whitespace // can't make both editor and linter happy
 func UpdateReplayInfo(
+	ctx context.Context,
 	conn repository.Querier,
 	eventKey string,
 	replayInfo model.ReplayInfo) (
@@ -103,7 +126,7 @@ func UpdateReplayInfo(
 	update event set data=mgm_jsonb_merge(data, '%s'::jsonb) where event_key=$1
 	`, jsonStr)
 
-	cmdTag, err := conn.Exec(context.Background(), sql, eventKey)
+	cmdTag, err := conn.Exec(ctx, sql, eventKey)
 	if err != nil {
 		return 0, err
 	}

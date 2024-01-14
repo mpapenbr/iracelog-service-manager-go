@@ -1,3 +1,4 @@
+//nolint:whitespace //can't make both the linter and editor happy :(
 package car
 
 // Note: data of this package is stored in the table wamp
@@ -12,7 +13,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-func Create(conn repository.Querier, state *model.DbCar) error {
+func Create(ctx context.Context, conn repository.Querier, state *model.DbCar) error {
 	_, err := conn.Exec(
 		context.Background(),
 		"insert into car (event_id, data) values ($1,$2)",
@@ -24,7 +25,11 @@ func Create(conn repository.Querier, state *model.DbCar) error {
 }
 
 // deletes all entries for an event with eventID
-func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
+func DeleteByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (int, error) {
 	cmdTag, err := conn.Exec(context.Background(),
 		"delete from car where event_id=$1", eventID)
 	if err != nil {
@@ -33,7 +38,11 @@ func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbCar, error) {
+func LoadByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) ([]*model.DbCar, error) {
 	rows, err := conn.Query(context.Background(),
 		fmt.Sprintf("%s where event_id=$1 order by data->'timestamp' asc", selector),
 		eventID)
@@ -54,7 +63,11 @@ func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbCar, error)
 	return ret, nil
 }
 
-func LoadLatestByEventId(conn repository.Querier, eventID int) (*model.DbCar, error) {
+func LoadLatestByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (*model.DbCar, error) {
 	row := conn.QueryRow(context.Background(),
 		fmt.Sprintf("%s where event_id=$1 order by data->'timestamp' desc", selector),
 		eventID)
@@ -64,7 +77,11 @@ func LoadLatestByEventId(conn repository.Querier, eventID int) (*model.DbCar, er
 }
 
 //nolint:lll //ok
-func LoadLatestByEventKey(conn repository.Querier, eventKey string) (*model.DbCar, error) {
+func LoadLatestByEventKey(
+	ctx context.Context,
+	conn repository.Querier,
+	eventKey string,
+) (*model.DbCar, error) {
 	row := conn.QueryRow(context.Background(), `
 	select c.id,c.event_id,c.data from car c join event e on c.event_id=e.id
 	where e.event_key=$1 order by c.data->'timestamp' desc`,

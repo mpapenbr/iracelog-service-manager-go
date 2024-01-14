@@ -10,6 +10,10 @@ import (
 	"github.com/gammazero/nexus/v3/client"
 	"github.com/gammazero/nexus/v3/wamp"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/utils"
@@ -17,6 +21,8 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/service"
 )
+
+var tracer = otel.Tracer("provider-endpoints")
 
 type ProviderManager struct {
 	pService        *service.ProviderService
@@ -109,7 +115,7 @@ func (pm *ProviderManager) handleRegisterProvider() error {
 				return client.InvokeResult{Args: wamp.List{"invalid registration request"}}
 			}
 			log.Debug("reveiced data", log.Any("data", req))
-			providerData, err := pm.pService.RegisterEvent(req)
+			providerData, err := pm.pService.RegisterEvent(ctx, req)
 			if err != nil {
 				return client.InvokeResult{Args: wamp.List{"could not register event"}}
 			}
@@ -167,7 +173,7 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 		processing.WithManifests(&pd.Event.Data.Manifests, raceSession),
 	)
 
-	go pm.storeAnalysisData(pd, time.NewTicker(15*time.Second))
+	go pm.storeAnalysisDataTicker(pd, time.NewTicker(15*time.Second))
 
 	topics := []struct {
 		topic   string
@@ -215,6 +221,24 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 //nolint:lll,dupl //by design
 func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
+		start := time.Now()
+		attrs := []attribute.KeyValue{
+			attribute.Int("eventId", pd.Event.ID),
+			attribute.String("eventKey", pd.Event.Key),
+		}
+		defer func() {
+			pd.StateRecorder.Recorder.Record(context.Background(), time.Since(start).Seconds(),
+				metric.WithAttributes(attrs...),
+			)
+		}()
+		pd.StateRecorder.MsgCouter++
+		traceCtx, mainSpan := tracer.Start(context.Background(), "handle state message")
+		mainSpan.SetAttributes([]attribute.KeyValue{
+			attribute.Int("msgCounter", pd.SpeedmapRecorder.MsgCouter),
+			attribute.Int("eventId", pd.Event.ID),
+			attribute.String("eventKey", pd.Event.Key),
+		}...)
+		defer mainSpan.End()
 		log.Debug("received message", log.Any("msg", event.Arguments))
 		stateData, err := prepareStateData(event)
 		if err != nil {
@@ -222,7 +246,9 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 				log.ErrorField(err))
 			return
 		}
-		if err := pm.stateService.AddState(&model.DbState{
+		storeCtx, storeSpan := tracer.Start(traceCtx, "store state message")
+		defer storeSpan.End()
+		if err := pm.stateService.AddState(storeCtx, &model.DbState{
 			EventID: pd.Event.ID,
 			Data:    *stateData,
 		}); err != nil {
@@ -230,6 +256,9 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 				log.ErrorField(err))
 			return
 		}
+		storeSpan.End()
+		_, processSpan := tracer.Start(traceCtx, "processing state message")
+		defer processSpan.End()
 		pd.Processor.ProcessState(stateData)
 	}
 }
@@ -238,13 +267,29 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 func (pm *ProviderManager) speedmapMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
 		log.Debug("received message", log.Any("msg", event.Arguments))
+		start := time.Now()
+		attrs := []attribute.KeyValue{
+			attribute.Int("eventId", pd.Event.ID),
+			attribute.String("eventKey", pd.Event.Key),
+		}
+		defer func() {
+			pd.SpeedmapRecorder.Recorder.Record(
+				context.Background(),
+				time.Since(start).Seconds(),
+				metric.WithAttributes(attrs...),
+			)
+		}()
+		traceCtx, mainSpan := tracer.Start(context.Background(), "handle speedmap message")
+		defer mainSpan.End()
 		speedmapData, err := prepareSpeedmapData(event)
 		if err != nil {
 			log.Error("Error preparing speedmapData",
 				log.ErrorField(err))
 			return
 		}
-		if err := pm.speedmapService.AddSpeedmap(&model.DbSpeedmap{
+		storeCtx, storeSpan := tracer.Start(traceCtx, "store speedmap message")
+		defer storeSpan.End()
+		if err := pm.speedmapService.AddSpeedmap(storeCtx, &model.DbSpeedmap{
 			EventID: pd.Event.ID,
 			Data:    *speedmapData,
 		}); err != nil {
@@ -278,7 +323,7 @@ func (pm *ProviderManager) carMessageHandler(pd *service.ProviderData) client.Ev
 }
 
 //nolint:whitespace,errcheck //can't make both editor and linter happy
-func (pm *ProviderManager) storeAnalysisData(
+func (pm *ProviderManager) storeAnalysisDataTicker(
 	pd *service.ProviderData,
 	ticker *time.Ticker,
 ) {
@@ -289,11 +334,42 @@ func (pm *ProviderManager) storeAnalysisData(
 
 			return
 		case <-ticker.C:
-			log.Debug("Storing analysis data", log.String("eventKey", pd.Event.Key))
-			pm.pService.UpdateAnalysisData(pd.Event.Key)
-			pm.pService.UpdateReplayInfo(pd.Event.Key)
+			pm.storeAnalysisData(pd)
 		}
 	}
+}
+
+//nolint:whitespace,errcheck //can't make both editor and linter happy
+func (pm *ProviderManager) storeAnalysisData(
+	pd *service.ProviderData,
+) {
+	log.Debug("Storing analysis data", log.String("eventKey", pd.Event.Key))
+	attrs := []attribute.KeyValue{
+		attribute.Int("eventId", pd.Event.ID),
+		attribute.String("eventKey", pd.Event.Key),
+	}
+	start := time.Now()
+	defer func() {
+		pd.AnalysisRecorder.Recorder.Record(
+			context.Background(),
+			time.Since(start).Seconds(),
+			metric.WithAttributes(attrs...),
+		)
+	}()
+
+	traceCtx, mainSpan := tracer.Start(context.Background(),
+		"store analysis data", trace.WithAttributes(attrs...))
+	defer mainSpan.End()
+	ctx, span := tracer.Start(traceCtx, "update analysis data")
+	if err := pm.pService.UpdateAnalysisData(ctx, pd.Event.Key); err != nil {
+		log.Warn("Error updating analysis data", log.ErrorField(err))
+	}
+	span.End()
+	ctx, span = tracer.Start(traceCtx, "update replay info")
+	if err := pm.pService.UpdateReplayInfo(ctx, pd.Event.Key); err != nil {
+		log.Warn("Error updating replay info", log.ErrorField(err))
+	}
+	span.End()
 }
 
 //nolint:whitespace //can't make both editor and linter happy
@@ -363,13 +439,10 @@ func (pm *ProviderManager) handleRemoveProvider() error {
 			}
 			log.Debug("received data", log.String("eventKey", req))
 			if pd, ok := pm.pService.Lookup[req]; ok {
+				// TODO: issue #66
+				// - ticker for storing analysis data
 				log.Debug("Calling cancel func", log.String("eventKey", req))
-				if err := pm.pService.UpdateAnalysisData(req); err != nil {
-					log.Warn("Error updating analysis data", log.ErrorField(err))
-				}
-				if err := pm.pService.UpdateReplayInfo(req); err != nil {
-					log.Warn("Error updating replay info", log.ErrorField(err))
-				}
+				pm.storeAnalysisData(pd)
 				pd.ActiveClient.CancelFunc()
 				pm.publishRemovedProvider(pd)
 				delete(pm.pService.Lookup, req)
@@ -395,10 +468,11 @@ func (pm *ProviderManager) handleEventExtraData() error {
 				}
 			}
 			if pd, ok := pm.pService.Lookup[*eventKey]; ok {
-				if err := pm.pService.StoreEventExtra(&model.DbEventExtra{
-					EventID: pd.Event.ID,
-					Data:    *extData,
-				}); err != nil {
+				if err := pm.pService.StoreEventExtra(
+					ctx, &model.DbEventExtra{
+						EventID: pd.Event.ID,
+						Data:    *extData,
+					}); err != nil {
 					log.Error("store extra data",
 						log.ErrorField(err),
 						log.Any("extraData", inv.Arguments))

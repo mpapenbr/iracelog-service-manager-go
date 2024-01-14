@@ -23,29 +23,30 @@ func InitAdminService(pool *pgxpool.Pool) *AdminService {
 }
 
 func (s *AdminService) DeleteEvent(id int) error {
-	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
+	ctx := context.Background()
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
-		_, err = car.DeleteByEventId(tx.Conn(), id)
+		_, err = car.DeleteByEventId(ctx, tx.Conn(), id)
 		if err != nil {
 			return err
 		}
-		_, err = state.DeleteByEventId(tx.Conn(), id)
+		_, err = state.DeleteByEventId(ctx, tx.Conn(), id)
 		if err != nil {
 			return err
 		}
-		_, err = speedmap.DeleteByEventId(tx.Conn(), id)
+		_, err = speedmap.DeleteByEventId(ctx, tx.Conn(), id)
 		if err != nil {
 			return err
 		}
-		_, err = analysis.DeleteByEventId(tx.Conn(), id)
+		_, err = analysis.DeleteByEventId(ctx, tx.Conn(), id)
 		if err != nil {
 			return err
 		}
-		_, err = event.DeleteExtraById(tx.Conn(), id)
+		_, err = event.DeleteExtraById(ctx, tx.Conn(), id)
 		if err != nil {
 			return err
 		}
-		_, err = event.DeleteById(tx.Conn(), id)
+		_, err = event.DeleteById(ctx, tx.Conn(), id)
 		return err
 	})
 }

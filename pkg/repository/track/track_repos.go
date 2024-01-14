@@ -1,3 +1,4 @@
+//nolint:whitespace //can't make both the linter and editor happy :(
 package track
 
 import (
@@ -10,8 +11,8 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-func Create(conn repository.Querier, track *model.DbTrack) error {
-	_, err := conn.Exec(context.Background(),
+func Create(ctx context.Context, conn repository.Querier, track *model.DbTrack) error {
+	_, err := conn.Exec(ctx,
 		"insert into track (id, data) values ($1,$2)",
 		track.ID, track.Data)
 	if err != nil {
@@ -21,16 +22,20 @@ func Create(conn repository.Querier, track *model.DbTrack) error {
 }
 
 // deletes an entry from the database, returns number of rows deleted.
-func DeleteById(conn repository.Querier, id int) (int, error) {
-	cmdTag, err := conn.Exec(context.Background(), "delete from track where id=$1", id)
+func DeleteById(ctx context.Context, conn repository.Querier, id int) (int, error) {
+	cmdTag, err := conn.Exec(ctx, "delete from track where id=$1", id)
 	if err != nil {
 		return 0, err
 	}
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func LoadById(conn repository.Querier, id int) (*model.DbTrack, error) {
-	row := conn.QueryRow(context.Background(),
+func LoadById(
+	ctx context.Context,
+	conn repository.Querier,
+	id int,
+) (*model.DbTrack, error) {
+	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where id=$1", selector), id)
 	var item model.DbTrack
 	if err := scan(&item, row); err != nil {
@@ -39,8 +44,12 @@ func LoadById(conn repository.Querier, id int) (*model.DbTrack, error) {
 	return &item, nil
 }
 
-func Update(conn repository.Querier, track *model.DbTrack) (int, error) {
-	cmdTag, err := conn.Exec(context.Background(),
+func Update(
+	ctx context.Context,
+	conn repository.Querier,
+	track *model.DbTrack,
+) (int, error) {
+	cmdTag, err := conn.Exec(ctx,
 		"update track set data=$1 where id=$2", track.Data, track.ID)
 	if err != nil {
 		return 0, err

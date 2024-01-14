@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gammazero/nexus/v3/client"
 	"github.com/gammazero/nexus/v3/wamp"
@@ -11,9 +12,12 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 )
 
-func NewClient() (*client.Client, error) {
+type ClientConfigFunc func(cfg *client.Config)
+
+func NewClient(opts ...ClientConfigFunc) (*client.Client, error) {
 	cfg := client.Config{
 		Realm: config.Realm,
+
 		// Logger:       logger,
 		HelloDetails: wamp.Dict{"authid": "backend"},
 		AuthHandlers: map[string]client.AuthFunc{
@@ -22,8 +26,40 @@ func NewClient() (*client.Client, error) {
 			},
 		},
 	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 	log.Info("Connecting to", log.String("url", config.URL))
 	return client.ConnectNet(context.Background(), config.URL, cfg)
+}
+
+func WithClientLogging(logger *log.Logger) ClientConfigFunc {
+	return func(cfg *client.Config) {
+		cfg.Logger = myLogWrapper{logger: logger}
+		cfg.Debug = logger.Level() == log.DebugLevel
+	}
+}
+
+type myLogWrapper struct {
+	logger *log.Logger
+}
+
+// Printf implements stdlog.StdLog.
+func (l myLogWrapper) Printf(format string, v ...interface{}) {
+	l.logger.Debug("nexus-client", log.String("msg", fmt.Sprintf(format, v...)))
+}
+
+// Println implements stdlog.StdLog.
+func (l myLogWrapper) Println(v ...interface{}) {
+	s := []string{}
+	for _, val := range v {
+		s = append(s, fmt.Sprintf("%v", val))
+	}
+	l.logger.Debug("nexus client", log.String("msg", strings.Join(s, " ")))
+}
+
+func (l myLogWrapper) Print(v ...interface{}) {
+	l.Println(v...)
 }
 
 func ExtractEventKey(inv *wamp.Invocation) (string, error) {

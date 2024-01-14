@@ -19,9 +19,13 @@ func InitSpeedmapService(pool *pgxpool.Pool) *SpeedmapService {
 	return &speedmapService
 }
 
-func (s *SpeedmapService) AddSpeedmap(entry *model.DbSpeedmap) error {
-	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
-		err := speedmap.Create(tx.Conn(), entry)
+//nolint:whitespace // can't make both linter and editor happy
+func (s *SpeedmapService) AddSpeedmap(
+	ctx context.Context,
+	entry *model.DbSpeedmap,
+) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := speedmap.Create(ctx, tx.Conn(), entry)
 		return err
 	})
 }

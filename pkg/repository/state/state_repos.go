@@ -1,3 +1,4 @@
+//nolint:whitespace // can't make both linter and editor happy
 package state
 
 // Note: data of this package is stored in the table wamp
@@ -14,9 +15,9 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-func Create(conn repository.Querier, state *model.DbState) error {
+func Create(ctx context.Context, conn repository.Querier, state *model.DbState) error {
 	_, err := conn.Exec(
-		context.Background(),
+		ctx,
 		"insert into wampdata (event_id, data) values ($1,$2)",
 		state.EventID, state.Data)
 	if err != nil {
@@ -26,8 +27,12 @@ func Create(conn repository.Querier, state *model.DbState) error {
 }
 
 // deletes all entries for an event with eventID
-func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
-	cmdTag, err := conn.Exec(context.Background(),
+func DeleteByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (int, error) {
+	cmdTag, err := conn.Exec(ctx,
 		"delete from wampdata where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
@@ -35,8 +40,12 @@ func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbState, error) {
-	rows, err := conn.Query(context.Background(),
+func LoadByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) ([]*model.DbState, error) {
+	rows, err := conn.Query(ctx,
 		fmt.Sprintf("%s where event_id=$1 order by data->'timestamp' asc", selector),
 		eventID)
 	if err != nil {
@@ -53,13 +62,14 @@ func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbState, erro
 // the first row contains full data, all other rows just containing the delta
 // information relative to the previous entry
 //
-//nolint:whitespace //can't make both editor and linter happy
+//nolint:funlen //ok
 func LoadByEventIdWithDelta(
+	ctx context.Context,
 	conn repository.Querier, eventID int, startTS float64, num int) (
 	*model.StateData, []*model.StateDelta, error,
 ) {
 	ret := make([]*model.StateDelta, 0)
-	rows, err := conn.Query(context.Background(), `
+	rows, err := conn.Query(ctx, `
 	select data from wampdata
     where event_id=$1 and (data->'timestamp')::numeric > $2
     order by (data->'timestamp')::numeric asc
