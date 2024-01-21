@@ -10,7 +10,14 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
-      "args": ["server", "--logFormat", "text", "--logLevel", "debug"]
+      "args": [
+        "server",
+        "--logFormat",
+        "text",
+        "--logLevel",
+        "info",
+        "--enable-telemetry"
+      ]
     },
     {
       "name": "Migrate",

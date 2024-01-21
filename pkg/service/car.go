@@ -20,8 +20,9 @@ func InitCarService(pool *pgxpool.Pool) *CarService {
 }
 
 func (s *CarService) AddCar(entry *model.DbCar) error {
-	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
-		err := car.Create(tx.Conn(), entry)
+	ctx := context.Background()
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := car.Create(ctx, tx.Conn(), entry)
 		return err
 	})
 }

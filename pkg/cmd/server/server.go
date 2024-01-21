@@ -1,13 +1,17 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
+	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
@@ -44,6 +48,14 @@ func NewServerCmd() *cobra.Command {
 		"logFormat",
 		"json",
 		"controls the log output format")
+	cmd.Flags().BoolVar(&config.EnableTelemetry,
+		"enable-telemetry",
+		false,
+		"enables telemetry")
+	cmd.Flags().StringVar(&config.TelemetryEndpoint,
+		"telemetry-endpoint",
+		"localhost:4317",
+		"Endpoint that receives open telemetry data")
 	return cmd
 }
 
@@ -58,6 +70,8 @@ func parseLogLevel(l string, defaultVal log.Level) log.Level {
 //nolint:funlen // by design
 func startServer() error {
 	var logger *log.Logger
+	var sqlLogger *log.Logger
+	var telemetry *config.Telemetry
 	switch config.LogFormat {
 	case "json":
 		logger = log.New(
@@ -65,10 +79,22 @@ func startServer() error {
 			parseLogLevel(config.LogLevel, log.InfoLevel),
 			log.WithCaller(true),
 			log.AddCallerSkip(1))
+		sqlLogger = log.New(
+			os.Stderr,
+			parseLogLevel(config.SQLLogLevel, log.InfoLevel),
+			log.WithCaller(true),
+			log.AddCallerSkip(1))
+
 	default:
 		logger = log.DevLogger(
 			os.Stderr,
 			parseLogLevel(config.LogLevel, log.DebugLevel),
+			log.WithCaller(true),
+			log.AddCallerSkip(1))
+
+		sqlLogger = log.DevLogger(
+			os.Stderr,
+			parseLogLevel(config.SQLLogLevel, log.InfoLevel),
 			log.WithCaller(true),
 			log.AddCallerSkip(1))
 	}
@@ -83,10 +109,26 @@ func startServer() error {
 	)
 	waitForRequiredServices()
 
+	pgTraceOption := postgres.WithTracer(sqlLogger, log.DebugLevel)
+	if config.EnableTelemetry {
+		log.Info("Enabling telemetry")
+		var err error
+		if telemetry, err = config.SetupTelemetry(context.Background()); err == nil {
+			pgTraceOption = postgres.WithOtlpTracer()
+		} else {
+			log.Warn("Could not setup telemetry", log.ErrorField(err))
+		}
+		err = otlpruntime.Start(otlpruntime.WithMinimumReadMemStatsInterval(time.Second))
+		if err != nil {
+			log.Warn("Could not start runtime metrics", log.ErrorField(err))
+		}
+	}
+
 	log.Info("Starting server")
 	pool := postgres.InitWithUrl(
 		config.DB,
-		postgres.WithTracer(logger, parseLogLevel(config.SQLLogLevel, log.DebugLevel)))
+		pgTraceOption,
+	)
 
 	pm, err := provider.InitProviderEndpoints(pool)
 	if err != nil {
@@ -94,7 +136,7 @@ func startServer() error {
 		return err
 	}
 
-	pub, err := public.InitPublicEndpoints(pool, pm.ProviderLookupFunc)
+	pub, err := public.InitPublicEndpoints(pool, pm.ProviderLookupFunc, logger)
 	if err != nil {
 		log.Error("server could not be started", log.ErrorField(err))
 		return err
@@ -107,6 +149,7 @@ func startServer() error {
 	}
 
 	log.Info("Server started")
+	setupGoRoutinesDump()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
@@ -115,6 +158,9 @@ func startServer() error {
 	pm.Shutdown()
 	pub.Shutdown()
 	adm.Shutdown()
+	if telemetry != nil {
+		telemetry.Shutdown()
+	}
 
 	//nolint:all // keeping by design
 	// select {
@@ -125,6 +171,20 @@ func startServer() error {
 
 	log.Info("Server terminated")
 	return nil
+}
+
+func setupGoRoutinesDump() {
+	go func() {
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGQUIT)
+		buf := make([]byte, 1<<20)
+		for {
+			<-sigs
+			stacklen := runtime.Stack(buf, true)
+			fmt.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n",
+				buf[:stacklen])
+		}
+	}()
 }
 
 func waitForRequiredServices() {
