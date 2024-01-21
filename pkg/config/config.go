@@ -11,5 +11,7 @@ var (
 	SQLLogLevel        string // sets the log level for sql subsystem
 	LogFormat          string // text vs json
 	MigrationSourceUrl string // location of migration files
+	EnableTelemetry    bool   // enable telemetry
+	TelemetryEndpoint  string // endpoint for telemetry
 
 )

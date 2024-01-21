@@ -1,3 +1,4 @@
+//nolint:whitespace //can't make both the linter and editor happy :(
 package analysis
 
 import (
@@ -10,8 +11,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-//nolint:whitespace //can't make both the linter and editor happy :(
-func Create(conn repository.Querier, entry *model.DbAnalysis) (
+func Create(ctx context.Context, conn repository.Querier, entry *model.DbAnalysis) (
 	*model.DbAnalysis, error,
 ) {
 	row := conn.QueryRow(context.Background(), `
@@ -28,7 +28,11 @@ func Create(conn repository.Querier, entry *model.DbAnalysis) (
 }
 
 // deletes all entries for an event with eventID
-func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
+func DeleteByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (int, error) {
 	cmdTag, err := conn.Exec(context.Background(),
 		"delete from analysis where event_id=$1", eventID)
 	if err != nil {
@@ -37,7 +41,11 @@ func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func LoadByEventId(conn repository.Querier, eventID int) (*model.DbAnalysis, error) {
+func LoadByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (*model.DbAnalysis, error) {
 	row := conn.QueryRow(context.Background(),
 		fmt.Sprintf("%s where event_id=$1", selector), eventID)
 	var item model.DbAnalysis
@@ -47,7 +55,11 @@ func LoadByEventId(conn repository.Querier, eventID int) (*model.DbAnalysis, err
 	return &item, nil
 }
 
-func Update(conn repository.Querier, analysis *model.DbAnalysis) (int, error) {
+func Update(
+	ctx context.Context,
+	conn repository.Querier,
+	analysis *model.DbAnalysis,
+) (int, error) {
 	cmdTag, err := conn.Exec(context.Background(),
 		"update analysis set data=$1 where id=$2", analysis.Data, analysis.ID)
 	if err != nil {

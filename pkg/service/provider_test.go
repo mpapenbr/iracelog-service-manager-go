@@ -82,7 +82,7 @@ func TestProviderService_RegisterEvent(t *testing.T) {
 				pool:   tt.fields.pool,
 				Lookup: tt.fields.lookup,
 			}
-			got, err := s.RegisterEvent(tt.args.req)
+			got, err := s.RegisterEvent(context.Background(), tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ProviderService.RegisterEvent() error = %v, wantErr %v",
 					err, tt.wantErr)
@@ -186,18 +186,20 @@ func TestProviderService_StoreEventExtra(t *testing.T) {
 			s := &ProviderService{
 				pool: tt.fields.pool, Lookup: ProviderLookup{},
 			}
+			ctx := context.Background()
 			//nolint:gosec //ignoring G601: implicit memory aliasing of items in for range loop
-			if pd, err := s.RegisterEvent(&tt.args.reqEvent); err != nil {
+			if pd, err := s.RegisterEvent(ctx, &tt.args.reqEvent); err != nil {
 				t.Errorf("ProviderService.StoreEventExtra() error = %v", err)
 			} else {
 				tt.args.extra.EventID = pd.Event.ID
 			}
 
-			if err := s.StoreEventExtra(tt.args.extra); err != nil {
+			if err := s.StoreEventExtra(ctx, tt.args.extra); err != nil {
 				t.Errorf("ProviderService.StoreEventExtra() error = %v", err)
 			}
-			if err := pool.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
+			if err := pool.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
 				dbTrack, err := track.LoadById(
+					ctx,
 					c.Conn(),
 					tt.args.reqEvent.EventInfo.TrackId)
 				if err != nil {

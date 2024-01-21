@@ -34,8 +34,9 @@ func createSampleEntry(db *pgxpool.Pool) *model.DbEvent {
 		Description: "myDescr",
 		Data:        data,
 	}
-	err := pgx.BeginFunc(context.Background(), db, func(tx pgx.Tx) error {
-		_, err := Create(tx.Conn(), event)
+	ctx := context.Background()
+	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+		_, err := Create(ctx, tx.Conn(), event)
 		return err
 	})
 	if err != nil {
@@ -73,8 +74,9 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				got, err := Create(c.Conn(), tt.args.event)
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				got, err := Create(ctx, c.Conn(), tt.args.event)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("EventRepository.CreateEvent() error = %v, wantErr %v",
 						err, tt.wantErr)
@@ -115,8 +117,9 @@ func TestEventRepository_LoadEventById(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				got, err := LoadById(c.Conn(), tt.args.id)
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				got, err := LoadById(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("EventRepository.LoadEventById() error = %v, wantErr %v", err, tt.wantErr)
 					return nil
@@ -157,8 +160,9 @@ func TestEventRepository_LoadEventByKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				got, err := LoadByKey(c.Conn(), tt.args.key)
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				got, err := LoadByKey(ctx, c.Conn(), tt.args.key)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("EventRepository.LoadEventByKey() error = %v, wantErr %v",
 						err, tt.wantErr)
@@ -200,8 +204,9 @@ func TestEventRepository_DeleteEventById(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				got, err := DeleteById(c.Conn(), tt.args.id)
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				got, err := DeleteById(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("EventRepository.DeleteEventById() error = %v, wantErr %v",
 						err, tt.wantErr)
@@ -225,15 +230,15 @@ func TestEventRepository_UpdateReplayInfo(t *testing.T) {
 		MinSessionTime: 2.0,
 		MaxSessionTime: 3.0,
 	}
-
-	err := pgx.BeginFunc(context.Background(), db, func(tx pgx.Tx) error {
-		numUpdated, err := UpdateReplayInfo(tx.Conn(), sample.Key, replayInfo)
+	ctx := context.Background()
+	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+		numUpdated, err := UpdateReplayInfo(ctx, tx.Conn(), sample.Key, replayInfo)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, numUpdated)
 		return err
 	})
 	assert.Nil(t, err)
-	event, err := LoadByKey(db, sample.Key)
+	event, err := LoadByKey(ctx, db, sample.Key)
 	assert.Nil(t, err)
 	assert.Equal(t, replayInfo, event.Data.ReplayInfo)
 }

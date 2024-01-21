@@ -19,9 +19,9 @@ func InitStateService(pool *pgxpool.Pool) *StateService {
 	return &stateService
 }
 
-func (s *StateService) AddState(entry *model.DbState) error {
-	return pgx.BeginFunc(context.Background(), s.pool, func(tx pgx.Tx) error {
-		err := state.Create(tx.Conn(), entry)
+func (s *StateService) AddState(ctx context.Context, entry *model.DbState) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := state.Create(ctx, tx.Conn(), entry)
 		return err
 	})
 }

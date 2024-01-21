@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/exaring/otelpgx"
 	pgxuuid "github.com/jackc/pgx-gofrs-uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,6 +19,12 @@ type PoolConfigOption func(cfg *pgxpool.Config)
 func WithTracer(logger *log.Logger, level log.Level) PoolConfigOption {
 	return func(cfg *pgxpool.Config) {
 		cfg.ConnConfig.Tracer = &myQueryTracer{log: logger, level: level}
+	}
+}
+
+func WithOtlpTracer() PoolConfigOption {
+	return func(cfg *pgxpool.Config) {
+		cfg.ConnConfig.Tracer = otelpgx.NewTracer()
 	}
 }
 

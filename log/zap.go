@@ -30,6 +30,10 @@ type Logger struct {
 	level Level
 }
 
+func (l *Logger) Level() Level {
+	return l.level
+}
+
 func (l *Logger) Debug(msg string, fields ...Field) {
 	l.l.Debug(msg, fields...)
 }

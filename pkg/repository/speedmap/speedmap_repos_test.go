@@ -29,11 +29,11 @@ func TestLoadRange(t *testing.T) {
 		Description: "myDescr",
 		Data:        model.EventData{},
 	}
-
-	err := pgx.BeginFunc(context.Background(), db, func(tx pgx.Tx) error {
-		e, err := event.Create(tx.Conn(), dbEvent)
+	ctx := context.Background()
+	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+		e, err := event.Create(ctx, tx.Conn(), dbEvent)
 		for i := 1; i <= 3; i++ {
-			Create(tx.Conn(), &model.DbSpeedmap{
+			Create(ctx, tx.Conn(), &model.DbSpeedmap{
 				EventID: e.ID,
 				Data:    model.SpeedmapData{Type: i, Timestamp: float64(i * 10.0)},
 			})
@@ -62,7 +62,8 @@ func TestLoadRange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRet, err := LoadRange(db, dbEvent.ID, tt.args.tsBegin, tt.args.num)
+			ctx := context.Background()
+			gotRet, err := LoadRange(ctx, db, dbEvent.ID, tt.args.tsBegin, tt.args.num)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadRange() error = %v, wantErr %v", err, tt.wantErr)
 				return

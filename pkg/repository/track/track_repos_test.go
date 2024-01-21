@@ -26,8 +26,9 @@ func createSampleEntry(db *pgxpool.Pool) *model.DbTrack {
 		ID:   1,
 		Data: model.TrackInfo{},
 	}
+	ctx := context.Background()
 	err := pgx.BeginFunc(context.Background(), db, func(tx pgx.Tx) error {
-		err := Create(tx, track)
+		err := Create(ctx, tx, track)
 		return err
 	})
 	if err != nil {
@@ -59,8 +60,9 @@ func TestCreate(t *testing.T) {
 	}
 	createSampleEntry(pool)
 	for _, tt := range tests {
+		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
-			err := Create(pool, tt.args.track)
+			err := Create(ctx, pool, tt.args.track)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create error = %v, wantErr %v",
 					err, tt.wantErr)
@@ -102,12 +104,13 @@ func TestCheckNullablePit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := pool.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				if err := Create(c, tt.args.track); err != nil {
+			ctx := context.Background()
+			err := pool.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				if err := Create(ctx, c, tt.args.track); err != nil {
 					t.Errorf("Could not create track = %v", err)
 					return err
 				}
-				check, err := LoadById(c, tt.args.track.ID)
+				check, err := LoadById(ctx, c, tt.args.track.ID)
 				if err != nil {
 					t.Errorf("Could not read track = %v", err)
 				}
@@ -147,8 +150,9 @@ func TestLoadById(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				got, err := LoadById(c.Conn(), tt.args.id)
+			ctx := context.Background()
+			pool.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				got, err := LoadById(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("LoadEventById() error = %v, wantErr %v", err, tt.wantErr)
 					return err
@@ -189,8 +193,9 @@ func TestDeleteById(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db.AcquireFunc(context.Background(), func(c *pgxpool.Conn) error {
-				got, err := DeleteById(c.Conn(), tt.args.id)
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				got, err := DeleteById(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("DeleteById() error = %v, wantErr %v", err, tt.wantErr)
 					return nil

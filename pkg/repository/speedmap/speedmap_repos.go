@@ -1,3 +1,4 @@
+//nolint:whitespace // can't make both editor and linter happy
 package speedmap
 
 // Note: data of this package is stored in the table wamp
@@ -13,9 +14,9 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
-func Create(conn repository.Querier, sm *model.DbSpeedmap) error {
+func Create(ctx context.Context, conn repository.Querier, sm *model.DbSpeedmap) error {
 	_, err := conn.Exec(
-		context.Background(),
+		ctx,
 		"insert into speedmap (event_id, data) values ($1,$2)",
 		sm.EventID, sm.Data)
 	if err != nil {
@@ -25,8 +26,12 @@ func Create(conn repository.Querier, sm *model.DbSpeedmap) error {
 }
 
 // deletes all entries for an event with eventID
-func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
-	cmdTag, err := conn.Exec(context.Background(),
+func DeleteByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (int, error) {
+	cmdTag, err := conn.Exec(ctx,
 		"delete from speedmap where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
@@ -34,8 +39,12 @@ func DeleteByEventId(conn repository.Querier, eventID int) (int, error) {
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbSpeedmap, error) {
-	rows, err := conn.Query(context.Background(),
+func LoadByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) ([]*model.DbSpeedmap, error) {
+	rows, err := conn.Query(ctx,
 		fmt.Sprintf("%s where event_id=$1 order by data->'timestamp' asc", selector),
 		eventID)
 	if err != nil {
@@ -49,9 +58,12 @@ func LoadByEventId(conn repository.Querier, eventID int) ([]*model.DbSpeedmap, e
 	return ret, err
 }
 
-//nolint:lll //ok
-func LoadLatestByEventId(conn repository.Querier, eventID int) (*model.DbSpeedmap, error) {
-	row := conn.QueryRow(context.Background(),
+func LoadLatestByEventId(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+) (*model.DbSpeedmap, error) {
+	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where event_id=$1 order by data->'timestamp' desc", selector),
 		eventID)
 	var e model.DbSpeedmap
@@ -59,9 +71,12 @@ func LoadLatestByEventId(conn repository.Querier, eventID int) (*model.DbSpeedma
 	return &e, err
 }
 
-//nolint:lll //ok
-func LoadLatestByEventKey(conn repository.Querier, eventKey string) (*model.DbSpeedmap, error) {
-	row := conn.QueryRow(context.Background(), `
+func LoadLatestByEventKey(
+	ctx context.Context,
+	conn repository.Querier,
+	eventKey string,
+) (*model.DbSpeedmap, error) {
+	row := conn.QueryRow(ctx, `
 	select s.id,s.event_id,s.data from speedmap s join event e on s.event_id=e.id
 	where e.event_key=$1 order by s.data->'timestamp' desc`,
 		eventKey)
@@ -70,12 +85,16 @@ func LoadLatestByEventKey(conn repository.Querier, eventKey string) (*model.DbSp
 	return &e, err
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func LoadRange(conn repository.Querier, eventID int, tsBegin float64, num int) (
+func LoadRange(
+	ctx context.Context,
+	conn repository.Querier,
+	eventID int,
+	tsBegin float64,
+	num int) (
 	ret []*model.SpeedmapData, err error,
 ) {
 	var rows pgx.Rows
-	if rows, err = conn.Query(context.Background(), `
+	if rows, err = conn.Query(ctx, `
 	select id,event_id,data from speedmap
     where event_id=$1 and (data->'timestamp')::numeric > $2
     order by (data->'timestamp')::numeric asc
@@ -99,12 +118,16 @@ func LoadRange(conn repository.Querier, eventID int, tsBegin float64, num int) (
 	}
 }
 
-//nolint:lll,funlen // best way to keep things readable
-func LoadAvgLapOverTime(conn repository.Querier, eventId, intervalSecs int) (
+//nolint:funlen,lll // best way to keep things readable
+func LoadAvgLapOverTime(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId,
+	intervalSecs int) (
 	[]*model.AvgLapOverTime, error,
 ) {
 	// calculate start id and starting time for date_bin
-	row := conn.QueryRow(context.Background(), `
+	row := conn.QueryRow(ctx, `
 SELECT sm.id,
        (data -> 'timestamp')::DECIMAL AS start
 FROM (SELECT id,
@@ -124,7 +147,7 @@ ORDER BY sm.id ASC LIMIT 1;
 	}
 
 	// check if there is an entry after startID where laptime >0
-	row = conn.QueryRow(context.Background(), `
+	row = conn.QueryRow(ctx, `
 SELECT id,
 	(data -> 'timestamp')::DECIMAL AS start
 FROM speedmap
@@ -136,7 +159,7 @@ ORDER BY id ASC LIMIT 1;
 		return nil, nil // empty result (not enough data)
 	}
 	// the big one with date_bin.
-	rows, err := conn.Query(context.Background(), `
+	rows, err := conn.Query(ctx, `
 SELECT s.data
 FROM speedmap s
 WHERE s.id IN (SELECT y.firstId
