@@ -1,6 +1,6 @@
 package config
 
-// this holds the resolved configuration values
+// this holds the resolved configuration values from CLI
 var (
 	DB                 string // connection string for the database
 	URL                string // URL of WAMP server
@@ -13,5 +13,12 @@ var (
 	MigrationSourceUrl string // location of migration files
 	EnableTelemetry    bool   // enable telemetry
 	TelemetryEndpoint  string // endpoint for telemetry
+	ProfilingPort      int    // port for profiling
+	PrintMessage       bool   // if true, the message payload will be print on debug level
 
 )
+
+// Config holds the configuration values which are used by the application
+type Config struct {
+	PrintMessage bool // if true, the message payload will be print on debug level
+}

@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof" //nolint:gosec // by design
 	"os"
 	"os/signal"
 	"runtime"
@@ -56,6 +58,14 @@ func NewServerCmd() *cobra.Command {
 		"telemetry-endpoint",
 		"localhost:4317",
 		"Endpoint that receives open telemetry data")
+	cmd.Flags().IntVar(&config.ProfilingPort,
+		"profiling-port",
+		0,
+		"port to use for providing profiling data")
+	cmd.Flags().BoolVar(&config.PrintMessage,
+		"print-message",
+		false,
+		"if true and log level is debug, the message payload will be printed")
 	return cmd
 }
 
@@ -67,7 +77,7 @@ func parseLogLevel(l string, defaultVal log.Level) log.Level {
 	return level
 }
 
-//nolint:funlen // by design
+//nolint:funlen,cyclop // by design
 func startServer() error {
 	var logger *log.Logger
 	var sqlLogger *log.Logger
@@ -107,6 +117,20 @@ func startServer() error {
 		log.String("realm", config.Realm),
 		log.String("password", config.Password),
 	)
+
+	if config.ProfilingPort > 0 {
+		log.Info("Starting profiling server on port", log.Int("port", config.ProfilingPort))
+		go func() {
+			//nolint:gosec // by design
+			err := http.ListenAndServe(
+				fmt.Sprintf("localhost:%d", config.ProfilingPort),
+				nil)
+			if err != nil {
+				log.Error("Profiling server stopped", log.ErrorField(err))
+			}
+		}()
+	}
+
 	waitForRequiredServices()
 
 	pgTraceOption := postgres.WithTracer(sqlLogger, log.DebugLevel)
