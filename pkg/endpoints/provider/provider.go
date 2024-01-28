@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing"
@@ -30,6 +31,7 @@ type ProviderManager struct {
 	speedmapService *service.SpeedmapService
 	carService      *service.CarService
 	wampClient      *client.Client
+	printMessage    bool
 }
 
 // contains the data sent to the client when using provider endpoints
@@ -39,6 +41,38 @@ type ProviderResponseData struct {
 	Info       model.EventDataInfo `json:"info"`
 	RecordDate time.Time           `json:"recordDate"`
 	DbId       int                 `json:"dbId"`
+}
+
+type Option func(*ProviderManager)
+
+func WithConfig(cfg config.Config) Option {
+	return func(pm *ProviderManager) {
+		pm.printMessage = cfg.PrintMessage
+	}
+}
+
+func WithPersistence(db *pgxpool.Pool) Option {
+	return func(pm *ProviderManager) {
+		pm.pService = service.InitProviderService(db)
+		pm.stateService = service.InitStateService(db)
+		pm.speedmapService = service.InitSpeedmapService(db)
+		pm.carService = service.InitCarService(db)
+	}
+}
+
+func NewProviderManager(opts ...Option) (*ProviderManager, error) {
+	pm := &ProviderManager{}
+	for _, opt := range opts {
+		opt(pm)
+	}
+	if pm.wampClient == nil {
+		var err error
+		pm.wampClient, err = utils.NewClient()
+		if err != nil {
+			log.Fatal("Could not connect wamp client", log.ErrorField(err))
+		}
+	}
+	return pm, nil
 }
 
 func InitProviderEndpoints(pool *pgxpool.Pool) (*ProviderManager, error) {
@@ -114,7 +148,9 @@ func (pm *ProviderManager) handleRegisterProvider() error {
 			if err != nil {
 				return client.InvokeResult{Args: wamp.List{"invalid registration request"}}
 			}
-			log.Debug("reveiced data", log.Any("data", req))
+			if pm.printMessage {
+				log.Debug("received data", log.Any("data", req))
+			}
 			providerData, err := pm.pService.RegisterEvent(ctx, req)
 			if err != nil {
 				return client.InvokeResult{Args: wamp.List{"could not register event"}}
@@ -239,7 +275,9 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 			attribute.String("eventKey", pd.Event.Key),
 		}...)
 		defer mainSpan.End()
-		log.Debug("received message", log.Any("msg", event.Arguments))
+		if pm.printMessage {
+			log.Debug("received message", log.Any("msg", event.Arguments))
+		}
 		stateData, err := prepareStateData(event)
 		if err != nil {
 			log.Error("Error preparing stateData",
@@ -266,7 +304,9 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 //nolint:lll,dupl //by design
 func (pm *ProviderManager) speedmapMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
-		log.Debug("received message", log.Any("msg", event.Arguments))
+		if pm.printMessage {
+			log.Debug("received message", log.Any("msg", event.Arguments))
+		}
 		start := time.Now()
 		attrs := []attribute.KeyValue{
 			attribute.Int("eventId", pd.Event.ID),
@@ -281,6 +321,7 @@ func (pm *ProviderManager) speedmapMessageHandler(pd *service.ProviderData) clie
 		}()
 		traceCtx, mainSpan := tracer.Start(context.Background(), "handle speedmap message")
 		defer mainSpan.End()
+
 		speedmapData, err := prepareSpeedmapData(event)
 		if err != nil {
 			log.Error("Error preparing speedmapData",
@@ -303,7 +344,9 @@ func (pm *ProviderManager) speedmapMessageHandler(pd *service.ProviderData) clie
 //nolint:lll,dupl //by design
 func (pm *ProviderManager) carMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
-		log.Debug("received message", log.Any("msg", event.Arguments))
+		if pm.printMessage {
+			log.Debug("received message", log.Any("msg", event.Arguments))
+		}
 		carData, err := prepareCarData(event)
 		if err != nil {
 			log.Error("Error preparing carData",
@@ -335,6 +378,7 @@ func (pm *ProviderManager) storeAnalysisDataTicker(
 			return
 		case <-ticker.C:
 			pm.storeAnalysisData(pd)
+
 		}
 	}
 }
