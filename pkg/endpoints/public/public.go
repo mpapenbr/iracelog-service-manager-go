@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
@@ -32,21 +33,27 @@ type (
 		endpoints    []endpointHandler
 		wampClient   *client.Client
 		providerFunc ProviderLookupFunc
+		pool         *pgxpool.Pool
+		printMessage bool
 	}
+	endpointParam struct {
+		name     string
+		pool     *pgxpool.Pool
+		recorder metric.Float64Histogram
+	}
+	endpointHandler struct {
+		name    string
+		handler func(*endpointParam) client.InvocationHandler
+		// metricName string
+		metricRecorder metric.Float64Histogram
+	}
+	Option func(*PublicManager)
 )
 
-type endpointParam struct {
-	name     string
-	pool     *pgxpool.Pool
-	recorder metric.Float64Histogram
-}
-
-type endpointHandler struct {
-	name    string
-	handler func(*endpointParam) client.InvocationHandler
-	// metricName string
-	metricRecorder metric.Float64Histogram
-}
+var (
+	meter  = otel.Meter("public-endpoints")
+	tracer = otel.Tracer("public-endpoints")
+)
 
 //nolint:whitespace,unparam //ok
 func prepareHandler(
@@ -71,58 +78,67 @@ func prepareHandler(
 	}
 }
 
-var (
-	meter  = otel.Meter("public-endpoints")
-	tracer = otel.Tracer("public-endpoints")
-)
+func WithConfig(cfg config.Config) Option {
+	return func(pm *PublicManager) {
+		pm.printMessage = cfg.PrintMessage
+	}
+}
 
-//nolint:whitespace,gocritic //can't make both the linter and editor happy :(
-func InitPublicEndpoints(
-	pool *pgxpool.Pool,
-	providerLookup ProviderLookupFunc,
-	logger *log.Logger,
-) (*PublicManager, error) {
-	wampClient, err := utils.NewClient(utils.WithClientLogging(logger))
-	if err != nil {
-		log.Fatal("Could not connect wamp client", log.ErrorField(err))
+func WithPersistence(db *pgxpool.Pool) Option {
+	return func(pm *PublicManager) {
+		pm.pool = db
 	}
-	ret := PublicManager{
-		wampClient:   wampClient,
-		providerFunc: providerLookup,
-		endpoints: []endpointHandler{
-			prepareHandler("get_events", "", "get list of events", getEventList),
-			prepareHandler("get_event_info", "", "", getEventInfoByIdHandler),
-			prepareHandler("get_event_info_by_key", "", "", getEventInfoByKeyHandler),
-			prepareHandler("get_event_cars", "", "", getEventCarsById),
-			prepareHandler("get_event_cars_by_key", "", "", getEventCarsByKey),
-			prepareHandler("get_event_speedmap", "", "", getSpeemapById),
-			prepareHandler("get_event_speedmap_by_key", "", "", getSpeemapByKey),
-			prepareHandler("get_track_info", "", "", getTrackInfoByIdHandler),
-			prepareHandler("archive.get_event_analysis", "", "", getEventAnalysisById),
-			prepareHandler("archive.avglap_over_time", "", "", getAvgLapOverTime),
-			prepareHandler("archive.state.delta", "", "", getStatesWithDiff),
-			prepareHandler("archive.speedmap", "", "", getArchivedSpeedmap),
-			prepareHandler("get_version", "", "", getVersion),
-		},
+}
+
+func WithWampClient(wampClient *client.Client) Option {
+	return func(pm *PublicManager) {
+		pm.wampClient = wampClient
 	}
-	for _, endpoint := range ret.endpoints {
+}
+
+func WithProviderLookup(lookup ProviderLookupFunc) Option {
+	return func(pm *PublicManager) {
+		pm.providerFunc = lookup
+	}
+}
+
+//nolint:gocritic //by design
+func NewPublicManager(opts ...Option) (*PublicManager, error) {
+	pm := &PublicManager{}
+	for _, opt := range opts {
+		opt(pm)
+	}
+	pm.endpoints = []endpointHandler{
+		prepareHandler("get_events", "", "get list of events", getEventList),
+		prepareHandler("get_event_info", "", "", getEventInfoByIdHandler),
+		prepareHandler("get_event_info_by_key", "", "", getEventInfoByKeyHandler),
+		prepareHandler("get_event_cars", "", "", getEventCarsById),
+		prepareHandler("get_event_cars_by_key", "", "", getEventCarsByKey),
+		prepareHandler("get_event_speedmap", "", "", getSpeemapById),
+		prepareHandler("get_event_speedmap_by_key", "", "", getSpeemapByKey),
+		prepareHandler("get_track_info", "", "", getTrackInfoByIdHandler),
+		prepareHandler("archive.get_event_analysis", "", "", getEventAnalysisById),
+		prepareHandler("archive.avglap_over_time", "", "", getAvgLapOverTime),
+		prepareHandler("archive.state.delta", "", "", getStatesWithDiff),
+		prepareHandler("archive.speedmap", "", "", getArchivedSpeedmap),
+		prepareHandler("get_version", "", "", getVersion),
+	}
+	for _, endpoint := range pm.endpoints {
 		name := fmt.Sprintf("racelog.public.%s", endpoint.name)
 
-		if err := wampClient.Register(name,
+		if err := pm.wampClient.Register(name,
 			endpoint.handler(
-				&endpointParam{name, pool, endpoint.metricRecorder}),
+				&endpointParam{name, pm.pool, endpoint.metricRecorder}),
 			wamp.Dict{}); err != nil {
 			log.Error("Register", zap.String("endpoint", name), log.ErrorField(err))
 		}
-
 	}
-
 	name := "racelog.public.live.get_event_analysis_by_key"
-	if err := wampClient.Register(name,
-		getLiveEventAnalysisByKey(ret.providerFunc), wamp.Dict{}); err != nil {
+	if err := pm.wampClient.Register(name,
+		getLiveEventAnalysisByKey(pm.providerFunc), wamp.Dict{}); err != nil {
 		log.Error("Register", zap.String("endpoint", name), log.ErrorField(err))
 	}
-	return &ret, nil
+	return pm, nil
 }
 
 //nolint:gocritic //by design

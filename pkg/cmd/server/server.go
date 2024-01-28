@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gammazero/nexus/v3/client"
 	"github.com/spf13/cobra"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 
@@ -21,13 +22,21 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/admin"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/public"
+	eputils "github.com/mpapenbr/iracelog-service-manager-go/pkg/endpoints/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
+var appConfig config.Config // holds processed config values
+
+//nolint:funlen // by design
 func NewServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "starts the server",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			appConfig = config.Config{}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return startServer()
 		},
@@ -62,7 +71,7 @@ func NewServerCmd() *cobra.Command {
 		"profiling-port",
 		0,
 		"port to use for providing profiling data")
-	cmd.Flags().BoolVar(&config.PrintMessage,
+	cmd.Flags().BoolVar(&appConfig.PrintMessage,
 		"print-message",
 		false,
 		"if true and log level is debug, the message payload will be printed")
@@ -154,19 +163,31 @@ func startServer() error {
 		pgTraceOption,
 	)
 
-	pm, err := provider.InitProviderEndpoints(pool)
+	pm, err := provider.NewProviderManager(
+		provider.WithPersistence(pool),
+		provider.WithConfig(appConfig),
+		provider.WithWampClient(getWampClient(logger)),
+	)
 	if err != nil {
 		log.Error("server could not be started", log.ErrorField(err))
 		return err
 	}
 
-	pub, err := public.InitPublicEndpoints(pool, pm.ProviderLookupFunc, logger)
+	pub, err := public.NewPublicManager(
+		public.WithPersistence(pool),
+		public.WithConfig(appConfig),
+		public.WithWampClient(getWampClient(logger)),
+		public.WithProviderLookup(pm.ProviderLookupFunc),
+	)
 	if err != nil {
 		log.Error("server could not be started", log.ErrorField(err))
 		return err
 	}
 
-	adm, err := admin.InitAdminEndpoints(pool)
+	adm, err := admin.NewAdminManager(
+		admin.WithPersistence(pool),
+		admin.WithWampClient(getWampClient(logger)),
+	)
 	if err != nil {
 		log.Error("server could not be started", log.ErrorField(err))
 		return err
@@ -195,6 +216,14 @@ func startServer() error {
 
 	log.Info("Server terminated")
 	return nil
+}
+
+func getWampClient(logger *log.Logger) *client.Client {
+	ret, err := eputils.NewClient(eputils.WithClientLogging(logger))
+	if err != nil {
+		log.Fatal("Could not connect wamp client", log.ErrorField(err))
+	}
+	return ret
 }
 
 func setupGoRoutinesDump() {

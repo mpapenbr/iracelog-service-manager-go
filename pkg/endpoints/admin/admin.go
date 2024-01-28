@@ -13,26 +13,39 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/service"
 )
 
-type AdminManager struct {
-	wampClient *client.Client
-	aService   *service.AdminService
+type (
+	AdminManager struct {
+		wampClient *client.Client
+		aService   *service.AdminService
+	}
+
+	Option func(*AdminManager)
+)
+
+func WithPersistence(db *pgxpool.Pool) Option {
+	return func(pm *AdminManager) {
+		pm.aService = service.InitAdminService(db)
+	}
 }
 
-func InitAdminEndpoints(pool *pgxpool.Pool) (*AdminManager, error) {
-	wampClient, err := utils.NewClient()
-	if err != nil {
-		log.Fatal("Could not connect wamp client", log.ErrorField(err))
+func WithWampClient(wampClient *client.Client) Option {
+	return func(pm *AdminManager) {
+		pm.wampClient = wampClient
 	}
-	ret := AdminManager{
-		wampClient: wampClient,
-		aService:   service.InitAdminService(pool),
-	}
+}
 
+func NewAdminManager(opts ...Option) (*AdminManager, error) {
+	ret := &AdminManager{}
+	for _, opt := range opts {
+		opt(ret)
+	}
+	if ret.aService == nil {
+		return nil, fmt.Errorf("no persistence layer provided")
+	}
 	if err := ret.handleDeleteEvent(); err != nil {
 		return nil, err
 	}
-
-	return &ret, nil
+	return ret, nil
 }
 
 func (admin *AdminManager) Shutdown() {
