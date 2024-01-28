@@ -51,6 +51,12 @@ func WithConfig(cfg config.Config) Option {
 	}
 }
 
+func WithWampClient(wampClient *client.Client) Option {
+	return func(pm *ProviderManager) {
+		pm.wampClient = wampClient
+	}
+}
+
 func WithPersistence(db *pgxpool.Pool) Option {
 	return func(pm *ProviderManager) {
 		pm.pService = service.InitProviderService(db)
@@ -65,43 +71,20 @@ func NewProviderManager(opts ...Option) (*ProviderManager, error) {
 	for _, opt := range opts {
 		opt(pm)
 	}
-	if pm.wampClient == nil {
-		var err error
-		pm.wampClient, err = utils.NewClient()
-		if err != nil {
-			log.Fatal("Could not connect wamp client", log.ErrorField(err))
-		}
+
+	if err := pm.handleRegisterProvider(); err != nil {
+		return nil, err
+	}
+	if err := pm.handleRemoveProvider(); err != nil {
+		return nil, err
+	}
+	if err := pm.handleListProvider(); err != nil {
+		return nil, err
+	}
+	if err := pm.handleEventExtraData(); err != nil {
+		return nil, err
 	}
 	return pm, nil
-}
-
-func InitProviderEndpoints(pool *pgxpool.Pool) (*ProviderManager, error) {
-	wampClient, err := utils.NewClient()
-	if err != nil {
-		log.Fatal("Could not connect wamp client", log.ErrorField(err))
-	}
-
-	ret := &ProviderManager{
-		pService:        service.InitProviderService(pool),
-		stateService:    service.InitStateService(pool),
-		speedmapService: service.InitSpeedmapService(pool),
-		carService:      service.InitCarService(pool),
-		wampClient:      wampClient,
-	}
-	if err := ret.handleRegisterProvider(); err != nil {
-		return nil, err
-	}
-	if err := ret.handleRemoveProvider(); err != nil {
-		return nil, err
-	}
-	if err := ret.handleListProvider(); err != nil {
-		return nil, err
-	}
-	if err := ret.handleEventExtraData(); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
 }
 
 func (pm *ProviderManager) Shutdown() {
