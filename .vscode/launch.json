@@ -15,7 +15,7 @@
         "--logFormat",
         "text",
         "--logLevel",
-        "info",
+        "debug",
         "--enable-telemetry"
       ]
     },

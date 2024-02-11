@@ -237,7 +237,7 @@ func (pm *ProviderManager) addHandlers(pd *service.ProviderData) {
 	}()
 }
 
-//nolint:lll,dupl //by design
+//nolint:lll,dupl,funlen //by design
 func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.EventHandler {
 	return func(event *wamp.Event) {
 		start := time.Now()
@@ -246,14 +246,16 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 			attribute.String("eventKey", pd.Event.Key),
 		}
 		defer func() {
-			pd.StateRecorder.Recorder.Record(context.Background(), time.Since(start).Seconds(),
+			pd.StateRecorder.Recorder.Record(
+				context.Background(),
+				time.Since(start).Seconds(),
 				metric.WithAttributes(attrs...),
 			)
 		}()
-		pd.StateRecorder.MsgCouter++
+		pd.StateRecorder.MsgCounter++
 		traceCtx, mainSpan := tracer.Start(context.Background(), "handle state message")
 		mainSpan.SetAttributes([]attribute.KeyValue{
-			attribute.Int("msgCounter", pd.SpeedmapRecorder.MsgCouter),
+			attribute.Int("msgCounter", pd.StateRecorder.MsgCounter),
 			attribute.Int("eventId", pd.Event.ID),
 			attribute.String("eventKey", pd.Event.Key),
 		}...)
@@ -263,8 +265,7 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 		}
 		stateData, err := prepareStateData(event)
 		if err != nil {
-			log.Error("Error preparing stateData",
-				log.ErrorField(err))
+			log.Error("Error preparing stateData", log.ErrorField(err))
 			return
 		}
 		storeCtx, storeSpan := tracer.Start(traceCtx, "store state message")
@@ -273,14 +274,32 @@ func (pm *ProviderManager) stateMessageHandler(pd *service.ProviderData) client.
 			EventID: pd.Event.ID,
 			Data:    *stateData,
 		}); err != nil {
-			log.Error("Error storing stateData",
-				log.ErrorField(err))
+			log.Error("Error storing stateData", log.ErrorField(err))
 			return
 		}
 		storeSpan.End()
 		_, processSpan := tracer.Start(traceCtx, "processing state message")
 		defer processSpan.End()
 		pd.Processor.ProcessState(stateData)
+		processSpan.End()
+
+		// publish combined analysis patch data
+
+		_, analysisSpan := tracer.Start(traceCtx, "posting analysis message")
+		defer analysisSpan.End()
+		analysisData := pd.Processor.GetCombinedPatchData()
+		msg := model.AnalysisCombinedMessage{
+			Type:    model.MTAnalysisCombinedPatch,
+			Payload: *analysisData,
+		}
+
+		if err := pm.wampClient.Publish(
+			fmt.Sprintf("racelog.public.live.analysis.%s", pd.Event.Key),
+			nil,
+			wamp.List{msg},
+			nil); err != nil {
+			log.Warn("Publish analysis delta", log.ErrorField(err))
+		}
 	}
 }
 
