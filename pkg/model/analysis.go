@@ -1,5 +1,7 @@
 package model
 
+import "github.com/wI2L/jsondiff"
+
 type DbAnalysis struct {
 	ID      int                 `json:"id"`
 	EventID int                 `json:"eventId"`
@@ -22,11 +24,34 @@ type AnalysisData struct {
 	// carNum ordered by race position
 	RaceOrder []string `json:"raceOrder"`
 }
+
+type AnalysisDataWithPatches struct {
+	Cars    AnalysisMessage `json:"cars"`    // latest StateData.Cars
+	Session AnalysisMessage `json:"session"` // latest StateData.Session
+	// carNum ordered by race position
+	RaceOrder        []string                 `json:"raceOrder"`
+	Patches          jsondiff.Patch           `json:"patches"`
+	RaceGraphPatches []AnalysisRaceGraphPatch `json:"raceGraphPatches"`
+}
+
+// holds the patch instructions for each car class raceGraph
+type AnalysisRaceGraphPatch struct {
+	CarClass string         `json:"carClass"`
+	Patches  jsondiff.Patch `json:"patches"`
+}
 type AnalysisMessage struct {
 	Type      MessageType `json:"type"`
 	Data      any         `json:"data"`
 	Timestamp float64     `json:"timestamp"`
 }
+
+// this is used to send combined analysis data and json-patch to the frontend
+type AnalysisCombinedMessage struct {
+	Type      MessageType             `json:"type"`    // should be MTAnalysisCombinedPatch
+	Payload   AnalysisDataWithPatches `json:"payload"` // contains json-patch data
+	Timestamp float64                 `json:"timestamp"`
+}
+
 type AnalysisCarInfo struct {
 	Name     string               `json:"name"`
 	CarNum   string               `json:"carNum"`

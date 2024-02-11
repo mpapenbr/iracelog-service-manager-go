@@ -27,8 +27,8 @@ type ProviderService struct {
 }
 
 type MetricRecorder struct {
-	Recorder  metric.Float64Histogram
-	MsgCouter int
+	Recorder   metric.Float64Histogram
+	MsgCounter int
 }
 
 type (
@@ -87,9 +87,9 @@ func (s *ProviderService) RegisterEvent(
 		Event:            dbEvent,
 		Registered:       time.Now(),
 		StopChan:         make(chan struct{}),
-		StateRecorder:    MetricRecorder{Recorder: stateRecorder, MsgCouter: 0},
-		SpeedmapRecorder: MetricRecorder{Recorder: speedmapRecorder, MsgCouter: 0},
-		AnalysisRecorder: MetricRecorder{Recorder: analysisRecorder, MsgCouter: 0},
+		StateRecorder:    MetricRecorder{Recorder: stateRecorder, MsgCounter: 0},
+		SpeedmapRecorder: MetricRecorder{Recorder: speedmapRecorder, MsgCounter: 0},
+		AnalysisRecorder: MetricRecorder{Recorder: analysisRecorder, MsgCounter: 0},
 	}
 	s.Lookup[req.EventKey] = data
 	return data, nil
