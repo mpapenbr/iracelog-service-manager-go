@@ -61,7 +61,7 @@ func ExtractFromWebsocketUrl(url string) (addr, proto string) {
 	if len(param) == 0 {
 		return "", ""
 	}
-	if port, ok := param["port"]; ok && len(port) > 0 {
+	if port, ok := param["port"]; ok && port != "" {
 		// if port is found, the addr contains our wanted value
 		return param["addr"], param["proto"]
 	} else if proto := param["proto"]; proto == "wss" {
@@ -77,7 +77,7 @@ func ExtractFromDBUrl(url string) string {
 	if len(param) == 0 {
 		return ""
 	}
-	if port, ok := param["port"]; ok && len(port) > 0 {
+	if port, ok := param["port"]; ok && port != "" {
 		return param["addr"] // if port is found, the addr contains our wanted value
 	} else {
 		return fmt.Sprintf("%s:5432", param["addr"])

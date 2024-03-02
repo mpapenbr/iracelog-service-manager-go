@@ -3,7 +3,7 @@
 {
   "name": "Go",
 
-  "image": "mcr.microsoft.com/devcontainers/go:1.21",
+  "image": "mcr.microsoft.com/devcontainers/go:1.22",
   // alternative: use the bullseye image
   // "image": "mcr.microsoft.com/devcontainers/go:1.20-bullseye",
   "runArgs": [
