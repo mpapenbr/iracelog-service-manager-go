@@ -1,4 +1,4 @@
-package server
+package wamp
 
 import (
 	"context"
@@ -31,8 +31,8 @@ var appConfig config.Config // holds processed config values
 //nolint:funlen // by design
 func NewServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "server",
-		Short: "starts the server",
+		Use:   "wamp",
+		Short: "starts the WAMP server",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			appConfig = config.Config{}
 			return nil

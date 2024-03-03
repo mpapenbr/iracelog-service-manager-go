@@ -14,7 +14,8 @@ import (
 	"github.com/spf13/viper"
 
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
-	serverCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server"
+	grpcServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/grpc"
+	wampServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/wamp"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
@@ -69,7 +70,8 @@ func init() {
 
 	// add commands here
 	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())
-	rootCmd.AddCommand(serverCmd.NewServerCmd())
+	rootCmd.AddCommand(wampServer.NewServerCmd())
+	rootCmd.AddCommand(grpcServer.NewServerCmd())
 }
 
 // initConfig reads in config file and ENV variables if set.

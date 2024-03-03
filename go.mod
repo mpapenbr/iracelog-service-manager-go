@@ -29,6 +29,8 @@ require (
 )
 
 require (
+	buf.build/gen/go/mpapenbr/testrepo/grpc/go v1.3.0-20240303070732-42490533785a.2 // indirect
+	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.32.0-20240303070732-42490533785a.1 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
