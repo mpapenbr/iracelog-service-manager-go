@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec // by design
 	"os"
@@ -13,14 +12,18 @@ import (
 	"syscall"
 	"time"
 
+	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/events/v1/eventsv1connect"
+	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
-	"google.golang.org/grpc"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -39,22 +42,22 @@ func NewServerCmd() *cobra.Command {
 			return startServer()
 		},
 	}
-	cmd.Flags().IntVarP(&config.GrpcPort,
-		"grpc-port",
-		"p",
-		8084,
-		"gRPC port to listen on")
+	cmd.Flags().StringVarP(&config.GrpcServerAddr,
+		"grpc-server-addr",
+		"a",
+		"localhost:8080",
+		"gRPC server listen address")
 
 	cmd.Flags().StringVar(&config.LogLevel,
-		"logLevel",
+		"log-level",
 		"info",
 		"controls the log level (debug, info, warn, error, fatal)")
 	cmd.Flags().StringVar(&config.SQLLogLevel,
-		"sqlLogLevel",
+		"sql-log-level",
 		"debug",
 		"controls the log level for sql methods")
 	cmd.Flags().StringVar(&config.LogFormat,
-		"logFormat",
+		"log-format",
 		"json",
 		"controls the log output format")
 	cmd.Flags().BoolVar(&config.EnableTelemetry,
@@ -160,20 +163,28 @@ func startServer() error {
 		config.DB,
 		pgTraceOption,
 	)
-	// TODO: remove dummy
-	if pool == nil {
+
+	eventService := newServer(WithPool(pool))
+	mux := http.NewServeMux()
+	myOtel, _ := otelconnect.NewInterceptor()
+	path, handler := eventsv1connect.NewEventServiceHandler(
+		eventService,
+		connect.WithInterceptors(myOtel),
+	)
+	mux.Handle(path, handler)
+	startServer := func() error {
+		log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
+		//nolint:gosec // by design
+		server := &http.Server{
+			Addr:    config.GrpcServerAddr,
+			Handler: h2c.NewHandler(newCORS().Handler(mux), &http2.Server{}),
+		}
+		return server.ListenAndServe()
 	}
-
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", config.GrpcPort))
-	if err != nil {
-		log.Fatal("failed to listen: %v", log.ErrorField(err))
+	if err := startServer(); err != nil {
+		log.Error("server could not be started", log.ErrorField(err))
+		return err
 	}
-	var opts []grpc.ServerOption
-
-	grpcServer := grpc.NewServer(opts...)
-	// pb.RegisterRouteGuideServer(grpcServer, newServer())
-	grpcServer.Serve(lis)
-
 	log.Info("Server started")
 	setupGoRoutinesDump()
 
@@ -232,4 +243,43 @@ func waitForRequiredServices() {
 	log.Debug("Waiting for connection checks to return")
 	wg.Wait()
 	log.Debug("Required services are available")
+}
+
+func newCORS() *cors.Cors {
+	// To let web developers play with the demo service from browsers, we need a
+	// very permissive CORS setup.
+	return cors.New(cors.Options{
+		AllowedMethods: []string{
+			http.MethodHead,
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+		},
+		AllowOriginFunc: func(origin string) bool {
+			// Allow all origins, which effectively disables CORS.
+			return true
+		},
+		AllowedHeaders: []string{"*"},
+		ExposedHeaders: []string{
+			// Content-Type is in the default safelist.
+			"Accept",
+			"Accept-Encoding",
+			"Accept-Post",
+			"Connect-Accept-Encoding",
+			"Connect-Content-Encoding",
+			"Content-Encoding",
+			"Grpc-Accept-Encoding",
+			"Grpc-Encoding",
+			"Grpc-Message",
+			"Grpc-Status",
+			"Grpc-Status-Details-Bin",
+		},
+		// Let browsers cache CORS information for longer, which reduces the number
+		// of preflight requests. Any changes to ExposedHeaders won't take effect
+		// until the cached data expires. FF caps this value at 24h, and modern
+		// Chrome caps it at 2h.
+		MaxAge: int(2 * time.Hour / time.Second),
+	})
 }

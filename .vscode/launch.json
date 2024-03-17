@@ -5,16 +5,31 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Server",
+      "name": "gRPC Server",
       "type": "go",
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
       "args": [
-        "server",
-        "--logFormat",
+        "grpc",
+        "--log-format",
         "text",
-        "--logLevel",
+        "--log-level",
+        "debug",
+        "--enable-telemetry"
+      ]
+    },
+    {
+      "name": "Wamp-Server",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "args": [
+        "wamp",
+        "--log-format",
+        "text",
+        "--log-level",
         "debug",
         "--enable-telemetry"
       ]

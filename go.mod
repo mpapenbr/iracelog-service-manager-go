@@ -3,11 +3,16 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.22
 
 require (
+	buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.15.0-20240303070732-42490533785a.1
+	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.32.0-20240303070732-42490533785a.1
+	connectrpc.com/connect v1.15.0
+	connectrpc.com/otelconnect v0.7.0
 	github.com/docker/go-connections v0.5.0
 	github.com/exaring/otelpgx v0.5.4
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/google/go-cmp v0.6.0
 	github.com/jackc/pgx/v5 v5.5.3
+	github.com/rs/cors v1.10.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
@@ -26,11 +31,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611
+	golang.org/x/net v0.21.0
 )
 
 require (
-	buf.build/gen/go/mpapenbr/testrepo/grpc/go v1.3.0-20240303070732-42490533785a.2 // indirect
-	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.32.0-20240303070732-42490533785a.1 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
@@ -94,7 +98,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.1.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240102182953-50ed04b92917 // indirect
@@ -120,7 +123,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.17.0 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

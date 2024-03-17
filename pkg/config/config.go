@@ -15,7 +15,7 @@ var (
 	TelemetryEndpoint  string // endpoint for telemetry
 	ProfilingPort      int    // port for profiling
 	PrintMessage       bool   // if true, the message payload will be print on debug level
-	GrpcPort           int    // port for gRPC server
+	GrpcServerAddr     string // listen addr for gRPC server
 
 )
 
