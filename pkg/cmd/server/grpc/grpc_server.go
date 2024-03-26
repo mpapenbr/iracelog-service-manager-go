@@ -12,9 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/events/v1/eventsv1connect"
+	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/event/v1/eventv1connect"
+	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/provider/v1/providerv1connect"
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
@@ -24,6 +26,10 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/event"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -76,6 +82,14 @@ func NewServerCmd() *cobra.Command {
 		"print-message",
 		false,
 		"if true and log level is debug, the message payload will be printed")
+	cmd.Flags().StringVar(&config.AdminToken,
+		"admin-token",
+		"",
+		"admin token value")
+	cmd.Flags().StringVar(&config.ProviderToken,
+		"provider-token",
+		"",
+		"provider token value")
 	return cmd
 }
 
@@ -164,14 +178,8 @@ func startServer() error {
 		pgTraceOption,
 	)
 
-	eventService := newServer(WithPool(pool))
-	mux := http.NewServeMux()
-	myOtel, _ := otelconnect.NewInterceptor()
-	path, handler := eventsv1connect.NewEventServiceHandler(
-		eventService,
-		connect.WithInterceptors(myOtel),
-	)
-	mux.Handle(path, handler)
+	mux := registerGrpcServices(pool)
+
 	startServer := func() error {
 		log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
 		//nolint:gosec // by design
@@ -205,6 +213,41 @@ func startServer() error {
 
 	log.Info("Server terminated")
 	return nil
+}
+
+func registerGrpcServices(pool *pgxpool.Pool) *http.ServeMux {
+	mux := http.NewServeMux()
+	myOtel, _ := otelconnect.NewInterceptor()
+	registerEventServer(mux, pool, myOtel)
+	registerProviderServer(mux, pool, myOtel)
+	return mux
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func registerEventServer(
+	mux *http.ServeMux, pool *pgxpool.Pool, otel connect.Interceptor,
+) {
+	eventService := event.NewServer(event.WithPool(pool))
+	path, handler := eventv1connect.NewEventServiceHandler(
+		eventService,
+		connect.WithInterceptors(otel),
+	)
+	mux.Handle(path, handler)
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func registerProviderServer(
+	mux *http.ServeMux, pool *pgxpool.Pool, otel connect.Interceptor,
+) {
+	providerService := provider.NewServer(provider.WithPool(pool),
+		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+	path, handler := providerv1connect.NewProviderServiceHandler(
+		providerService,
+		connect.WithInterceptors(otel,
+			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
+				auth.WithProviderToken(config.ProviderToken))),
+	)
+	mux.Handle(path, handler)
 }
 
 func setupGoRoutinesDump() {
