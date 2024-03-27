@@ -14,6 +14,8 @@ import (
 
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/event/v1/eventv1connect"
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/provider/v1/providerv1connect"
+	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
+
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,6 +32,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/provider"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -218,8 +221,10 @@ func startServer() error {
 func registerGrpcServices(pool *pgxpool.Pool) *http.ServeMux {
 	mux := http.NewServeMux()
 	myOtel, _ := otelconnect.NewInterceptor()
+	eventLookup := utils.NewEventLookup()
 	registerEventServer(mux, pool, myOtel)
-	registerProviderServer(mux, pool, myOtel)
+	registerProviderServer(mux, pool, myOtel, eventLookup)
+	registerStateServer(mux, pool, myOtel, eventLookup)
 	return mux
 }
 
@@ -237,12 +242,37 @@ func registerEventServer(
 
 //nolint:whitespace // can't make both editor and linter happy
 func registerProviderServer(
-	mux *http.ServeMux, pool *pgxpool.Pool, otel connect.Interceptor,
+	mux *http.ServeMux,
+	pool *pgxpool.Pool,
+	otel connect.Interceptor,
+	eventLookup *utils.EventLookup,
 ) {
-	providerService := provider.NewServer(provider.WithPool(pool),
+	providerService := provider.NewServer(
+		provider.WithPool(pool),
+		provider.WithEventLookup(eventLookup),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
+		connect.WithInterceptors(otel,
+			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
+				auth.WithProviderToken(config.ProviderToken))),
+	)
+	mux.Handle(path, handler)
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func registerStateServer(
+	mux *http.ServeMux,
+	pool *pgxpool.Pool,
+	otel connect.Interceptor,
+	eventLookup *utils.EventLookup,
+) {
+	stateService := state.NewServer(
+		state.WithPool(pool),
+		state.WithEventLookup(eventLookup),
+		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+	path, handler := racestatev1connect.NewRaceStateServiceHandler(
+		stateService,
 		connect.WithInterceptors(otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
 				auth.WithProviderToken(config.ProviderToken))),

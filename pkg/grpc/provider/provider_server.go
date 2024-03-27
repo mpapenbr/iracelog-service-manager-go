@@ -13,12 +13,11 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 func NewServer(opts ...Option) *providerServer {
-	ret := &providerServer{
-		lookup: make(map[string]*eventv1.Event),
-	}
+	ret := &providerServer{}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -33,22 +32,25 @@ func WithPool(p *pgxpool.Pool) Option {
 	}
 }
 
+func WithEventLookup(lookup *utils.EventLookup) Option {
+	return func(srv *providerServer) {
+		srv.lookup = lookup
+	}
+}
+
 func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	return func(srv *providerServer) {
 		srv.pe = pe
 	}
 }
 
-var (
-	ErrEventAlreadyRegistered = errors.New("event already registered")
-	ErrEventNotFound          = errors.New("event not found")
-)
+var ErrEventAlreadyRegistered = errors.New("event already registered")
 
 type providerServer struct {
 	x.UnimplementedProviderServiceHandler
 	pool   *pgxpool.Pool
 	pe     permission.PermissionEvaluator
-	lookup map[string]*eventv1.Event
+	lookup *utils.EventLookup
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -58,7 +60,7 @@ func (s *providerServer) ListLiveEvents(
 	stream *connect.ServerStream[providerv1.ListLiveEventsResponse],
 ) error {
 	log.Debug("ListLiveEvents called")
-	for _, v := range s.lookup {
+	for _, v := range s.lookup.GetEvents() {
 		if err := stream.Send(&providerv1.ListLiveEventsResponse{Event: v}); err != nil {
 			log.Error("Error sending event", log.ErrorField(err))
 			return err
@@ -78,10 +80,19 @@ func (s *providerServer) RegisterEvent(
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
-	if _, ok := s.lookup[req.Msg.Event.Key]; ok {
+	log.Debug("RegisterEvent",
+		log.Any("track", req.Msg.Track),
+		log.Any("event", req.Msg.Event))
+
+	selector := &eventv1.EventSelector{
+		Arg: &eventv1.EventSelector_Key{
+			Key: req.Msg.Key,
+		},
+	}
+	if e, _ := s.lookup.GetEvent(selector); e != nil {
 		return nil, connect.NewError(connect.CodeAlreadyExists, ErrEventAlreadyRegistered)
 	}
-	s.lookup[req.Msg.Event.Key] = req.Msg.Event
+	s.lookup.AddEvent(req.Msg.Event)
 	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
 		nil
 }
@@ -95,23 +106,13 @@ func (s *providerServer) UnregisterEvent(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	var key string
-	switch req.Msg.EventSelector.Arg.(type) {
-	case *eventv1.EventSelector_Id:
-		for k, v := range s.lookup {
-			if v.Id == uint32(req.Msg.EventSelector.GetId()) {
-				key = k
-				break
-			}
-		}
-	case *eventv1.EventSelector_Key:
-		key = req.Msg.EventSelector.GetKey()
+
+	event, err := s.lookup.GetEvent(req.Msg.EventSelector)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if key == "" {
-		return nil, connect.NewError(connect.CodeNotFound, ErrEventNotFound)
-	}
-	s.cleanup(key)
-	delete(s.lookup, key)
+	s.cleanup(event)
+	s.lookup.RemoveEvent(req.Msg.EventSelector)
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
 
@@ -125,20 +126,17 @@ func (s *providerServer) UnregisterAll(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	ret := make([]*eventv1.Event, len(s.lookup))
-	i := 0
-	for k, v := range s.lookup {
-		ret[i] = v
-		s.cleanup(k)
-		i++
+
+	for _, v := range s.lookup.GetEvents() {
+		s.cleanup(v)
 		if err := stream.Send(&providerv1.UnregisterAllResponse{Event: v}); err != nil {
 			log.Warn("Error sending event on unregisterAll", log.ErrorField(err))
 		}
 	}
-	s.lookup = make(map[string]*eventv1.Event)
+	s.lookup.Clear()
 	return nil
 }
 
-func (s *providerServer) cleanup(key string) {
-	log.Warn("cleanup not yet implemented", log.String("key", key))
+func (s *providerServer) cleanup(event *eventv1.Event) {
+	log.Warn("cleanup not yet implemented", log.String("key", event.Key))
 }

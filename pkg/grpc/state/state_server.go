@@ -1,0 +1,90 @@
+package state
+
+import (
+	"context"
+
+	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
+	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
+)
+
+func NewServer(opts ...Option) *stateServer {
+	ret := &stateServer{}
+	for _, opt := range opts {
+		opt(ret)
+	}
+	return ret
+}
+
+type Option func(*stateServer)
+
+func WithPool(p *pgxpool.Pool) Option {
+	return func(srv *stateServer) {
+		srv.pool = p
+	}
+}
+
+func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
+	return func(srv *stateServer) {
+		srv.pe = pe
+	}
+}
+
+func WithEventLookup(lookup *utils.EventLookup) Option {
+	return func(srv *stateServer) {
+		srv.lookup = lookup
+	}
+}
+
+type stateServer struct {
+	x.UnimplementedRaceStateServiceHandler
+	pool   *pgxpool.Pool
+	pe     permission.PermissionEvaluator
+	lookup *utils.EventLookup
+}
+
+func (s *stateServer) PublishState(
+	ctx context.Context,
+	req *connect.Request[racestatev1.PublishStateRequest]) (
+	*connect.Response[racestatev1.PublishStateResponse], error,
+) {
+	a := auth.FromContext(&ctx)
+	if !s.pe.HasRole(a, auth.RoleProvider) {
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+	}
+	// get the event
+	event, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("PublishState called",
+		log.String("event", event.Key),
+		log.Int("car entries", len(req.Msg.Cars)))
+	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil
+}
+
+func (s *stateServer) PublishSpeedmap(
+	ctx context.Context,
+	req *connect.Request[racestatev1.PublishSpeedmapRequest]) (
+	*connect.Response[racestatev1.PublishSpeedmapResponse], error,
+) {
+	a := auth.FromContext(&ctx)
+	if !s.pe.HasRole(a, auth.RoleProvider) {
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+	}
+	// get the event
+	event, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("PublishSpeedmap called",
+		log.String("event", event.Key),
+		log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
+	return connect.NewResponse(&racestatev1.PublishSpeedmapResponse{}), nil
+}
