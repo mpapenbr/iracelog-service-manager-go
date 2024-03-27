@@ -3,11 +3,11 @@ package state
 import (
 	"context"
 
+	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
+	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
-	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
@@ -49,6 +49,7 @@ type stateServer struct {
 	lookup *utils.EventLookup
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func (s *stateServer) PublishState(
 	ctx context.Context,
 	req *connect.Request[racestatev1.PublishStateRequest]) (
@@ -69,6 +70,7 @@ func (s *stateServer) PublishState(
 	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func (s *stateServer) PublishSpeedmap(
 	ctx context.Context,
 	req *connect.Request[racestatev1.PublishSpeedmapRequest]) (
@@ -87,4 +89,24 @@ func (s *stateServer) PublishSpeedmap(
 		log.String("event", event.Key),
 		log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
 	return connect.NewResponse(&racestatev1.PublishSpeedmapResponse{}), nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *stateServer) PublishDriverData(
+	ctx context.Context,
+	req *connect.Request[racestatev1.PublishDriverDataRequest]) (
+	*connect.Response[racestatev1.PublishDriverDataResponse], error,
+) {
+	a := auth.FromContext(&ctx)
+	if !s.pe.HasRole(a, auth.RoleProvider) {
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+	}
+	// get the event
+	event, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("PublishDriverData called",
+		log.String("event", event.Key))
+	return connect.NewResponse(&racestatev1.PublishDriverDataResponse{}), nil
 }

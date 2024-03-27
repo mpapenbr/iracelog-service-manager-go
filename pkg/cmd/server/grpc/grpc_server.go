@@ -15,7 +15,6 @@ import (
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/event/v1/eventv1connect"
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/provider/v1/providerv1connect"
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
-
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
