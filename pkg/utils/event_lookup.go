@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing"
 )
 
 func NewEventLookup() *EventLookup {
@@ -14,6 +15,10 @@ func NewEventLookup() *EventLookup {
 
 var ErrEventNotFound = errors.New("event not found")
 
+type EventProcessingData struct {
+	Event     *eventv1.Event
+	Processor *processing.Processor
+}
 type EventLookup struct {
 	lookup map[string]*eventv1.Event
 }

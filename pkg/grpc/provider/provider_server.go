@@ -26,7 +26,7 @@ func NewServer(opts ...Option) *providerServer {
 
 type Option func(*providerServer)
 
-func WithPool(p *pgxpool.Pool) Option {
+func WithPersistence(p *pgxpool.Pool) Option {
 	return func(srv *providerServer) {
 		srv.pool = p
 	}

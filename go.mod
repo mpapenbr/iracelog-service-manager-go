@@ -3,8 +3,8 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.22
 
 require (
-	buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240327213922-ee48fa5b325c.1
-	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240327213922-ee48fa5b325c.1
+	buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240328105213-21f3a2569df2.1
+	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240328105213-21f3a2569df2.1
 	connectrpc.com/connect v1.16.0
 	connectrpc.com/otelconnect v0.7.0
 	github.com/docker/go-connections v0.5.0

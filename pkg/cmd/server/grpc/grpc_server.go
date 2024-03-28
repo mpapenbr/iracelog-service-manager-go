@@ -247,7 +247,7 @@ func registerProviderServer(
 	eventLookup *utils.EventLookup,
 ) {
 	providerService := provider.NewServer(
-		provider.WithPool(pool),
+		provider.WithPersistence(pool),
 		provider.WithEventLookup(eventLookup),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := providerv1connect.NewProviderServiceHandler(
