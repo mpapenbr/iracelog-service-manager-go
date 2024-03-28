@@ -59,14 +59,15 @@ func (s *stateServer) PublishState(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	// get the event
-	event, err := s.lookup.GetEvent(req.Msg.Event)
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	log.Debug("PublishState called",
-		log.String("event", event.Key),
+		log.String("event", epd.Event.Key),
 		log.Int("car entries", len(req.Msg.Cars)))
+	epd.Processor.ProcessState(req.Msg)
 	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil
 }
 
@@ -80,13 +81,13 @@ func (s *stateServer) PublishSpeedmap(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	// get the event
-	event, err := s.lookup.GetEvent(req.Msg.Event)
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	log.Debug("PublishSpeedmap called",
-		log.String("event", event.Key),
+		log.String("event", epd.Event.Key),
 		log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
 	return connect.NewResponse(&racestatev1.PublishSpeedmapResponse{}), nil
 }
@@ -101,12 +102,13 @@ func (s *stateServer) PublishDriverData(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	// get the event
-	event, err := s.lookup.GetEvent(req.Msg.Event)
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	log.Debug("PublishDriverData called",
-		log.String("event", event.Key))
+		log.String("event", epd.Event.Key))
+	epd.Processor.ProcessCarData(req.Msg)
 	return connect.NewResponse(&racestatev1.PublishDriverDataResponse{}), nil
 }

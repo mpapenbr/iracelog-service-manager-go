@@ -1,8 +1,10 @@
 package processing
 
 import (
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing/car"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing/race"
+	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
+
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
 )
 
 type Processor struct {
@@ -24,4 +26,13 @@ func NewProcessor(opts ...ProcessorOption) *Processor {
 		opt(ret)
 	}
 	return ret
+}
+
+func (p *Processor) ProcessState(payload *racestatev1.PublishStateRequest) {
+	p.carProcessor.ProcessStatePayload(payload)
+	p.raceProcessor.ProcessStatePayload(payload)
+}
+
+func (p *Processor) ProcessCarData(payload *racestatev1.PublishDriverDataRequest) {
+	p.carProcessor.ProcessCarPayload(payload)
 }

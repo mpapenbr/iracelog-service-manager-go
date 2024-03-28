@@ -1,5 +1,6 @@
 package recorder
 
+// TODO: really needed?
 type RecorderManager struct {
 	lookup map[string]*RecorderInfo
 }

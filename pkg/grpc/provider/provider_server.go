@@ -107,11 +107,11 @@ func (s *providerServer) UnregisterEvent(
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
-	event, err := s.lookup.GetEvent(req.Msg.EventSelector)
+	_, err := s.lookup.GetEvent(req.Msg.EventSelector)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	s.cleanup(event)
+
 	s.lookup.RemoveEvent(req.Msg.EventSelector)
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
@@ -128,15 +128,10 @@ func (s *providerServer) UnregisterAll(
 	}
 
 	for _, v := range s.lookup.GetEvents() {
-		s.cleanup(v)
 		if err := stream.Send(&providerv1.UnregisterAllResponse{Event: v}); err != nil {
 			log.Warn("Error sending event on unregisterAll", log.ErrorField(err))
 		}
 	}
 	s.lookup.Clear()
 	return nil
-}
-
-func (s *providerServer) cleanup(event *eventv1.Event) {
-	log.Warn("cleanup not yet implemented", log.String("key", event.Key))
 }
