@@ -13,7 +13,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	checkCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/check"
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
+	replayCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay"
 	grpcServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/grpc"
 	wampServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/wamp"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
@@ -72,6 +74,8 @@ func init() {
 	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())
 	rootCmd.AddCommand(wampServer.NewServerCmd())
 	rootCmd.AddCommand(grpcServer.NewServerCmd())
+	rootCmd.AddCommand(replayCmd.NewReplayCmd())
+	rootCmd.AddCommand(checkCmd.NewCheckCmd())
 }
 
 // initConfig reads in config file and ENV variables if set.

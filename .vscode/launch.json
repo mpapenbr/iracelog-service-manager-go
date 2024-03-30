@@ -21,6 +21,45 @@
       ]
     },
     {
+      "name": "replay",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "replay",
+        "320",
+        "--log-level",
+        "debug",
+        "--addr",
+        "http://localhost:8084",
+        "-t",
+        "admin",
+        "--key",
+        "mptest",
+        "--speed",
+        "10"
+      ]
+    },
+    {
+      "name": "check convert",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "convert",
+        "320",
+        "--log-level",
+        "debug",
+        "--start",
+        "1711241308"
+      ]
+    },
+    {
       "name": "Wamp-Server",
       "type": "go",
       "request": "launch",

@@ -6,7 +6,6 @@ package state
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 
 	"github.com/jackc/pgx/v5"
@@ -44,10 +43,14 @@ func LoadByEventId(
 	ctx context.Context,
 	conn repository.Querier,
 	eventID int,
+	startTS float64, num int,
 ) ([]*model.DbState, error) {
-	rows, err := conn.Query(ctx,
-		fmt.Sprintf("%s where event_id=$1 order by data->'timestamp' asc", selector),
-		eventID)
+	rows, err := conn.Query(ctx, `
+	select id,event_id,data from wampdata
+    where event_id=$1 and (data->'timestamp')::numeric > $2
+    order by (data->'timestamp')::numeric asc
+    limit $3
+	`, eventID, startTS, num)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"sync"
 
 	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
 	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
@@ -47,6 +48,7 @@ type stateServer struct {
 	pool   *pgxpool.Pool
 	pe     permission.PermissionEvaluator
 	lookup *utils.EventLookup
+	mu     sync.Mutex
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -67,6 +69,8 @@ func (s *stateServer) PublishState(
 	log.Debug("PublishState called",
 		log.String("event", epd.Event.Key),
 		log.Int("car entries", len(req.Msg.Cars)))
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	epd.Processor.ProcessState(req.Msg)
 	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil
 }
@@ -109,6 +113,8 @@ func (s *stateServer) PublishDriverData(
 	}
 	log.Debug("PublishDriverData called",
 		log.String("event", epd.Event.Key))
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	epd.Processor.ProcessCarData(req.Msg)
 	return connect.NewResponse(&racestatev1.PublishDriverDataResponse{}), nil
 }

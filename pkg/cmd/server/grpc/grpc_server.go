@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/event/v1/eventv1connect"
+	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/livedata/v1/livedatav1connect"
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/provider/v1/providerv1connect"
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
 	"connectrpc.com/connect"
@@ -29,6 +30,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/event"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/livedata"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/state"
@@ -224,6 +226,7 @@ func registerGrpcServices(pool *pgxpool.Pool) *http.ServeMux {
 	registerEventServer(mux, pool, myOtel)
 	registerProviderServer(mux, pool, myOtel, eventLookup)
 	registerStateServer(mux, pool, myOtel, eventLookup)
+	registerLiveDataServer(mux, myOtel, eventLookup)
 	return mux
 }
 
@@ -275,6 +278,21 @@ func registerStateServer(
 		connect.WithInterceptors(otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
 				auth.WithProviderToken(config.ProviderToken))),
+	)
+	mux.Handle(path, handler)
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func registerLiveDataServer(
+	mux *http.ServeMux,
+	otel connect.Interceptor,
+	eventLookup *utils.EventLookup,
+) {
+	liveDataService := livedata.NewServer(
+		livedata.WithEventLookup(eventLookup))
+	path, handler := livedatav1connect.NewLiveDataServiceHandler(
+		liveDataService,
+		connect.WithInterceptors(otel),
 	)
 	mux.Handle(path, handler)
 }
