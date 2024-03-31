@@ -165,9 +165,10 @@ func (r *replayTask) ReplayEvent(eventId int) error {
 	log.Debug("Replaying event", log.String("event", r.sourceEvent.Name))
 
 	r.wg = sync.WaitGroup{}
-	r.wg.Add(2)
+	r.wg.Add(3)
 	go r.sendDriverData()
 	go r.sendStateData()
+	go r.sendSpeedmapData()
 
 	log.Debug("Waiting for tasks to finish")
 	r.wg.Wait()
@@ -275,11 +276,66 @@ func (r *replayTask) sendStateData() error {
 				log.Int("i", i),
 				log.Int("item", item.ID),
 				log.Duration("realWait", time.Duration(realWait*float64(time.Millisecond))),
-				log.Duration("wait", time.Duration(wait)*time.Millisecond))
-			timer.Reset(time.Duration(wait) * time.Millisecond)
+				log.Duration("wait", wait*time.Millisecond))
+			timer.Reset(wait * time.Millisecond)
 
 		case <-r.ctx.Done():
 			log.Debug("sendStateData Context done")
+			return nil
+		}
+	}
+}
+
+func (r *replayTask) sendSpeedmapData() error {
+	defer r.wg.Done()
+	sf := initSpeedmapFetcher(r.pool, r.sourceEvent.ID, 0)
+
+	conv := convert.NewSpeedmapMessageConverter()
+	i := 0
+	timer := time.NewTimer(1 * time.Second)
+	lastTS := -1.0
+	for {
+		select {
+		case <-timer.C:
+			item := sf.next()
+			if item == nil {
+				return nil
+			}
+			if lastTS < 0 {
+				lastTS = item.Timestamp
+			}
+			req := connect.NewRequest[racestatev1.PublishSpeedmapRequest](
+				&racestatev1.PublishSpeedmapRequest{
+					Event:     r.buildEventSelector(),
+					Speedmap:  conv.ConvertSpeedmapPayload(item),
+					Timestamp: timestamppb.New(time.UnixMilli(int64(item.Timestamp * 1000))),
+				},
+			)
+			r.withToken(req.Header())
+			if _, err := r.raceStateService.PublishSpeedmap(r.ctx, req); err != nil {
+				return err
+			}
+
+			i++
+
+			// strange: this is measured in seconds
+			realWait := (item.Timestamp - lastTS) * 1000
+			var wait time.Duration
+			if speed > 0 {
+				wait = time.Duration(realWait / float64(speed))
+			} else {
+				wait = 0
+			}
+			lastTS = item.Timestamp
+			log.Debug("Wait until next send",
+				log.String("component", "speedmap"),
+				log.Int("i", i),
+				log.Duration("realWait", time.Duration(realWait*float64(time.Millisecond))),
+				log.Duration("wait", wait*time.Millisecond))
+			timer.Reset(wait * time.Millisecond)
+
+		case <-r.ctx.Done():
+			log.Debug("sendSpeedmap Context done")
 			return nil
 		}
 	}

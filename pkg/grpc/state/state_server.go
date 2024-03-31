@@ -16,7 +16,7 @@ import (
 )
 
 func NewServer(opts ...Option) *stateServer {
-	ret := &stateServer{}
+	ret := &stateServer{debugWire: false}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -43,12 +43,19 @@ func WithEventLookup(lookup *utils.EventLookup) Option {
 	}
 }
 
+func WithDebugWire(arg bool) Option {
+	return func(srv *stateServer) {
+		srv.debugWire = arg
+	}
+}
+
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
-	pool   *pgxpool.Pool
-	pe     permission.PermissionEvaluator
-	lookup *utils.EventLookup
-	mu     sync.Mutex
+	pool      *pgxpool.Pool
+	pe        permission.PermissionEvaluator
+	lookup    *utils.EventLookup
+	mu        sync.Mutex
+	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -66,9 +73,11 @@ func (s *stateServer) PublishState(
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("PublishState called",
-		log.String("event", epd.Event.Key),
-		log.Int("car entries", len(req.Msg.Cars)))
+	if s.debugWire {
+		log.Debug("PublishState called",
+			log.String("event", epd.Event.Key),
+			log.Int("car entries", len(req.Msg.Cars)))
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	epd.Processor.ProcessState(req.Msg)
@@ -90,9 +99,13 @@ func (s *stateServer) PublishSpeedmap(
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("PublishSpeedmap called",
-		log.String("event", epd.Event.Key),
-		log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
+	if s.debugWire {
+		log.Debug("PublishSpeedmap called",
+			log.String("event", epd.Event.Key),
+			log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
+	}
+	epd.Processor.ProcessSpeedmap(req.Msg)
+
 	return connect.NewResponse(&racestatev1.PublishSpeedmapResponse{}), nil
 }
 
@@ -111,8 +124,9 @@ func (s *stateServer) PublishDriverData(
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("PublishDriverData called",
-		log.String("event", epd.Event.Key))
+	if s.debugWire {
+		log.Debug("PublishDriverData called", log.String("event", epd.Event.Key))
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	epd.Processor.ProcessCarData(req.Msg)

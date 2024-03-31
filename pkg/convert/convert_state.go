@@ -30,7 +30,7 @@ func (p *StateConverter) ConvertStatePayload(m *model.StateData) *racestatev1.Pu
 		Cars:      p.convertCars(m.Payload.Cars),
 		Session:   p.convertSession(m.Payload.Session),
 		Messages:  p.convertMessages(m.Payload.Messages),
-		Timestamp: timestamppb.New(time.UnixMilli(int64(m.Timestamp))),
+		Timestamp: timestamppb.New(time.UnixMilli(int64(m.Timestamp * 1000))),
 	}
 	return ret
 }

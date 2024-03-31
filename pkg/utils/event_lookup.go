@@ -3,10 +3,13 @@ package utils
 import (
 	"errors"
 
+	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/broadcast"
 )
 
 func NewEventLookup() *EventLookup {
@@ -18,8 +21,12 @@ func NewEventLookup() *EventLookup {
 var ErrEventNotFound = errors.New("event not found")
 
 type EventProcessingData struct {
-	Event     *eventv1.Event
-	Processor *processing.Processor
+	Event               *eventv1.Event
+	Processor           *processing.Processor
+	AnalysisBroadcast   broadcast.BroadcastServer[*analysisv1.Analysis]
+	RacestateBroadcast  broadcast.BroadcastServer[*racestatev1.PublishStateRequest]
+	DriverDataBroadcast broadcast.BroadcastServer[*racestatev1.PublishDriverDataRequest]
+	SpeedmapBroadcast   broadcast.BroadcastServer[*racestatev1.PublishSpeedmapRequest]
 }
 type EventLookup struct {
 	lookup map[string]*EventProcessingData
@@ -29,12 +36,26 @@ func (e *EventLookup) AddEvent(event *eventv1.Event) {
 	if _, ok := e.lookup[event.Key]; ok {
 		return
 	}
+	analysisSource := make(chan *analysisv1.Analysis)
+	racestateSource := make(chan *racestatev1.PublishStateRequest)
+	driverDataSource := make(chan *racestatev1.PublishDriverDataRequest)
+	speedmapSource := make(chan *racestatev1.PublishSpeedmapRequest)
+
 	cp := car.NewCarProcessor()
 	epd := &EventProcessingData{
 		Event: event,
 		Processor: processing.NewProcessor(
 			processing.WithCarProcessor(cp),
+			processing.WithPublishChannels(
+				analysisSource,
+				racestateSource,
+				driverDataSource,
+				speedmapSource),
 		),
+		AnalysisBroadcast:   broadcast.NewBroadcastServer(analysisSource),
+		RacestateBroadcast:  broadcast.NewBroadcastServer(racestateSource),
+		DriverDataBroadcast: broadcast.NewBroadcastServer(driverDataSource),
+		SpeedmapBroadcast:   broadcast.NewBroadcastServer(speedmapSource),
 	}
 	e.lookup[event.Key] = epd
 }
@@ -61,6 +82,10 @@ func (e *EventLookup) GetEvent(selector *eventv1.EventSelector) (
 
 func (e *EventLookup) RemoveEvent(selector *eventv1.EventSelector) {
 	if epd, err := e.GetEvent(selector); err == nil {
+		epd.AnalysisBroadcast.Close()
+		epd.RacestateBroadcast.Close()
+		epd.DriverDataBroadcast.Close()
+		epd.SpeedmapBroadcast.Close()
 		delete(e.lookup, epd.Event.Key)
 	}
 }

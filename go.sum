@@ -16,6 +16,10 @@ buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240329070307-e137337f
 buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240329070307-e137337f0060.1/go.mod h1:74a6bvOP8Zk4csy+N1Fgf149mgSLJk+3RWv4V26xagk=
 buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240329070710-b6c54e92ae11.1 h1:nrFJrsfxvFWBjoc4GkEKIQ12HeUOH7UWwQSXk3pJcDU=
 buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240329070710-b6c54e92ae11.1/go.mod h1:6NDFHJS/CxLInohkwNqj1WNdoAAfLCCN5ORwXaHVrqA=
+buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240330223100-1402cf8bbcd2.1 h1:vkN1rDFPUA6xs7pM9UAXmzouKzB98muqrgx21MQvAmo=
+buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240330223100-1402cf8bbcd2.1/go.mod h1:4TUTstY44SXvqdL60SNpcKxrRFhJ8mi/LAR2EAvPXkI=
+buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240331135822-6162544c994c.1 h1:zS/7MeIda9i9bIqTgcsVDGmmJ87lx3v21ZpUrAB2ezY=
+buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.0-20240331135822-6162544c994c.1/go.mod h1:43lq09rd4WRYf4exhTQzfQ1nPuc9XTFM/FaKWK/Lveo=
 buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240327152211-1860975e0d22.1 h1:Lc/cBth9QFO+vu9gQp/1tvzolhraQ6O4pk+TeQa/tCY=
 buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240327152211-1860975e0d22.1/go.mod h1:1WUYP1QuOWvlFm0xgsh0nAHM5AZPX2uHba8qiNCx5MI=
 buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240327213726-13a13923a03c.1 h1:CyD7efrpj+/nVw9UG/aRhET4lnbi0gsZwqrZCh2M3BI=
@@ -34,6 +38,10 @@ buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240329070307-e13
 buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240329070307-e137337f0060.1/go.mod h1:1WUYP1QuOWvlFm0xgsh0nAHM5AZPX2uHba8qiNCx5MI=
 buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240329070710-b6c54e92ae11.1 h1:BCAa+QkkM4c+tdt1JCbjgCCEN+a5Xg/OHCLWCsznl9o=
 buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240329070710-b6c54e92ae11.1/go.mod h1:1WUYP1QuOWvlFm0xgsh0nAHM5AZPX2uHba8qiNCx5MI=
+buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240330223100-1402cf8bbcd2.1 h1:GEXpqOBua6axV7MXKJIAG7H8jBgZVRIfZnL1G1nRCZM=
+buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240330223100-1402cf8bbcd2.1/go.mod h1:1WUYP1QuOWvlFm0xgsh0nAHM5AZPX2uHba8qiNCx5MI=
+buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240331135822-6162544c994c.1 h1:Db4m1kmeLrpD7gyggk2KEKEMJlrp0FxKTlB0fiuY5TY=
+buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.33.0-20240331135822-6162544c994c.1/go.mod h1:1WUYP1QuOWvlFm0xgsh0nAHM5AZPX2uHba8qiNCx5MI=
 connectrpc.com/connect v1.16.0 h1:rdtfQjZ0OyFkWPTegBNcH7cwquGAN1WzyJy80oFNibg=
 connectrpc.com/connect v1.16.0/go.mod h1:XpZAduBQUySsb4/KO5JffORVkDI4B6/EYPi7N8xpNZw=
 connectrpc.com/otelconnect v0.7.0 h1:ZH55ZZtcJOTKWWLy3qmL4Pam4RzRWBJFOqTPyAqCXkY=
