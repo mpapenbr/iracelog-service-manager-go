@@ -1,8 +1,9 @@
 package check
 
 import (
-	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/spf13/cobra"
+
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
 )
 
 func NewCheckCmd() *cobra.Command {

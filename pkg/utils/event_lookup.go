@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"sync"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
@@ -27,6 +28,7 @@ type EventProcessingData struct {
 	RacestateBroadcast  broadcast.BroadcastServer[*racestatev1.PublishStateRequest]
 	DriverDataBroadcast broadcast.BroadcastServer[*racestatev1.PublishDriverDataRequest]
 	SpeedmapBroadcast   broadcast.BroadcastServer[*racestatev1.PublishSpeedmapRequest]
+	Mutex               sync.Mutex
 }
 type EventLookup struct {
 	lookup map[string]*EventProcessingData
@@ -56,6 +58,7 @@ func (e *EventLookup) AddEvent(event *eventv1.Event) {
 		RacestateBroadcast:  broadcast.NewBroadcastServer(racestateSource),
 		DriverDataBroadcast: broadcast.NewBroadcastServer(driverDataSource),
 		SpeedmapBroadcast:   broadcast.NewBroadcastServer(speedmapSource),
+		Mutex:               sync.Mutex{},
 	}
 	e.lookup[event.Key] = epd
 }

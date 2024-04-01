@@ -147,6 +147,3 @@ func computeSessionChanges(ref, cur []interface{}) [][2]any {
 	}
 	return ret
 }
-
-// little helper
-const selector = string(`select id,event_id, data from wampdata`)

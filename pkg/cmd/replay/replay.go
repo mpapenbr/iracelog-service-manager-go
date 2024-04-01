@@ -1,3 +1,4 @@
+//nolint:funlen // keeping by design
 package replay
 
 import (
@@ -18,6 +19,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/convert"
@@ -27,8 +31,6 @@ import (
 	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/event"
 	trackrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
-	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func NewReplayCmd() *cobra.Command {
@@ -49,7 +51,7 @@ Note: This is only for debugging purposes and should not be used in production.
 	}
 
 	cmd.Flags().IntVar(&speed, "speed", 1,
-		"Recording speed (<=0 means: go as fast as possible)")
+		"Recording speed (0 means: go as fast as possible)")
 	cmd.Flags().StringVar(&addr, "addr", "localhost:8084", "gRPC server address")
 	cmd.Flags().StringVar(&logLevel,
 		"log-level",
@@ -140,9 +142,12 @@ type replayTask struct {
 	wg               sync.WaitGroup
 }
 
+//nolint:errcheck // keeping by design
 func (r *replayTask) ReplayEvent(eventId int) error {
-	r.providerService = providerv1connect.NewProviderServiceClient(http.DefaultClient, addr, connect.WithGRPC())
-	r.raceStateService = racestatev1connect.NewRaceStateServiceClient(http.DefaultClient, addr, connect.WithGRPC())
+	r.providerService = providerv1connect.NewProviderServiceClient(
+		http.DefaultClient, addr, connect.WithGRPC())
+	r.raceStateService = racestatev1connect.NewRaceStateServiceClient(
+		http.DefaultClient, addr, connect.WithGRPC())
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	defer r.cancel()
 
@@ -179,6 +184,7 @@ func (r *replayTask) ReplayEvent(eventId int) error {
 	return err
 }
 
+//nolint:gocognit // keeping by design
 func (r *replayTask) sendDriverData() error {
 	defer r.wg.Done()
 	data, err := carrepo.LoadByEventId(r.ctx, r.pool, r.sourceEvent.ID)
@@ -222,8 +228,8 @@ func (r *replayTask) sendDriverData() error {
 				log.Debug("Wait until next send",
 					log.String("component", "driverData"),
 					log.Duration("realWait", time.Duration(realWait*float64(time.Millisecond))),
-					log.Duration("wait", time.Duration(wait)*time.Millisecond))
-				timer.Reset(time.Duration(wait) * time.Millisecond)
+					log.Duration("wait", wait*time.Millisecond))
+				timer.Reset(wait * time.Millisecond)
 			} else {
 				return nil
 			}
@@ -234,6 +240,7 @@ func (r *replayTask) sendDriverData() error {
 	}
 }
 
+//nolint:gocognit // keeping by design
 func (r *replayTask) sendStateData() error {
 	defer r.wg.Done()
 	sf := initStateFetcher(r.pool, r.sourceEvent.ID, 0)
@@ -286,6 +293,7 @@ func (r *replayTask) sendStateData() error {
 	}
 }
 
+//nolint:gocognit // keeping by design
 func (r *replayTask) sendSpeedmapData() error {
 	defer r.wg.Done()
 	sf := initSpeedmapFetcher(r.pool, r.sourceEvent.ID, 0)

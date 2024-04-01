@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/cobra"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/convert"
@@ -15,7 +17,6 @@ import (
 	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/event"
 	staterepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
-	"github.com/spf13/cobra"
 )
 
 func NewCheckConvertCmd() *cobra.Command {
@@ -50,7 +51,7 @@ func checkConvert(eventArg string) {
 		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	eventId, err := strconv.Atoi(eventArg)
+	eventId, _ := strconv.Atoi(eventArg)
 	ctx := context.Background()
 	postgresAddr := utils.ExtractFromDBUrl(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
@@ -60,7 +61,8 @@ func checkConvert(eventArg string) {
 	defer pool.Close()
 	sourceEvent, err := eventrepo.LoadById(ctx, pool, eventId)
 	if err != nil {
-		log.Fatal("event not found", log.ErrorField(err))
+		log.Error("event not found", log.ErrorField(err))
+		return
 	}
 	log.Info("event found", log.String("event", sourceEvent.Key))
 	df := initDataFetcher(pool, eventId)
@@ -71,8 +73,6 @@ func checkConvert(eventArg string) {
 			break
 		}
 		sc.ConvertStatePayload(&state.Data)
-
-		// log.Debug("state", log.Int("id", state.ID))
 	}
 }
 

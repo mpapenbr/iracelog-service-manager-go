@@ -66,11 +66,14 @@ func (s *liveDataServer) LiveRaceState(
 				log.String("event", epd.Event.Key))
 		}
 		if err := stream.Send(&livedatav1.LiveRaceStateResponse{
-			Timestamp: timestamppb.Now(),
+			Timestamp: d.Timestamp,
 			Session:   d.Session,
 			Cars:      d.Cars,
 			Messages:  d.Messages,
 		}); err != nil {
+			epd.Mutex.Lock()
+			//nolint:gocritic // by design
+			defer epd.Mutex.Unlock()
 			epd.RacestateBroadcast.CancelSubscription(dataChan)
 			return err
 		}
@@ -104,7 +107,7 @@ func (s *liveDataServer) LiveAnalysis(
 			Timestamp: timestamppb.Now(),
 			Analysis:  proto.Clone(a).(*analysisv1.Analysis),
 		}); err != nil {
-			epd.AnalysisBroadcast.CancelSubscription(dataChan)
+			s.cancelSubscription(epd, dataChan)
 			return err
 		}
 	}
@@ -136,10 +139,166 @@ func (s *liveDataServer) LiveSpeedmap(
 			Timestamp: a.Timestamp,
 			Speedmap:  proto.Clone(a.Speedmap).(*speedmapv1.Speedmap),
 		}); err != nil {
+			epd.Mutex.Lock()
+			//nolint:gocritic // by design
+			defer epd.Mutex.Unlock()
 			epd.SpeedmapBroadcast.CancelSubscription(dataChan)
 			return err
 		}
 	}
 	log.Debug("LiveSpeedmap stream closed")
 	return nil
+}
+
+//nolint:whitespace,dupl,gocritic // can't make both editor and linter happy
+func (s *liveDataServer) LiveCarInfos(
+	ctx context.Context,
+	req *connect.Request[livedatav1.LiveCarInfosRequest],
+	stream *connect.ServerStream[livedatav1.LiveCarInfosResponse],
+) error {
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("Sending live carinfo data",
+		log.String("event", epd.Event.Key),
+	)
+	dataChan := epd.AnalysisBroadcast.Subscribe()
+	for a := range dataChan {
+		if s.debugWire {
+			log.Debug("Sending carinfo data",
+				log.String("event", epd.Event.Key))
+		}
+		//nolint:errcheck // by design
+		work := proto.Clone(a).(*analysisv1.Analysis)
+		if err := stream.Send(&livedatav1.LiveCarInfosResponse{
+			CarInfos: work.CarInfos,
+		}); err != nil {
+			s.cancelSubscription(epd, dataChan)
+			return err
+		}
+	}
+	log.Debug("LiveCarInfo stream closed")
+	return nil
+}
+
+//nolint:whitespace,dupl,funlen,gocritic // can't make both editor and linter happy
+func (s *liveDataServer) LiveAnalysisSel(
+	ctx context.Context,
+	req *connect.Request[livedatav1.LiveAnalysisSelRequest],
+	stream *connect.ServerStream[livedatav1.LiveAnalysisSelResponse],
+) error {
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("Sending live analysis data by selector",
+		log.String("event", epd.Event.Key),
+	)
+	dataChan := epd.AnalysisBroadcast.Subscribe()
+	//nolint:errcheck // by design
+	first := proto.Clone(<-dataChan).(*analysisv1.Analysis)
+	firstResp := &livedatav1.LiveAnalysisSelResponse{
+		Timestamp:        timestamppb.Now(),
+		CarInfos:         first.CarInfos,
+		CarLaps:          first.CarLaps,
+		CarPits:          first.CarPits,
+		CarStints:        first.CarStints,
+		RaceOrder:        first.RaceOrder,
+		RaceGraph:        first.RaceGraph,
+		CarComputeStates: first.CarComputeStates,
+	}
+	if err := stream.Send(firstResp); err != nil {
+		log.Warn("Error sending live analysis data by selector (first)", log.ErrorField(err))
+		s.cancelSubscription(epd, dataChan)
+		return err
+	}
+	for a := range dataChan {
+		if s.debugWire {
+			log.Debug("Sending carinfo data",
+				log.String("event", epd.Event.Key))
+		}
+		//nolint:errcheck // by design
+		work := proto.Clone(a).(*analysisv1.Analysis)
+		if err := stream.Send(
+			s.composeAnalysisResponse(work, req.Msg.Selector)); err != nil {
+			log.Warn("Error sending live analysis data by selector", log.ErrorField(err))
+			s.cancelSubscription(epd, dataChan)
+			return err
+		}
+	}
+	log.Debug("LiveAnalysisSel stream closed")
+	return nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *liveDataServer) cancelSubscription(
+	epd *utils.EventProcessingData,
+	dataChan <-chan *analysisv1.Analysis,
+) {
+	epd.Mutex.Lock()
+	defer epd.Mutex.Unlock()
+	epd.AnalysisBroadcast.CancelSubscription(dataChan)
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *liveDataServer) composeAnalysisResponse(
+	a *analysisv1.Analysis,
+	sel *livedatav1.AnalysisSelector,
+) *livedatav1.LiveAnalysisSelResponse {
+	ret := &livedatav1.LiveAnalysisSelResponse{
+		Timestamp: timestamppb.Now(),
+	}
+	for _, c := range sel.Components {
+		switch c {
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_COMPUTE_STATES:
+			ret.CarComputeStates = a.CarComputeStates
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_INFOS:
+			ret.CarInfos = a.CarInfos
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_LAPS:
+			ret.CarLaps = s.tailedCarlaps(a.CarLaps, sel.CarLapsNumTail)
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_PITS:
+			ret.CarPits = a.CarPits
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_STINTS:
+			ret.CarStints = a.CarStints
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_RACE_ORDER:
+			ret.RaceOrder = a.RaceOrder
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_RACE_GRAPH:
+			ret.RaceGraph = s.tailedRaceGraph(a.RaceGraph, sel.RaceGraphNumTail)
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_UNSPECIFIED:
+			// nothing
+		}
+	}
+	return ret
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (*liveDataServer) tailedCarlaps(
+	in []*analysisv1.CarLaps,
+	tail uint32,
+) []*analysisv1.CarLaps {
+	if len(in) < int(tail) {
+		return in
+	}
+	return in[len(in)-int(tail):]
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (*liveDataServer) tailedRaceGraph(
+	in []*analysisv1.RaceGraph,
+	tail uint32,
+) []*analysisv1.RaceGraph {
+	ret := make([]*analysisv1.RaceGraph, len(in))
+	for i, r := range in {
+		work := analysisv1.RaceGraph{LapNo: r.LapNo, CarClass: r.CarClass}
+		if len(r.Gaps) < int(tail) {
+			work.Gaps = r.Gaps
+		} else {
+			work.Gaps = r.Gaps[len(r.Gaps)-int(tail):]
+		}
+		ret[i] = &work
+	}
+	return ret
 }

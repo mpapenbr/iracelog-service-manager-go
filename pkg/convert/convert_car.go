@@ -3,6 +3,7 @@ package convert
 import (
 	carv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/car/v1"
 	driverv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/driver/v1"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 )
 
@@ -22,8 +23,8 @@ func ConvertCarInfo(m *model.CarInfo) *carv1.CarInfo {
 
 func ConvertCarInfos(m []model.CarInfo) []*carv1.CarInfo {
 	ret := make([]*carv1.CarInfo, 0)
-	for _, d := range m {
-		ret = append(ret, ConvertCarInfo(&d))
+	for i := range m {
+		ret = append(ret, ConvertCarInfo(&m[i]))
 	}
 	return ret
 }
@@ -37,8 +38,8 @@ func ConvertCarClass(m *model.CarClass) *carv1.CarClass {
 
 func ConvertCarClasses(m []model.CarClass) []*carv1.CarClass {
 	ret := make([]*carv1.CarClass, 0)
-	for _, d := range m {
-		ret = append(ret, ConvertCarClass(&d))
+	for i := range m {
+		ret = append(ret, ConvertCarClass(&m[i]))
 	}
 	return ret
 }
@@ -66,8 +67,8 @@ func ConvertDriver(m *model.Driver) *driverv1.Driver {
 
 func ConvertDrivers(m []model.Driver) []*driverv1.Driver {
 	ret := make([]*driverv1.Driver, 0)
-	for _, d := range m {
-		ret = append(ret, ConvertDriver(&d))
+	for i := range m {
+		ret = append(ret, ConvertDriver(&m[i]))
 	}
 	return ret
 }
@@ -90,8 +91,8 @@ func ConvertCarEntry(m *model.CarEntry) *carv1.CarEntry {
 
 func ConvertCarEntries(m []model.CarEntry) []*carv1.CarEntry {
 	ret := make([]*carv1.CarEntry, 0)
-	for _, d := range m {
-		ret = append(ret, ConvertCarEntry(&d))
+	for i := range m {
+		ret = append(ret, ConvertCarEntry(&m[i]))
 	}
 	return ret
 }

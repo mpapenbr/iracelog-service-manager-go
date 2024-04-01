@@ -6,9 +6,10 @@ import (
 
 	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing/util"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func NewStateMessageConverter(e *model.DbEvent, eventKey string) *StateConverter {
@@ -24,6 +25,7 @@ type StateConverter struct {
 	eventKey         string
 }
 
+//nolint:lll // better readability
 func (p *StateConverter) ConvertStatePayload(m *model.StateData) *racestatev1.PublishStateRequest {
 	ret := &racestatev1.PublishStateRequest{
 		Event:     &eventv1.EventSelector{Arg: &eventv1.EventSelector_Key{Key: p.eventKey}},
@@ -85,6 +87,7 @@ func (p *StateConverter) convertSession(session []interface{}) *racestatev1.Sess
 	}
 }
 
+//nolint:lll // better readability
 func (p *StateConverter) convertMessages(messages [][]interface{}) []*racestatev1.Message {
 	ret := make([]*racestatev1.Message, 0)
 	for _, msg := range messages {
@@ -113,6 +116,7 @@ func (p *StateConverter) convertMessage(messages []interface{}) *racestatev1.Mes
 	return ret
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func convertLaptime(
 	msg []interface{}, key string, extr func(arg []interface{}, key string) interface{},
 ) *racestatev1.TimeWithMarker {
@@ -165,6 +169,7 @@ func convertTimeMarker(rawVal string) racestatev1.TimeMarker {
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func convertTireCompound(
 	msg []interface{}, key string, extr func(arg []interface{}, key string) interface{},
 ) *racestatev1.TireCompound {
@@ -177,6 +182,7 @@ func convertTireCompound(
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func convertCarState(
 	msg []interface{}, key string, extr func(arg []interface{}, key string) interface{},
 ) racestatev1.CarState {
@@ -205,6 +211,7 @@ func convertCarState(
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func convertMessageType(
 	msg []interface{}, key string, extr func(arg []interface{}, key string) interface{},
 ) racestatev1.MessageType {
@@ -224,6 +231,7 @@ func convertMessageType(
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func convertMessageSubType(
 	msg []interface{}, key string, extr func(arg []interface{}, key string) interface{},
 ) racestatev1.MessageSubType {
@@ -243,6 +251,7 @@ func convertMessageSubType(
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func (p *StateConverter) getIntFrom(
 	msg []interface{},
 	key string,
@@ -260,6 +269,7 @@ func (p *StateConverter) getIntFrom(
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func (p *StateConverter) getFloatFrom(
 	msg []interface{},
 	key string,
@@ -275,6 +285,7 @@ func (p *StateConverter) getFloatFrom(
 	return -1
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func (p *StateConverter) getStringFrom(
 	msg []interface{},
 	key string,
@@ -288,26 +299,4 @@ func (p *StateConverter) getStringFrom(
 		fmt.Printf("Error extracting string val %s: %v %T\n", key, rawVal, rawVal)
 	}
 	return ""
-}
-
-func (p *StateConverter) getLaptime(
-	msg []interface{},
-	key string,
-	extractor func(arg []interface{}, key string) interface{},
-) float64 {
-	rawVal := extractor(msg, key)
-	switch val := rawVal.(type) {
-	case float64:
-		return val
-	case int:
-		return float64(val)
-	case []interface{}:
-		switch multiVal := val[0].(type) {
-		case float64:
-			return multiVal
-		case int:
-			return float64(multiVal)
-		}
-	}
-	return -1
 }

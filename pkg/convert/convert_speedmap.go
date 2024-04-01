@@ -2,6 +2,7 @@ package convert
 
 import (
 	speedmapv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/speedmap/v1"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 )
 
@@ -11,6 +12,7 @@ func NewSpeedmapMessageConverter() *SpeedmapMessageConverter {
 
 type SpeedmapMessageConverter struct{}
 
+//nolint:whitespace // can't make both editor and linter happy
 func (c *SpeedmapMessageConverter) ConvertSpeedmapPayload(
 	in *model.SpeedmapData,
 ) *speedmapv1.Speedmap {
@@ -24,7 +26,10 @@ func (c *SpeedmapMessageConverter) ConvertSpeedmapPayload(
 	}
 }
 
-func (c *SpeedmapMessageConverter) convertData(data map[string]*model.ClassSpeedmapData) map[string]*speedmapv1.ClassData {
+//nolint:whitespace // can't make both editor and linter happy
+func (c *SpeedmapMessageConverter) convertData(
+	data map[string]*model.ClassSpeedmapData,
+) map[string]*speedmapv1.ClassData {
 	ret := make(map[string]*speedmapv1.ClassData)
 	for k, v := range data {
 		ret[k] = &speedmapv1.ClassData{

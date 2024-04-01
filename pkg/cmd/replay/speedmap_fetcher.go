@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 	speedmaprepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/repository/speedmap"
 )
 
+//nolint:lll // readablity
 func initSpeedmapFetcher(pool *pgxpool.Pool, eventId int, startTS float64) *speedmapFetcher {
 	df := &speedmapFetcher{
 		pool:    pool,

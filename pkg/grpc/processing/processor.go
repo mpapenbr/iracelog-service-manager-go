@@ -27,6 +27,7 @@ func WithCarProcessor(carProcessor *car.CarProcessor) ProcessorOption {
 	}
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func WithPublishChannels(
 	analysisChan chan *analysisv1.Analysis,
 	racestateChan chan *racestatev1.PublishStateRequest,

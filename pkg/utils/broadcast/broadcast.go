@@ -2,8 +2,11 @@ package broadcast
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
+
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 )
 
@@ -27,6 +30,9 @@ type broadcastServer[T any] struct {
 	removeListener chan (<-chan T)
 	ctx            context.Context
 	cancel         context.CancelFunc
+	numRcv         int
+	numSnd         int
+	numSkip        int
 }
 
 func (b *broadcastServer[T]) Subscribe() <-chan T {
@@ -40,7 +46,8 @@ func (b *broadcastServer[T]) CancelSubscription(ch <-chan T) {
 }
 
 func (b *broadcastServer[T]) Close() {
-	log.Info("Closing broadcast server")
+	log.Info("Closing broadcast server",
+		log.Int("rcv", b.numRcv), log.Int("snd", b.numSnd), log.Int("skip", b.numSkip))
 	b.cancel()
 }
 
@@ -58,6 +65,7 @@ func NewBroadcastServer[T any](source <-chan T) BroadcastServer[T] {
 	return b
 }
 
+//nolint:funlen,cyclop,gocognit // by design
 func (b *broadcastServer[T]) serve() {
 	defer func() {
 		log.Info("Closing listeners")
@@ -67,6 +75,7 @@ func (b *broadcastServer[T]) serve() {
 			}
 		}
 	}()
+	m := sync.Mutex{}
 	for {
 		select {
 		case <-b.ctx.Done():
@@ -75,16 +84,37 @@ func (b *broadcastServer[T]) serve() {
 		case ch := <-b.addListener:
 			b.listeners = append(b.listeners, ch)
 		case ch := <-b.removeListener:
+			log.Debug("removing listener", log.Int("len", len(b.listeners)))
+			m.Lock()
+			log.Debug("got lock")
 			for i, listener := range b.listeners {
 				if listener == ch {
 					b.listeners = append(b.listeners[:i], b.listeners[i+1:]...)
+					log.Debug("removed listener", log.Int("len", len(b.listeners)))
 					break
 				}
 			}
+			log.Debug("unlocking", log.Int("len", len(b.listeners)))
+			m.Unlock()
 		case msg := <-b.source:
+			m.Lock()
+			b.numRcv++
+
 			for _, listener := range b.listeners {
-				listener <- msg
+				select {
+				case listener <- msg:
+					b.numSnd++
+				// as an alternative we could use a timeout here
+				// something like case <-time.After(100 * time.Millisecond):
+				// but we have to keep in mind: don't wait too long
+				case <-time.After(50 * time.Millisecond):
+					// default:
+					// log.Debug("skipping listener", log.Int("len", len(b.listeners)))
+					b.numSkip++
+				}
 			}
+
+			m.Unlock()
 		}
 	}
 }
