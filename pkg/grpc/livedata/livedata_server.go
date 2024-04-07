@@ -6,6 +6,7 @@ import (
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/livedata/v1/livedatav1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
 	livedatav1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/livedata/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
 	speedmapv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/speedmap/v1"
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -126,7 +127,7 @@ func (s *liveDataServer) LiveSpeedmap(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live rspeedmap data",
+	log.Debug("Sending live speedmap data",
 		log.String("event", epd.Event.Key),
 	)
 	dataChan := epd.SpeedmapBroadcast.Subscribe()
@@ -150,11 +151,61 @@ func (s *liveDataServer) LiveSpeedmap(
 	return nil
 }
 
-//nolint:whitespace,dupl,gocritic // can't make both editor and linter happy
-func (s *liveDataServer) LiveCarInfos(
+//nolint:whitespace,dupl // can't make both editor and linter happy
+func (s *liveDataServer) LiveDriverData(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveCarInfosRequest],
-	stream *connect.ServerStream[livedatav1.LiveCarInfosResponse],
+	req *connect.Request[livedatav1.LiveDriverDataRequest],
+	stream *connect.ServerStream[livedatav1.LiveDriverDataResponse],
+) error {
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("Sending live driver data",
+		log.String("event", epd.Event.Key),
+	)
+
+	//nolint:lll // readability
+	composeResp := func(a *racestatev1.PublishDriverDataRequest) *livedatav1.LiveDriverDataResponse {
+		return &livedatav1.LiveDriverDataResponse{
+			Timestamp:      a.Timestamp,
+			Entries:        a.Entries,
+			Cars:           a.Cars,
+			CarClasses:     a.CarClasses,
+			SessionTime:    a.SessionTime,
+			CurrentDrivers: a.CurrentDrivers,
+		}
+	}
+	if err := stream.Send(composeResp(epd.LastDriverData)); err != nil {
+		log.Warn("Error sending live driver (first)", log.ErrorField(err))
+		return err
+	}
+	dataChan := epd.DriverDataBroadcast.Subscribe()
+	for a := range dataChan {
+		if s.debugWire {
+			log.Debug("Sending driver data",
+				log.String("event", epd.Event.Key))
+		}
+		//nolint:errcheck // by design
+		work := proto.Clone(a).(*racestatev1.PublishDriverDataRequest)
+		if err := stream.Send(composeResp(work)); err != nil {
+			epd.Mutex.Lock()
+			//nolint:gocritic // by design
+			defer epd.Mutex.Unlock()
+			epd.DriverDataBroadcast.CancelSubscription(dataChan)
+			return err
+		}
+	}
+	log.Debug("LiveDriverData stream closed")
+	return nil
+}
+
+//nolint:whitespace,dupl,gocritic // can't make both editor and linter happy
+func (s *liveDataServer) LiveCarOccupancies(
+	ctx context.Context,
+	req *connect.Request[livedatav1.LiveCarOccupanciesRequest],
+	stream *connect.ServerStream[livedatav1.LiveCarOccupanciesResponse],
 ) error {
 	// get the epd
 	epd, err := s.lookup.GetEvent(req.Msg.Event)
@@ -172,8 +223,8 @@ func (s *liveDataServer) LiveCarInfos(
 		}
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*analysisv1.Analysis)
-		if err := stream.Send(&livedatav1.LiveCarInfosResponse{
-			CarInfos: work.CarInfos,
+		if err := stream.Send(&livedatav1.LiveCarOccupanciesResponse{
+			CarOccupancies: work.CarOccupancies,
 		}); err != nil {
 			s.cancelSubscription(epd, dataChan)
 			return err
@@ -202,7 +253,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 	first := proto.Clone(<-dataChan).(*analysisv1.Analysis)
 	firstResp := &livedatav1.LiveAnalysisSelResponse{
 		Timestamp:        timestamppb.Now(),
-		CarInfos:         first.CarInfos,
+		CarOccupancies:   first.CarOccupancies,
 		CarLaps:          first.CarLaps,
 		CarPits:          first.CarPits,
 		CarStints:        first.CarStints,
@@ -255,10 +306,10 @@ func (s *liveDataServer) composeAnalysisResponse(
 		switch c {
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_COMPUTE_STATES:
 			ret.CarComputeStates = a.CarComputeStates
-		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_INFOS:
-			ret.CarInfos = a.CarInfos
+		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_OCCUPANCIES:
+			ret.CarOccupancies = a.CarOccupancies
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_LAPS:
-			ret.CarLaps = s.tailedCarlaps(a.CarLaps, sel.CarLapsNumTail)
+			ret.CarLaps = tailedCarlaps(a.CarLaps, sel.CarLapsNumTail)
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_PITS:
 			ret.CarPits = a.CarPits
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_CAR_STINTS:
@@ -266,7 +317,7 @@ func (s *liveDataServer) composeAnalysisResponse(
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_RACE_ORDER:
 			ret.RaceOrder = a.RaceOrder
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_RACE_GRAPH:
-			ret.RaceGraph = s.tailedRaceGraph(a.RaceGraph, sel.RaceGraphNumTail)
+			ret.RaceGraph = tailedRaceGraph(a.RaceGraph, sel.RaceGraphNumTail)
 		case livedatav1.AnalysisComponent_ANALYSIS_COMPONENT_UNSPECIFIED:
 			// nothing
 		}
@@ -274,31 +325,47 @@ func (s *liveDataServer) composeAnalysisResponse(
 	return ret
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func (*liveDataServer) tailedCarlaps(
+func tailedCarlaps(
 	in []*analysisv1.CarLaps,
 	tail uint32,
 ) []*analysisv1.CarLaps {
-	if len(in) < int(tail) {
-		return in
+	ret := make([]*analysisv1.CarLaps, len(in))
+	for i, r := range in {
+		work := analysisv1.CarLaps{CarNum: r.CarNum}
+		if len(r.Laps) < int(tail) {
+			work.Laps = r.Laps
+		} else {
+			work.Laps = r.Laps[len(r.Laps)-int(tail):]
+		}
+		ret[i] = &work
 	}
-	return in[len(in)-int(tail):]
+	return ret
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func (*liveDataServer) tailedRaceGraph(
+func tailedRaceGraph(
 	in []*analysisv1.RaceGraph,
 	tail uint32,
 ) []*analysisv1.RaceGraph {
-	ret := make([]*analysisv1.RaceGraph, len(in))
-	for i, r := range in {
-		work := analysisv1.RaceGraph{LapNo: r.LapNo, CarClass: r.CarClass}
-		if len(r.Gaps) < int(tail) {
-			work.Gaps = r.Gaps
+	ret := make([]*analysisv1.RaceGraph, 0)
+	source := toMap(in)
+	for _, r := range source {
+		// work := analysisv1.RaceGraph{LapNo: r.LapNo, CarClass: r.CarClass}
+		if len(r) < int(tail) {
+			ret = append(ret, r...)
 		} else {
-			work.Gaps = r.Gaps[len(r.Gaps)-int(tail):]
+			ret = append(ret, r[len(r)-int(tail):]...)
 		}
-		ret[i] = &work
+	}
+	return ret
+}
+
+func toMap(in []*analysisv1.RaceGraph) map[string][]*analysisv1.RaceGraph {
+	ret := make(map[string][]*analysisv1.RaceGraph, 0)
+	for _, r := range in {
+		if _, ok := ret[r.CarClass]; !ok {
+			ret[r.CarClass] = make([]*analysisv1.RaceGraph, 0)
+		}
+		ret[r.CarClass] = append(ret[r.CarClass], r)
 	}
 	return ret
 }

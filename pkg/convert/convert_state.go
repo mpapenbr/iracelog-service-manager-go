@@ -16,6 +16,7 @@ func NewStateMessageConverter(e *model.DbEvent, eventKey string) *StateConverter
 	ret := &StateConverter{
 		payloadExtractor: util.NewPayloadExtractor(&e.Data.Manifests),
 		eventKey:         eventKey,
+		numSectors:       len(e.Data.Info.Sectors),
 	}
 	return ret
 }
@@ -23,6 +24,7 @@ func NewStateMessageConverter(e *model.DbEvent, eventKey string) *StateConverter
 type StateConverter struct {
 	payloadExtractor *util.PayloadExtractor
 	eventKey         string
+	numSectors       int
 }
 
 //nolint:lll // better readability
@@ -47,6 +49,10 @@ func (p *StateConverter) convertCars(cars [][]interface{}) []*racestatev1.Car {
 
 func (p *StateConverter) convertCar(car []interface{}) *racestatev1.Car {
 	extr := p.payloadExtractor.ExtractCarValue
+	sectors := make([]*racestatev1.TimeWithMarker, p.numSectors)
+	for i := 0; i < p.numSectors; i++ {
+		sectors[i] = convertLaptime(car, fmt.Sprintf("s%d", i+1), extr)
+	}
 
 	return &racestatev1.Car{
 		CarIdx:       int32(p.getIntFrom(car, "carIdx", extr)),
@@ -65,6 +71,7 @@ func (p *StateConverter) convertCar(car []interface{}) *racestatev1.Car {
 		TireCompound: convertTireCompound(car, "tireCompound", extr),
 		Best:         convertLaptime(car, "best", extr),
 		Last:         convertLaptime(car, "last", extr),
+		Sectors:      sectors,
 	}
 }
 
@@ -79,6 +86,7 @@ func (p *StateConverter) convertSession(session []interface{}) *racestatev1.Sess
 		AirPressure:     float32(p.getFloatFrom(session, "airPressure", extr)),
 		WindDir:         float32(p.getFloatFrom(session, "windDir", extr)),
 		WindVel:         float32(p.getFloatFrom(session, "windVel", extr)),
+		TimeOfDay:       uint32(p.getIntFrom(session, "timeOfDay", extr)),
 		TimeRemain:      float32(p.getFloatFrom(session, "timeRemain", extr)),
 		LapsRemain:      int32(p.getIntFrom(session, "lapsRemain", extr)),
 		FlagState:       p.getStringFrom(session, "flagState", extr),
@@ -176,6 +184,8 @@ func convertTireCompound(
 	rawVal := extr(msg, key)
 	switch val := rawVal.(type) {
 	case int:
+		return &racestatev1.TireCompound{RawValue: uint32(val)}
+	case float64:
 		return &racestatev1.TireCompound{RawValue: uint32(val)}
 	default:
 		return nil

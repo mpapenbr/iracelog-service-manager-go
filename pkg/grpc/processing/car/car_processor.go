@@ -10,15 +10,15 @@ import (
 )
 
 type CarProcessor struct {
-	ByCarIdx       map[uint32]*carv1.CarEntry
-	ByCarNum       map[string]*carv1.CarEntry
-	ComputeState   map[string]*analysisv1.CarComputeState
-	StintLookup    map[string]*analysisv1.CarStint
-	PitLookup      map[string]*analysisv1.CarPit
-	CarInfoLookup  map[string]*analysisv1.CarInfo
-	NumByIdx       map[uint32]string
-	CurrentDrivers map[uint32]string
-	CarClasses     []*carv1.CarClass
+	ByCarIdx           map[uint32]*carv1.CarEntry
+	ByCarNum           map[string]*carv1.CarEntry
+	ComputeState       map[string]*analysisv1.CarComputeState
+	StintLookup        map[string]*analysisv1.CarStint
+	PitLookup          map[string]*analysisv1.CarPit
+	CarOccupancyLookup map[string]*analysisv1.CarOccupancy
+	NumByIdx           map[uint32]string
+	CurrentDrivers     map[uint32]string
+	CarClasses         []*carv1.CarClass
 }
 
 type CarProcessorOption func(cp *CarProcessor)
@@ -27,13 +27,13 @@ const OUT_THRESHOLD = 60.0
 
 func NewCarProcessor(opts ...CarProcessorOption) *CarProcessor {
 	cp := &CarProcessor{
-		ByCarIdx:      make(map[uint32]*carv1.CarEntry),
-		ByCarNum:      make(map[string]*carv1.CarEntry),
-		ComputeState:  make(map[string]*analysisv1.CarComputeState),
-		StintLookup:   make(map[string]*analysisv1.CarStint),
-		PitLookup:     make(map[string]*analysisv1.CarPit),
-		CarInfoLookup: make(map[string]*analysisv1.CarInfo),
-		NumByIdx:      make(map[uint32]string),
+		ByCarIdx:           make(map[uint32]*carv1.CarEntry),
+		ByCarNum:           make(map[string]*carv1.CarEntry),
+		ComputeState:       make(map[string]*analysisv1.CarComputeState),
+		StintLookup:        make(map[string]*analysisv1.CarStint),
+		PitLookup:          make(map[string]*analysisv1.CarPit),
+		CarOccupancyLookup: make(map[string]*analysisv1.CarOccupancy),
+		NumByIdx:           make(map[uint32]string),
 	}
 	for _, opt := range opts {
 		opt(cp)
@@ -66,18 +66,19 @@ func (p *CarProcessor) ProcessCarPayload(payload *racestatev1.PublishDriverDataR
 //nolint:gocognit,nestif // by design
 func (p *CarProcessor) updateCarInfo(payload *racestatev1.PublishDriverDataRequest) {
 	for carIdx, name := range payload.CurrentDrivers {
-		item, ok := p.CarInfoLookup[p.NumByIdx[carIdx]]
+		item, ok := p.CarOccupancyLookup[p.NumByIdx[carIdx]]
 		if !ok {
-			item = &analysisv1.CarInfo{
-				CarNum: p.NumByIdx[carIdx],
-				Name:   p.ByCarIdx[carIdx].Team.Name,
+			item = &analysisv1.CarOccupancy{
+				CarNum:            p.NumByIdx[carIdx],
+				Name:              p.ByCarIdx[carIdx].Team.Name,
+				CurrentDriverName: name,
 				Drivers: []*analysisv1.Driver{
 					p.newDriverEntry(name, payload.SessionTime),
 				},
 			}
 		} else {
 			updateLeave := func(arg *analysisv1.Driver) {
-				arg.SeatTime[len(arg.SeatTime)-1].LeaveCarTime = payload.SessionTime
+				arg.SeatTimes[len(arg.SeatTimes)-1].LeaveCarTime = payload.SessionTime
 			}
 
 			driverIndex, driverEntry := p.driverEntryByName(item.Drivers, name)
@@ -92,29 +93,31 @@ func (p *CarProcessor) updateCarInfo(payload *racestatev1.PublishDriverDataReque
 			} else {
 				// check if we have a driver change
 				if p.CurrentDrivers[carIdx] != name {
+					item.CurrentDriverName = name
 					if currentDriverIdx != -1 {
 						updateLeave(currentDriverEntry)
 					}
-					item.Drivers[driverIndex].SeatTime = append(
-						item.Drivers[driverIndex].SeatTime,
+					item.Drivers[driverIndex].SeatTimes = append(
+						item.Drivers[driverIndex].SeatTimes,
 						&analysisv1.SeatTime{
 							EnterCarTime: payload.SessionTime,
 							LeaveCarTime: payload.SessionTime,
 						})
+
 				} else {
 					updateLeave(driverEntry)
 				}
 			}
 		}
-		p.CarInfoLookup[p.NumByIdx[carIdx]] = item
+		p.CarOccupancyLookup[p.NumByIdx[carIdx]] = item
 	}
 }
 
 //nolint:lll // by design
 func (p *CarProcessor) newDriverEntry(arg string, sessionTime float32) *analysisv1.Driver {
 	return &analysisv1.Driver{
-		DriverName: arg,
-		SeatTime: []*analysisv1.SeatTime{
+		Name: arg,
+		SeatTimes: []*analysisv1.SeatTime{
 			{EnterCarTime: sessionTime, LeaveCarTime: sessionTime},
 		},
 	}
@@ -122,13 +125,13 @@ func (p *CarProcessor) newDriverEntry(arg string, sessionTime float32) *analysis
 
 // gets called while processing state message if car is still active
 func (p *CarProcessor) markSeatTime(carNum string, sessionTime float32) {
-	entry := p.CarInfoLookup[carNum]
+	entry := p.CarOccupancyLookup[carNum]
 	carIdx := p.ByCarNum[carNum].Car.CarIdx
 	_, driverEntry := p.driverEntryByName(entry.Drivers, p.CurrentDrivers[carIdx])
 	if driverEntry != nil {
-		driverEntry.SeatTime[len(driverEntry.SeatTime)-1].LeaveCarTime = sessionTime
+		driverEntry.SeatTimes[len(driverEntry.SeatTimes)-1].LeaveCarTime = sessionTime
 	}
-	p.CarInfoLookup[carNum] = entry
+	p.CarOccupancyLookup[carNum] = entry
 }
 
 //nolint:whitespace,funlen // can't make the linters happy
@@ -138,7 +141,7 @@ func (p *CarProcessor) driverEntryByName(data []*analysisv1.Driver, name string)
 	driverIndex := slices.IndexFunc(
 		data,
 		func(item *analysisv1.Driver) bool {
-			return item.DriverName == name
+			return item.Name == name
 		})
 	if driverIndex == -1 {
 		return -1, nil

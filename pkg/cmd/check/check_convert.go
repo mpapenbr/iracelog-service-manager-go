@@ -72,7 +72,8 @@ func checkConvert(eventArg string) {
 		if state == nil {
 			break
 		}
-		sc.ConvertStatePayload(&state.Data)
+		x := sc.ConvertStatePayload(&state.Data)
+		log.Debug("converted state", log.Any("data", x))
 	}
 }
 

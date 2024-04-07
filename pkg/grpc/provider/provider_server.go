@@ -57,16 +57,13 @@ type providerServer struct {
 func (s *providerServer) ListLiveEvents(
 	ctx context.Context,
 	req *connect.Request[providerv1.ListLiveEventsRequest],
-	stream *connect.ServerStream[providerv1.ListLiveEventsResponse],
-) error {
+) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
 	log.Debug("ListLiveEvents called")
+	ec := []*providerv1.LiveEventContainer{}
 	for _, v := range s.lookup.GetEvents() {
-		if err := stream.Send(&providerv1.ListLiveEventsResponse{Event: v}); err != nil {
-			log.Error("Error sending event", log.ErrorField(err))
-			return err
-		}
+		ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 	}
-	return nil
+	return connect.NewResponse(&providerv1.ListLiveEventsResponse{Events: ec}), nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -92,7 +89,7 @@ func (s *providerServer) RegisterEvent(
 	if e, _ := s.lookup.GetEvent(selector); e != nil {
 		return nil, connect.NewError(connect.CodeAlreadyExists, ErrEventAlreadyRegistered)
 	}
-	s.lookup.AddEvent(req.Msg.Event)
+	s.lookup.AddEvent(req.Msg.Event, req.Msg.Track)
 	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
 		nil
 }
@@ -120,18 +117,16 @@ func (s *providerServer) UnregisterEvent(
 func (s *providerServer) UnregisterAll(
 	ctx context.Context,
 	req *connect.Request[providerv1.UnregisterAllRequest],
-	stream *connect.ServerStream[providerv1.UnregisterAllResponse],
-) error {
+) (*connect.Response[providerv1.UnregisterAllResponse], error) {
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
+	ec := []*providerv1.LiveEventContainer{}
 	for _, v := range s.lookup.GetEvents() {
-		if err := stream.Send(&providerv1.UnregisterAllResponse{Event: v}); err != nil {
-			log.Warn("Error sending event on unregisterAll", log.ErrorField(err))
-		}
+		ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 	}
 	s.lookup.Clear()
-	return nil
+	return connect.NewResponse(&providerv1.UnregisterAllResponse{Events: ec}), nil
 }

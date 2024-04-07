@@ -91,7 +91,7 @@ func (p *Processor) composeAnalysisData() *analysisv1.Analysis {
 		CarComputeStates: flattenByReference(p.carProcessor.ComputeState, carNums),
 		CarStints:        flattenByReference(p.carProcessor.StintLookup, carNums),
 		CarPits:          flattenByReference(p.carProcessor.PitLookup, carNums),
-		CarInfos:         flattenByReference(p.carProcessor.CarInfoLookup, carNums),
+		CarOccupancies:   flattenByReference(p.carProcessor.CarOccupancyLookup, carNums),
 		RaceGraph:        flattenRaceGraph(p.raceProcessor.RaceGraph, classes),
 	}
 	return ret
