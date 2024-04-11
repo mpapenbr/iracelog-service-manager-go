@@ -166,7 +166,7 @@ func (p *RaceProcessor) processClassRaceGraph(
 
 	leaderEntry := slices.IndexFunc(carClassEntries,
 		func(item *racestatev1.Car) bool {
-			return item.Pos == 1
+			return item.Pic == 1
 		})
 
 	if leaderEntry == -1 {
