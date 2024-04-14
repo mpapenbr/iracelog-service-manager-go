@@ -185,7 +185,7 @@ func (p *RaceProcessor) processClassRaceGraph(
 			CarNum: p.carProcessor.NumByIdx[uint32(carMsgEntry.CarIdx)],
 			LapNo:  carMsgEntry.Lc,
 			Pos:    carMsgEntry.Pos,
-			Gap:    carMsgEntry.Gap,
+			Gap:    carMsgEntry.Gap - carClassEntries[leaderEntry].Gap,
 			Pic:    carMsgEntry.Pic,
 		}
 

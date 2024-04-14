@@ -151,7 +151,7 @@ func (s *liveDataServer) LiveSpeedmap(
 	return nil
 }
 
-//nolint:whitespace,dupl // can't make both editor and linter happy
+//nolint:whitespace,dupl,funlen // can't make both editor and linter happy
 func (s *liveDataServer) LiveDriverData(
 	ctx context.Context,
 	req *connect.Request[livedatav1.LiveDriverDataRequest],
@@ -325,6 +325,7 @@ func (s *liveDataServer) composeAnalysisResponse(
 	return ret
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func tailedCarlaps(
 	in []*analysisv1.CarLaps,
 	tail uint32,
@@ -342,6 +343,7 @@ func tailedCarlaps(
 	return ret
 }
 
+//nolint:whitespace // can't make both editor and linter happy
 func tailedRaceGraph(
 	in []*analysisv1.RaceGraph,
 	tail uint32,
@@ -349,7 +351,6 @@ func tailedRaceGraph(
 	ret := make([]*analysisv1.RaceGraph, 0)
 	source := toMap(in)
 	for _, r := range source {
-		// work := analysisv1.RaceGraph{LapNo: r.LapNo, CarClass: r.CarClass}
 		if len(r) < int(tail) {
 			ret = append(ret, r...)
 		} else {

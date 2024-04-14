@@ -1,3 +1,4 @@
+//nolint:thelper,whitespace,lll,funlen,gocritic,dupl // ok for tests
 package livedata
 
 import (
@@ -186,7 +187,7 @@ func Test_tailedRaceGraph(t *testing.T) {
 			},
 		},
 		{
-			name: "request last from mulitple laps",
+			name: "request last from multiple laps",
 			args: args{
 				in: []*analysisv1.RaceGraph{
 					{

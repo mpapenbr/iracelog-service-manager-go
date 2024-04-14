@@ -63,7 +63,7 @@ func (p *CarProcessor) ProcessCarPayload(payload *racestatev1.PublishDriverDataR
 	p.CurrentDrivers = payload.CurrentDrivers
 }
 
-//nolint:gocognit,nestif // by design
+//nolint:gocognit,nestif,funlen // by design
 func (p *CarProcessor) updateCarInfo(payload *racestatev1.PublishDriverDataRequest) {
 	for carIdx, name := range payload.CurrentDrivers {
 		item, ok := p.CarOccupancyLookup[p.NumByIdx[carIdx]]
@@ -103,7 +103,6 @@ func (p *CarProcessor) updateCarInfo(payload *racestatev1.PublishDriverDataReque
 							EnterCarTime: payload.SessionTime,
 							LeaveCarTime: payload.SessionTime,
 						})
-
 				} else {
 					updateLeave(driverEntry)
 				}
