@@ -168,18 +168,18 @@ func Test_tailedRaceGraph(t *testing.T) {
 				},
 				{
 					LapNo:    1,
-					CarClass: "B",
+					CarClass: "All",
 					Gaps: []*analysisv1.GapInfo{
+						{CarNum: "1", Gap: 0},
+						{CarNum: "2", Gap: 1},
 						{CarNum: "10", Gap: 0},
 						{CarNum: "20", Gap: 1},
 					},
 				},
 				{
 					LapNo:    1,
-					CarClass: "All",
+					CarClass: "B",
 					Gaps: []*analysisv1.GapInfo{
-						{CarNum: "1", Gap: 0},
-						{CarNum: "2", Gap: 1},
 						{CarNum: "10", Gap: 0},
 						{CarNum: "20", Gap: 1},
 					},

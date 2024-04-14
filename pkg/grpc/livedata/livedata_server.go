@@ -2,6 +2,7 @@ package livedata
 
 import (
 	"context"
+	"sort"
 
 	"buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/livedata/v1/livedatav1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
@@ -350,13 +351,22 @@ func tailedRaceGraph(
 ) []*analysisv1.RaceGraph {
 	ret := make([]*analysisv1.RaceGraph, 0)
 	source := toMap(in)
-	for _, r := range source {
-		if len(r) < int(tail) {
-			ret = append(ret, r...)
+
+	// sort keys
+	keys := make([]string, 0, len(source))
+	for k := range source {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		m := source[k]
+		if len(m) < int(tail) {
+			ret = append(ret, m...)
 		} else {
-			ret = append(ret, r[len(r)-int(tail):]...)
+			ret = append(ret, m[len(m)-int(tail):]...)
 		}
 	}
+
 	return ret
 }
 
