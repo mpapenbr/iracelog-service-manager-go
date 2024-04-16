@@ -18,7 +18,6 @@ import (
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
 	replayCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay"
 	grpcServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/grpc"
-
 	wampServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/wamp"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"

@@ -1,4 +1,4 @@
-//nolint:funlen // keeping by design
+//nolint:all // keeping by design
 package client
 
 import (
@@ -56,7 +56,6 @@ func liveStateData(eventArg string) {
 	for r.Receive() {
 		resp := r.Msg()
 		log.Debug("got state: ", log.Time("ts", resp.Timestamp.AsTime()))
-
 	}
 	log.Info("done")
 }
