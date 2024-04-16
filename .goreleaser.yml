@@ -29,7 +29,7 @@ archives:
 
 dockers:
   - image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Version }}"
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
 
     build_flag_templates:
       - "--pull"
@@ -43,9 +43,9 @@ dockers:
       - pkg/db/migrate/migrations
 
 docker_manifests:
-  - name_template: "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Version }}"
+  - name_template: "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
     image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Version }}"
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
 
 checksum:
   name_template: "checksums.txt"
