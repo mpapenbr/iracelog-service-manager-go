@@ -47,7 +47,7 @@ func SetupPostgres(ctx context.Context, opts ...PostgresContainerOption) (
 ) {
 	// setup the container
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:15",
+		Image:        "postgres:16",
 		Env:          map[string]string{},
 		ExposedPorts: []string{},
 		Cmd:          []string{"postgres", "-c", "fsync=off"},

@@ -5,16 +5,94 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Server",
+      "name": "gRPC Server",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "grpc",
+        "--log-format",
+        "text",
+        "--log-level",
+        "debug",
+        "--enable-telemetry",
+        "--admin-token",
+        "admin"
+      ]
+    },
+    {
+      "name": "replay",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "replay",
+        "grpc",
+        "2",
+        "--log-level",
+        "debug",
+        "--addr",
+        "http://localhost:8084",
+        "-t",
+        "admin",
+        "--speed",
+        "10",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_grpc"
+        // "--do-not-persist"
+      ]
+    },
+    {
+      "name": "check convert",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "convert",
+        "320",
+        "--log-level",
+        "debug",
+        "--start",
+        "1711241308",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_try"
+      ]
+    },
+    {
+      "name": "check datafetcher",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "datafetcher",
+        "2",
+        "--log-level",
+        "debug",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_grpc"
+      ]
+    },
+    {
+      "name": "Wamp-Server",
       "type": "go",
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
       "args": [
-        "server",
-        "--logFormat",
+        "wamp",
+        "--log-format",
         "text",
-        "--logLevel",
+        "--log-level",
         "debug",
         "--enable-telemetry"
       ]

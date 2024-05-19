@@ -26,7 +26,8 @@ run:
 # output configuration options
 output:
   # default is "colored-line-number"
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
 
   # print lines of code with issue, default is true
   print-issued-lines: true
@@ -140,7 +141,8 @@ linters-settings:
   gocritic:
     # which checks should be enabled; can't be combined with 'disabled-checks';
     # see https://go-critic.github.io/overview#checks-overview
-
+    disabled-checks:
+      - ptrToRefParam
     # enable checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags
     # empty list by default. See https://github.com/go-critic/go-critic#usage -> "Tags"
     enabled-tags:
@@ -195,6 +197,7 @@ linters-settings:
         # whether to check exported functions
         checkExported: true
 
+
   gocyclo:
     # minimal code complexity to report, 30 by default (recommended 10-20)
     min-complexity: 15
@@ -224,9 +227,6 @@ linters-settings:
     simplify: true
 
   gofumpt:
-    # select the Go version to target. The default is `1.15`.
-    lang-version: "1.20"
-
     # choose whether or not to use the extra rules - disabled by default
     extra-rules: true
 
@@ -240,14 +240,12 @@ linters-settings:
     min-confidence: 0.8
 
   gomnd:
-    settings:
-      mnd:
-        # list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks
-        # optional: remove the "operation" and "assign" if needed
-        checks: argument,case,condition,operation,return,assign
-        # ignored-numbers: 1000
-        # ignored-files: magic_.*.go
-        # ignored-functions: math.*
+    # list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks
+    # optional: remove the "operation" and "assign" if needed
+    checks: argument,case,condition,operation,return,assign
+    # ignored-numbers: 1000
+    # ignored-files: magic_.*.go
+    # ignored-functions: math.*
 
   gosec:
     # list of available rules: https://github.com/securego/gosec#available-rules
@@ -261,13 +259,9 @@ linters-settings:
     #   - G204
 
   gosimple:
-    go: "1.22" # version to target - default is '1.13'
     checks: ["all"] # https://staticcheck.io/docs/options#checks for more info
 
   govet:
-    # report about shadowed variables
-    check-shadowing: true
-
     # settings per analyzer
     settings:
       # printf: # analyzer name, run `go tool vet help` to see all analyzers
@@ -378,12 +372,11 @@ linters-settings:
 
   staticcheck:
     # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
-    go: "1.20" # go version to target. The default is '1.13'
+
     checks: ["all"] # https://staticcheck.io/docs/options#checks for more info
 
   stylecheck:
     # Stylecheck is a replacement for golint
-    go: "1.20" # go version to target. default is '1.13'
     checks: ["all"]
     dot-import-whitelist:
       - fmt
@@ -422,7 +415,7 @@ linters-settings:
 
   unused:
     # Checks code for unused constants, variables, functions and types
-    go: "1.20" # go version to target. The default is '1.13'
+
 
   whitespace:
     # Tool for detection of leading and trailing whitespace - checks for unnecessary
