@@ -24,4 +24,5 @@ type PitInfo struct {
 	Exit       float64 `json:"exit"`
 	Entry      float64 `json:"entry"`
 	LaneLength float64 `json:"laneLength"`
+	Lane       float64 `json:"lane"`
 }

@@ -3,6 +3,7 @@ package track
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -42,6 +43,30 @@ func LoadById(
 		return nil, err
 	}
 	return &item, nil
+}
+
+func LoadAll(
+	ctx context.Context,
+	conn repository.Querier,
+) ([]*model.DbTrack, error) {
+	rows, err := conn.Query(ctx, selector)
+	if err != nil {
+		return nil, err
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	ret := make([]*model.DbTrack, 0)
+
+	for rows.Next() {
+		var item model.DbTrack
+
+		if err := rows.Scan(&item.ID, &item.Data); err != nil {
+			return nil, err
+		}
+		ret = append(ret, &item)
+	}
+	return ret, nil
 }
 
 func Update(

@@ -13,8 +13,13 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	checkCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/check"
+	clientCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/client"
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
-	serverCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server"
+	replayCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay"
+	grpcServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/grpc"
+	wampServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/wamp"
+	transferCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/transfer"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
@@ -69,7 +74,12 @@ func init() {
 
 	// add commands here
 	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())
-	rootCmd.AddCommand(serverCmd.NewServerCmd())
+	rootCmd.AddCommand(wampServer.NewServerCmd())
+	rootCmd.AddCommand(grpcServer.NewServerCmd())
+	rootCmd.AddCommand(replayCmd.NewReplayCmd())
+	rootCmd.AddCommand(checkCmd.NewCheckCmd())
+	rootCmd.AddCommand(clientCmd.NewLiveStateCmd())
+	rootCmd.AddCommand(transferCmd.NewTransferCmd())
 }
 
 // initConfig reads in config file and ENV variables if set.

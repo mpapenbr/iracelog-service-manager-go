@@ -16,8 +16,8 @@ import (
 )
 
 func initTestDb() *pgxpool.Pool {
-	pool := tcpg.SetupTestDb()
-	tcpg.ClearAllTables(pool)
+	pool := tcpg.SetupTestDbDeprecated()
+	tcpg.ClearAllTablesDeprecated(pool)
 	return pool
 }
 

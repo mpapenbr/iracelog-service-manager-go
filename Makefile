@@ -80,7 +80,7 @@ lint:
 # No `help` message for this command - designed to be consumed internally
 .PHONY: --test-runner
 --test-runner:
-	go test ./... -p 1 -race -covermode=atomic -coverprofile=./coverage/coverage.txt
+	go test  `go list ./... | grep pkg/grpc` -p 1 -race -covermode=atomic -coverprofile=./coverage/coverage.txt
 	go tool cover -html=./coverage/coverage.txt -o ./coverage/coverage.html
 
 

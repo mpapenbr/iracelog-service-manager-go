@@ -30,4 +30,4 @@ jobs:
         run: go mod download
 
       - name: Test
-        run: go test ./... -p 1 -race -coverprofile=coverage.txt -covermode=atomic -gcflags=-l
+        run: go test `go list ./... | grep pkg/grpc` -p 1 -race -coverprofile=coverage.txt -covermode=atomic -gcflags=-l

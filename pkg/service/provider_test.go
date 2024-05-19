@@ -14,8 +14,8 @@ import (
 )
 
 func initTestDb() *pgxpool.Pool {
-	pool := tcpg.SetupTestDb()
-	tcpg.ClearAllTables(pool)
+	pool := tcpg.SetupTestDbDeprecated()
+	tcpg.ClearAllTablesDeprecated(pool)
 	return pool
 }
 
@@ -181,8 +181,8 @@ func TestProviderService_StoreEventExtra(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tcpg.ClearTrackTable(tt.fields.pool)
-			tcpg.ClearEventTable(tt.fields.pool)
+			tcpg.ClearTrackTableDeprecated(tt.fields.pool)
+			tcpg.ClearEventTableDeprecated(tt.fields.pool)
 			s := &ProviderService{
 				pool: tt.fields.pool, Lookup: ProviderLookup{},
 			}
