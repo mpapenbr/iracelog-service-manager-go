@@ -129,6 +129,7 @@ func ClearAllTables(pool *pgxpool.Pool) {
 		"c_car",
 		"c_car_class",
 		"rs_info",
+		"event_ext",
 		"event",
 		"track",
 	}

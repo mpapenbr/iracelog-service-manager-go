@@ -45,11 +45,13 @@ CREATE TABLE IF NOT EXISTS event (
 	replay_min_session_time numeric not null default 0,
 	replay_max_session_time numeric not null default 0,
 	sessions jsonb not null
+
 );
 comment on table event is 'Information about a recorded event';
 comment on column event.replay_min_timestamp is 'timestamp of the race start';
 comment on column event.replay_min_session_time is 'session time of the race start';
 comment on column event.replay_max_session_time is 'session time of the race end';
+
 
 -- Column id is associated with sequence public.event_id_seq
 ALTER TABLE
@@ -61,6 +63,20 @@ ADD
 ADD
 	CONSTRAINT event_track_id_fkey FOREIGN KEY (track_id) REFERENCES track (id);
 
+
+-- ### event_ext ###
+CREATE TABLE IF NOT EXISTS event_ext (
+	event_id integer not null,
+	extra_info jsonb not null default '{}'
+);
+ALTER TABLE
+	event_ext
+ADD
+	CONSTRAINT event_ext_pkey PRIMARY KEY (event_id),
+ADD
+	CONSTRAINT event_ext_event_id_fkey FOREIGN KEY (event_id) REFERENCES event (id);
+
+comment on table event_ext is 'additional information about a recorded event';
 
 
 -- ### rs_info (record stamp info) ###
