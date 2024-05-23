@@ -3,8 +3,8 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.22
 
 require (
-	buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.2-20240519093930-3e9de22e3668.1
-	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.34.1-20240519093930-3e9de22e3668.1
+	buf.build/gen/go/mpapenbr/testrepo/connectrpc/go v1.16.2-20240523183733-5b92f15cfcf7.1
+	buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go v1.34.1-20240523183733-5b92f15cfcf7.1
 	connectrpc.com/connect v1.16.2
 	connectrpc.com/otelconnect v0.7.0
 	github.com/docker/go-connections v0.5.0
@@ -32,6 +32,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.26.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611
+	golang.org/x/mod v0.16.0
 	golang.org/x/net v0.25.0
 	google.golang.org/protobuf v1.34.1
 	gotest.tools/v3 v3.5.1
@@ -98,7 +99,6 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.26.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.2.0 // indirect
-	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240227224415-6ceb2ff114de // indirect

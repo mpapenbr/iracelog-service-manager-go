@@ -11,6 +11,7 @@ import (
 	carrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car"
 	carproto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	eventextrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event/ext"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	speedmapproto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 )
@@ -58,6 +59,12 @@ func (s *EventService) DeleteEvent(ctx context.Context, eventId int) error {
 			return err
 		}
 		log.Debug("Deleted c_car* data", log.Int("num", num))
+
+		num, err = eventextrepos.DeleteByEventId(ctx, tx.Conn(), eventId)
+		if err != nil {
+			return err
+		}
+		log.Debug("Deleted event_ext data", log.Int("num", num))
 
 		_, err = event.DeleteById(ctx, tx.Conn(), eventId)
 		return err

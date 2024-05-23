@@ -20,6 +20,7 @@ import (
 	carrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car"
 	carprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
 	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	eventextrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event/ext"
 	racestaterepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -170,6 +171,34 @@ func (s *stateServer) PublishDriverData(
 	epd.Processor.ProcessCarData(req.Msg)
 
 	return connect.NewResponse(&racestatev1.PublishDriverDataResponse{}), nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *stateServer) PublishEventExtraInfo(
+	ctx context.Context,
+	req *connect.Request[racestatev1.PublishEventExtraInfoRequest]) (
+	*connect.Response[racestatev1.PublishEventExtraInfoResponse], error,
+) {
+	a := auth.FromContext(&ctx)
+	if !s.pe.HasRole(a, auth.RoleProvider) {
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+	}
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if s.debugWire {
+		log.Debug("PublishEventExtraInfo called", log.String("event", epd.Event.Key))
+	}
+
+	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
+		return eventextrepos.Upsert(ctx, tx, int(epd.Event.Id), req.Msg.ExtraInfo)
+	}); err != nil {
+		log.Error("error storing event extra info", log.ErrorField(err))
+	}
+
+	return connect.NewResponse(&racestatev1.PublishEventExtraInfoResponse{}), nil
 }
 
 //nolint:whitespace,dupl // false positive

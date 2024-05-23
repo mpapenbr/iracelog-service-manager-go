@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
@@ -18,7 +19,9 @@ import (
 	aProtoRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
 	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
+	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
 
 func NewServer(opts ...Option) *providerServer {
@@ -148,6 +151,30 @@ func (s *providerServer) UnregisterAll(
 	}
 	s.lookup.Clear()
 	return connect.NewResponse(&providerv1.UnregisterAllResponse{Events: ec}), nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *providerServer) Ping(
+	ctx context.Context,
+	req *connect.Request[providerv1.PingRequest],
+) (*connect.Response[providerv1.PingResponse], error) {
+	return connect.NewResponse(&providerv1.PingResponse{
+		Num:       req.Msg.Num,
+		Timestamp: timestamppb.Now(),
+	}), nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *providerServer) VersionCheck(
+	ctx context.Context,
+	req *connect.Request[providerv1.VersionCheckRequest],
+) (*connect.Response[providerv1.VersionCheckResponse], error) {
+	return connect.NewResponse(&providerv1.VersionCheckResponse{
+		ProvidedRaceloggerVersion:  req.Msg.RaceloggerVersion,
+		SupportedRaceloggerVersion: util.RequiredClientVersion,
+		ServerVersion:              version.Version,
+		RaceloggerCompatible:       util.CheckRaceloggerVersion(req.Msg.RaceloggerVersion),
+	}), nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
