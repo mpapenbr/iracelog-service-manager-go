@@ -2,16 +2,19 @@ package analysis
 
 import (
 	"context"
+	"errors"
 
 	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/analysis/v1/analysisv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/common/v1"
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	aProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 func NewServer(opts ...Option) *analysisServer {
@@ -60,6 +63,9 @@ func (s *analysisServer) GetAnalysis(
 	}
 
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, connect.NewError(connect.CodeNotFound, utils.ErrEventNotFound)
+		}
 		return nil, err
 	}
 	return connect.NewResponse(&analysisv1.GetAnalysisResponse{

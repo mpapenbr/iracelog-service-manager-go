@@ -120,6 +120,8 @@ func (s *providerServer) UnregisterEvent(
 	ctx context.Context,
 	req *connect.Request[providerv1.UnregisterEventRequest],
 ) (*connect.Response[providerv1.UnregisterEventResponse], error) {
+	log.Debug("UnregisterEvent",
+		log.Any("event", req.Msg.EventSelector))
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/racestate/v1/racestatev1connect"
-	commonv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
@@ -19,10 +18,10 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	carrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car"
 	carprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
-	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	eventextrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event/ext"
 	racestaterepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -209,14 +208,7 @@ func (s *stateServer) GetDriverData(
 ) {
 	var data *eventv1.Event
 	var err error
-	switch req.Msg.Event.Arg.(type) {
-	case *commonv1.EventSelector_Id:
-		data, err = eventrepos.LoadById(ctx, s.pool, int(req.Msg.Event.GetId()))
-	case *commonv1.EventSelector_Key:
-		data, err = eventrepos.LoadByKey(context.Background(), s.pool,
-			req.Msg.Event.GetKey())
-	}
-
+	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.Event)
 	if err != nil {
 		return nil, err
 	}
@@ -245,14 +237,7 @@ func (s *stateServer) GetStatesData(
 ) {
 	var data *eventv1.Event
 	var err error
-	switch req.Msg.Event.Arg.(type) {
-	case *commonv1.EventSelector_Id:
-		data, err = eventrepos.LoadById(ctx, s.pool, int(req.Msg.Event.GetId()))
-	case *commonv1.EventSelector_Key:
-		data, err = eventrepos.LoadByKey(context.Background(), s.pool,
-			req.Msg.Event.GetKey())
-	}
-
+	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.Event)
 	if err != nil {
 		return nil, err
 	}
@@ -281,14 +266,7 @@ func (s *stateServer) GetSpeedmapsData(
 ) {
 	var data *eventv1.Event
 	var err error
-	switch req.Msg.Event.Arg.(type) {
-	case *commonv1.EventSelector_Id:
-		data, err = eventrepos.LoadById(ctx, s.pool, int(req.Msg.Event.GetId()))
-	case *commonv1.EventSelector_Key:
-		data, err = eventrepos.LoadByKey(context.Background(), s.pool,
-			req.Msg.Event.GetKey())
-	}
-
+	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.Event)
 	if err != nil {
 		return nil, err
 	}

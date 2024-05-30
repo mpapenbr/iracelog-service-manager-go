@@ -243,7 +243,8 @@ func registerEventServer(
 	path, handler := eventv1connect.NewEventServiceHandler(
 		eventService,
 		connect.WithInterceptors(otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken)),
+			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
+				auth.WithProviderToken(config.ProviderToken)),
 		),
 	)
 	mux.Handle(path, handler)

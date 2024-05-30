@@ -7,7 +7,6 @@ import (
 	x "buf.build/gen/go/mpapenbr/testrepo/connectrpc/go/testrepo/event/v1/eventv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
 	carv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/car/v1"
-	commonv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
 	"connectrpc.com/connect"
@@ -22,6 +21,7 @@ import (
 	rProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	smProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	eventservice "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/service/event"
 )
 
@@ -99,17 +99,13 @@ func (s *eventsServer) GetEvent(
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var e *eventv1.Event
 	var a *analysisv1.Analysis
+
 	var err error
-	switch req.Msg.EventSelector.Arg.(type) {
-	case *commonv1.EventSelector_Id:
-		e, err = event.LoadById(ctx, s.pool, int(req.Msg.EventSelector.GetId()))
-	case *commonv1.EventSelector_Key:
-		e, err = event.LoadByKey(context.Background(), s.pool,
-			req.Msg.EventSelector.GetKey())
-	}
+	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
 	if err != nil {
 		return nil, err
 	}
+
 	a, err = aProto.LoadByEventId(ctx, s.pool, int(e.Id))
 	if err != nil {
 		return nil, err
@@ -167,14 +163,7 @@ func (s *eventsServer) DeleteEvent(
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var data *eventv1.Event
 	var err error
-	switch req.Msg.EventSelector.Arg.(type) {
-	case *commonv1.EventSelector_Id:
-		data, err = event.LoadById(ctx, s.pool, int(req.Msg.EventSelector.GetId()))
-	case *commonv1.EventSelector_Key:
-		data, err = event.LoadByKey(context.Background(), s.pool,
-			req.Msg.EventSelector.GetKey())
-	}
-
+	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
 	if err != nil {
 		return nil, err
 	}
