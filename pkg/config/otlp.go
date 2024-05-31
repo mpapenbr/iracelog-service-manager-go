@@ -45,11 +45,18 @@ func (t Telemetry) Shutdown() {
 }
 
 func SetupTelemetry(ctx context.Context) (*Telemetry, error) {
-	res := resource.NewWithAttributes(
-		semconv.SchemaURL,
-		semconv.ServiceNameKey.String("iracelog-service-manager"),
-		semconv.ServiceVersionKey.String(version.Version),
-	)
+	res, err := resource.New(ctx,
+		resource.WithSchemaURL(semconv.SchemaURL),
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String("iracelog-service-manager"),
+			semconv.ServiceVersionKey.String(version.Version),
+		),
+		resource.WithFromEnv())
+	if err != nil {
+		log.Error("Failed to create resource", log.ErrorField(err))
+		return nil, err
+	}
+
 	ret := Telemetry{ctx: ctx}
 
 	if m, err := setupMetrics(res); err != nil {
