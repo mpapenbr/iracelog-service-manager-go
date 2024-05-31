@@ -6,8 +6,8 @@ import (
 	"log"
 	"testing"
 
-	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
-	trackv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/track/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/proto"
@@ -18,7 +18,7 @@ import (
 )
 
 var sampleTrack = &trackv1.Track{
-	Id:        &trackv1.TrackId{Id: 1},
+	Id:        1,
 	Name:      "testtrack",
 	ShortName: "tt",
 	Config:    "testconfig",

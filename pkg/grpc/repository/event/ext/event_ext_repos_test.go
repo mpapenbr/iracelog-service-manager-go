@@ -5,8 +5,8 @@ import (
 	"context"
 	"testing"
 
-	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
-	trackv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/track/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"google.golang.org/protobuf/proto"
 
 	base "github.com/mpapenbr/iracelog-service-manager-go/testsupport/basedata"

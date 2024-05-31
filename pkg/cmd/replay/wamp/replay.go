@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"time"
 
-	commonv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/common/v1"
-	eventv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/event/v1"
-	providerv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/provider/v1"
-	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
-	trackv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/track/v1"
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
+	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
@@ -243,7 +243,7 @@ func (r *wampReplayTask) createRegisterRequest() *providerv1.RegisterEventReques
 			// PitSpeed:  float32(e.Data.Info.TrackPitSpeed),
 		},
 		Track: &trackv1.Track{
-			Id:        &trackv1.TrackId{Id: uint32(t.Data.ID)},
+			Id:        uint32(t.Data.ID),
 			Name:      t.Data.Name,
 			ShortName: t.Data.ShortName,
 			Config:    t.Data.Config,

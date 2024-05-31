@@ -4,9 +4,9 @@ package car
 import (
 	"context"
 
-	carv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/car/v1"
-	driverv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/driver/v1"
-	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
+	carv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/car/v1"
+	driverv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/driver/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"

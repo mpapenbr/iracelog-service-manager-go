@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	trackv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/track/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
@@ -23,7 +23,7 @@ func Create(ctx context.Context, conn repository.Querier, track *trackv1.Track) 
 		pit_speed, pit_entry, pit_exit, pit_lane_length
 	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		`,
-		track.Id.Id, track.Name, track.ShortName, track.Config, track.Length,
+		track.Id, track.Name, track.ShortName, track.Config, track.Length,
 		track.Sectors,
 		track.PitSpeed, workPitInfo.Entry, workPitInfo.Exit, workPitInfo.LaneLength,
 	)
@@ -42,18 +42,18 @@ func LoadById(ctx context.Context, conn repository.Querier, id int) (
 	from track where id=$1
 	`, id)
 	var item trackv1.Track
-	var tId trackv1.TrackId
+
 	var sectors []trackv1.Sector
 	var pitInfo trackv1.PitInfo
 	if err := row.Scan(
-		&tId.Id,
+		&item.Id,
 		&item.Name, &item.ShortName, &item.Config, &item.Length,
 		&sectors,
 		&item.PitSpeed, &pitInfo.Entry, &pitInfo.Exit, &pitInfo.LaneLength,
 	); err != nil {
 		return nil, err
 	}
-	item.Id = &tId
+
 	item.PitInfo = &pitInfo
 	item.Sectors = make([]*trackv1.Sector, len(sectors))
 	for i := range sectors {
@@ -69,7 +69,7 @@ func EndsureTrack(
 	conn repository.Querier,
 	track *trackv1.Track,
 ) error {
-	_, err := LoadById(ctx, conn, int(track.Id.Id))
+	_, err := LoadById(ctx, conn, int(track.Id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Create(ctx, conn, track)
 	}

@@ -5,9 +5,9 @@ import (
 	"context"
 	"testing"
 
-	carv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/car/v1"
-	driverv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/driver/v1"
-	racestatev1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/racestate/v1"
+	carv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/car/v1"
+	driverv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/driver/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 
 	base "github.com/mpapenbr/iracelog-service-manager-go/testsupport/basedata"
 	"github.com/mpapenbr/iracelog-service-manager-go/testsupport/testdb"
