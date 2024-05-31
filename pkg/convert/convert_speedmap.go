@@ -1,7 +1,7 @@
 package convert
 
 import (
-	speedmapv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/speedmap/v1"
+	speedmapv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/speedmap/v1"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 )

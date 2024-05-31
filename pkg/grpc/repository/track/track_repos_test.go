@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	trackv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/track/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gotest.tools/v3/assert"
@@ -17,7 +17,7 @@ import (
 )
 
 var sampleTrack = &trackv1.Track{
-	Id:        &trackv1.TrackId{Id: 1},
+	Id:        1,
 	Name:      "testtrack",
 	ShortName: "tt",
 	Config:    "testconfig",
@@ -67,7 +67,7 @@ func TestCreate(t *testing.T) {
 		{
 			name: "new entry",
 			args: args{track: &trackv1.Track{
-				Id:        &trackv1.TrackId{Id: 2},
+				Id:        2,
 				Name:      "testtrack2",
 				ShortName: "tt2",
 				Config:    "testconfig2", Length: 2000, PitSpeed: 70, Sectors: []*trackv1.Sector{},
@@ -205,7 +205,7 @@ func TestDeleteById(t *testing.T) {
 	}{
 		{
 			name: "delete_existing",
-			args: args{id: int(sample.Id.Id)},
+			args: args{id: int(sample.Id)},
 			want: 1,
 		},
 		{

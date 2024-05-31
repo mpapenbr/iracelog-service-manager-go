@@ -4,7 +4,7 @@ package transfer
 import (
 	"context"
 
-	trackv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/track/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	trackDest "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
@@ -60,7 +60,7 @@ func transferTracks() {
 	for _, t := range sourceTracks {
 		log.Info("transferring track", log.Int("id", t.ID), log.String("name", t.Data.Name))
 		destTrack := &trackv1.Track{
-			Id:        &trackv1.TrackId{Id: uint32(t.Data.ID)},
+			Id:        uint32(t.Data.ID),
 			Name:      t.Data.Name,
 			ShortName: t.Data.ShortName,
 			Config:    t.Data.Config,

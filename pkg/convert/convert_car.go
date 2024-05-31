@@ -1,8 +1,8 @@
 package convert
 
 import (
-	carv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/car/v1"
-	driverv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/driver/v1"
+	carv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/car/v1"
+	driverv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/driver/v1"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 )

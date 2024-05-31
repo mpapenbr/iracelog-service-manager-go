@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	analysisv1 "buf.build/gen/go/mpapenbr/testrepo/protocolbuffers/go/testrepo/analysis/v1"
+	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 )
 
 func Test_tailedCarlaps(t *testing.T) {
