@@ -111,6 +111,7 @@ func (s *providerServer) RegisterEvent(
 	}
 	epd := s.lookup.AddEvent(req.Msg.Event, req.Msg.Track, req.Msg.RecordingMode)
 	s.storeAnalysisDataWorker(epd)
+	s.storeReplayInfoWorker(epd)
 	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
 		nil
 }
@@ -132,6 +133,7 @@ func (s *providerServer) UnregisterEvent(
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	s.storeAnalysisData(epd)
+	s.storeReplayInfo(epd)
 	s.lookup.RemoveEvent(req.Msg.EventSelector)
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
@@ -179,7 +181,7 @@ func (s *providerServer) VersionCheck(
 	}), nil
 }
 
-//nolint:whitespace // can't make both editor and linter happy
+//nolint:whitespace,dupl // false positive
 func (s *providerServer) storeAnalysisDataWorker(
 	epd *utils.EventProcessingData,
 ) {
@@ -207,7 +209,35 @@ func (s *providerServer) storeAnalysisDataWorker(
 	}()
 }
 
-//nolint:whitespace // can't make both editor and linter happy
+//nolint:whitespace,dupl // false positive
+func (s *providerServer) storeReplayInfoWorker(
+	epd *utils.EventProcessingData,
+) {
+	if epd.RecordingMode == providerv1.RecordingMode_RECORDING_MODE_DO_NOT_PERSIST {
+		return
+	}
+	// in case we're recording the data, setup a listener for the analysis data
+	// and persist it to the database every 5s
+	go func() {
+		ch := epd.ReplayInfoBroadcast.Subscribe()
+		lastPersist := time.Now()
+		for data := range ch {
+			//nolint:errcheck // by design
+			if time.Since(lastPersist) > 5*time.Second {
+				lastPersist = time.Now()
+				if err := eventrepos.UpdateReplayInfo(
+					context.Background(),
+					s.pool,
+					int(epd.Event.Id),
+					data); err != nil {
+					log.Error("error storing replay info data", log.ErrorField(err))
+				}
+			}
+		}
+	}()
+}
+
+//nolint:whitespace,dupl // false positive
 func (s *providerServer) storeAnalysisData(
 	epd *utils.EventProcessingData,
 ) {
@@ -222,6 +252,24 @@ func (s *providerServer) storeAnalysisData(
 				epd.LastAnalysisData)
 		}); err != nil {
 		log.Error("error storing analysis data", log.ErrorField(err))
+	}
+}
+
+//nolint:whitespace,dupl // false positive
+func (s *providerServer) storeReplayInfo(
+	epd *utils.EventProcessingData,
+) {
+	if err := s.storeData(
+		context.Background(),
+		epd.RecordingMode,
+		func(ctx context.Context, tx pgx.Tx) error {
+			return eventrepos.UpdateReplayInfo(
+				context.Background(),
+				s.pool,
+				int(epd.Event.Id),
+				epd.LastReplayInfo)
+		}); err != nil {
+		log.Error("error storing replay info", log.ErrorField(err))
 	}
 }
 

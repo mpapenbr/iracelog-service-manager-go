@@ -160,6 +160,15 @@ func (s *stateServer) PublishDriverData(
 		if err := carrepos.Create(ctx, tx, int(epd.Event.Id), req.Msg); err != nil {
 			log.Error("error storing car data", log.ErrorField(err))
 		}
+		if epd.LastRsInfoId == 0 {
+			var rsErr error
+			epd.LastRsInfoId, rsErr = racestaterepos.CreateDummyRaceStateInfo(
+				ctx, tx, int(epd.Event.Id), req.Msg.Timestamp.AsTime())
+			if rsErr != nil {
+				log.Error("error creating dummy racestate info", log.ErrorField(rsErr))
+				return rsErr
+			}
+		}
 		return carprotorepos.Create(ctx, tx, epd.LastRsInfoId, req.Msg)
 	}); err != nil {
 		log.Error("error storing car state", log.ErrorField(err))

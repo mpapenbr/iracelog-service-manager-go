@@ -14,6 +14,7 @@ import (
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/broadcast"
 )
 
@@ -33,9 +34,11 @@ type EventProcessingData struct {
 	RacestateBroadcast  broadcast.BroadcastServer[*racestatev1.PublishStateRequest]
 	DriverDataBroadcast broadcast.BroadcastServer[*racestatev1.PublishDriverDataRequest]
 	SpeedmapBroadcast   broadcast.BroadcastServer[*racestatev1.PublishSpeedmapRequest]
+	ReplayInfoBroadcast broadcast.BroadcastServer[*eventv1.ReplayInfo]
 	Mutex               sync.Mutex
 	LastDriverData      *racestatev1.PublishDriverDataRequest
 	LastAnalysisData    *analysisv1.Analysis
+	LastReplayInfo      *eventv1.ReplayInfo
 	RecordingMode       providerev1.RecordingMode
 	LastRsInfoId        int // holds the last rs_info_id for storing state data
 }
@@ -56,29 +59,47 @@ func (e *EventLookup) AddEvent(
 	racestateSource := make(chan *racestatev1.PublishStateRequest)
 	driverDataSource := make(chan *racestatev1.PublishDriverDataRequest)
 	speedmapSource := make(chan *racestatev1.PublishSpeedmapRequest)
+	replayInfoSource := make(chan *eventv1.ReplayInfo)
 
 	cp := car.NewCarProcessor()
+	rp := race.NewRaceProcessor(
+		race.WithCarProcessor(cp),
+		race.WithRaceSession(findRaceSession(event)),
+	)
 	epd := &EventProcessingData{
 		Event:         event,
 		Track:         track,
 		RecordingMode: recordingMode,
 		Processor: processing.NewProcessor(
 			processing.WithCarProcessor(cp),
+			processing.WithRaceProcessor(rp),
 			processing.WithPublishChannels(
 				analysisSource,
 				racestateSource,
 				driverDataSource,
-				speedmapSource),
+				speedmapSource,
+				replayInfoSource,
+			),
 		),
 		AnalysisBroadcast:   broadcast.NewBroadcastServer("analysis", analysisSource),
 		RacestateBroadcast:  broadcast.NewBroadcastServer("racestate", racestateSource),
 		DriverDataBroadcast: broadcast.NewBroadcastServer("driverdata", driverDataSource),
 		SpeedmapBroadcast:   broadcast.NewBroadcastServer("speedmap", speedmapSource),
+		ReplayInfoBroadcast: broadcast.NewBroadcastServer("replayInfo", replayInfoSource),
 		Mutex:               sync.Mutex{},
 	}
 	epd.setupOwnListeners()
 	e.lookup[event.Key] = epd
 	return epd
+}
+
+func findRaceSession(e *eventv1.Event) uint32 {
+	for _, s := range e.Sessions {
+		if s.Name == "RACE" {
+			return s.Num
+		}
+	}
+	return 0
 }
 
 func (epd *EventProcessingData) setupOwnListeners() {
@@ -94,6 +115,13 @@ func (epd *EventProcessingData) setupOwnListeners() {
 		for data := range ch {
 			//nolint:errcheck // by design
 			epd.LastAnalysisData = proto.Clone(data).(*analysisv1.Analysis)
+		}
+	}()
+	go func() {
+		ch := epd.ReplayInfoBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.LastReplayInfo = proto.Clone(data).(*eventv1.ReplayInfo)
 		}
 	}()
 }
@@ -124,6 +152,7 @@ func (e *EventLookup) RemoveEvent(selector *commonv1.EventSelector) {
 		epd.RacestateBroadcast.Close()
 		epd.DriverDataBroadcast.Close()
 		epd.SpeedmapBroadcast.Close()
+		epd.ReplayInfoBroadcast.Close()
 		delete(e.lookup, epd.Event.Key)
 	}
 }
