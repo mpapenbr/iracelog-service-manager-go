@@ -75,6 +75,31 @@ func CreateRaceState(
 	return rsInfoId, nil
 }
 
+// this method is used if there are driver data prior to the first race state
+// this should not happen but may occur on migration from old wamp data
+func CreateDummyRaceStateInfo(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId int,
+	ts time.Time,
+) (rsInfoId int, err error) {
+	row := conn.QueryRow(ctx, `
+	insert into rs_info (
+		event_id, record_stamp, session_time, time_of_day, air_temp, track_temp,
+		track_wetness, precipitation
+	) values ($1,$2,$3,$4,$5,$6,$7,$8)
+	returning id
+		`,
+		eventId, ts, 0, 0, 0, 0, 0, 0,
+	)
+	rsInfoId = 0
+	//nolint:govet,gocritic // by design
+	if err = row.Scan(&rsInfoId); err != nil {
+		return 0, err
+	}
+	return rsInfoId, nil
+}
+
 func FindNearestRaceState(
 	ctx context.Context,
 	conn repository.Querier,

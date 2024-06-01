@@ -4,7 +4,9 @@ import (
 	"sort"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
@@ -17,13 +19,19 @@ type Processor struct {
 	racestateChan  chan *racestatev1.PublishStateRequest
 	driverDataChan chan *racestatev1.PublishDriverDataRequest
 	speedmapChan   chan *racestatev1.PublishSpeedmapRequest
+	replayInfoChan chan *eventv1.ReplayInfo
 }
 type ProcessorOption func(proc *Processor)
 
 func WithCarProcessor(carProcessor *car.CarProcessor) ProcessorOption {
 	return func(proc *Processor) {
 		proc.carProcessor = carProcessor
-		proc.raceProcessor = race.NewRaceProcessor(race.WithCarProcessor(carProcessor))
+	}
+}
+
+func WithRaceProcessor(raceProcessor *race.RaceProcessor) ProcessorOption {
+	return func(proc *Processor) {
+		proc.raceProcessor = raceProcessor
 	}
 }
 
@@ -33,12 +41,14 @@ func WithPublishChannels(
 	racestateChan chan *racestatev1.PublishStateRequest,
 	driverDataChan chan *racestatev1.PublishDriverDataRequest,
 	speedmapChan chan *racestatev1.PublishSpeedmapRequest,
+	replayInfoChan chan *eventv1.ReplayInfo,
 ) ProcessorOption {
 	return func(proc *Processor) {
 		proc.analysisChan = analysisChan
 		proc.racestateChan = racestateChan
 		proc.driverDataChan = driverDataChan
 		proc.speedmapChan = speedmapChan
+		proc.replayInfoChan = replayInfoChan
 	}
 }
 
@@ -59,6 +69,9 @@ func (p *Processor) ProcessState(payload *racestatev1.PublishStateRequest) {
 	if p.racestateChan != nil {
 		p.racestateChan <- payload
 	}
+	if p.replayInfoChan != nil {
+		p.replayInfoChan <- p.composeReplayInfo()
+	}
 }
 
 func (p *Processor) ProcessCarData(payload *racestatev1.PublishDriverDataRequest) {
@@ -76,6 +89,11 @@ func (p *Processor) ProcessSpeedmap(payload *racestatev1.PublishSpeedmapRequest)
 	if p.speedmapChan != nil {
 		p.speedmapChan <- payload
 	}
+}
+
+func (p *Processor) composeReplayInfo() *eventv1.ReplayInfo {
+	ret := proto.Clone(p.raceProcessor.ReplayInfo.ProtoReflect().Interface())
+	return ret.(*eventv1.ReplayInfo)
 }
 
 func (p *Processor) composeAnalysisData() *analysisv1.Analysis {

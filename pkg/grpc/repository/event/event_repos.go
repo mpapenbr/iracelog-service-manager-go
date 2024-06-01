@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
@@ -82,6 +83,30 @@ func LoadAll(ctx context.Context, conn repository.Querier) (
 
 	}
 	return ret, nil
+}
+
+// deletes an entry from the database, returns number of rows deleted.
+func UpdateReplayInfo(
+	ctx context.Context,
+	conn repository.Querier,
+	id int,
+	replayInfo *eventv1.ReplayInfo,
+) error {
+	cmdTag, err := conn.Exec(ctx, `update event set
+	replay_min_timestamp=$1, replay_min_session_time=$2, replay_max_session_time=$3
+	where id=$4`,
+		replayInfo.MinTimestamp.AsTime(),
+		replayInfo.MinSessionTime,
+		replayInfo.MaxSessionTime,
+		id)
+	if err != nil {
+		return err
+	}
+	if cmdTag.RowsAffected() != 1 {
+		log.Warn("UpdateReplayInfo: no rows affected",
+			log.Int("eventId", id), log.Int("rowsAffected", int(cmdTag.RowsAffected())))
+	}
+	return nil
 }
 
 // deletes an entry from the database, returns number of rows deleted.

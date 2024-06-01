@@ -5,11 +5,12 @@ import (
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	carv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/car/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"golang.org/x/exp/slices"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 )
 
 type RaceProcessor struct {
@@ -17,7 +18,7 @@ type RaceProcessor struct {
 	RaceOrder  []string
 	CarLaps    map[string]*analysisv1.CarLaps     // key carNum
 	RaceGraph  map[string][]*analysisv1.RaceGraph // key: "overall", carClass names
-	ReplayInfo model.ReplayInfo
+	ReplayInfo eventv1.ReplayInfo
 	// internal
 	carProcessor *car.CarProcessor
 
@@ -44,7 +45,7 @@ func NewRaceProcessor(opts ...RaceProcessorOption) *RaceProcessor {
 		RaceOrder:            make([]string, 0),
 		RaceGraph:            make(map[string][]*analysisv1.RaceGraph),
 		CarLaps:              make(map[string]*analysisv1.CarLaps),
-		ReplayInfo:           model.ReplayInfo{},
+		ReplayInfo:           eventv1.ReplayInfo{},
 		raceStartMarkerFound: false,
 	}
 	for _, opt := range opts {
@@ -90,7 +91,7 @@ func (p *RaceProcessor) processReplayInfo(
 		return
 	}
 
-	p.ReplayInfo.MaxSessionTime = float64(sessionTime)
+	p.ReplayInfo.MaxSessionTime = sessionTime
 	if !p.raceStartMarkerFound {
 		foundIndex := slices.IndexFunc(payload.Messages,
 			func(m *racestatev1.Message) bool {
@@ -99,12 +100,12 @@ func (p *RaceProcessor) processReplayInfo(
 					m.SubType == racestatev1.MessageSubType_MESSAGE_SUB_TYPE_RACE_CONTROL
 			})
 		if foundIndex != -1 {
-			p.ReplayInfo.MinTimestamp = float64(payload.Timestamp.Seconds)
-			p.ReplayInfo.MinSessionTime = float64(sessionTime)
+			p.ReplayInfo.MinTimestamp = timestamppb.New(payload.Timestamp.AsTime())
+			p.ReplayInfo.MinSessionTime = sessionTime
 			p.raceStartMarkerFound = true
-		} else if p.ReplayInfo.MinTimestamp == 0 {
-			p.ReplayInfo.MinTimestamp = float64(payload.Timestamp.Seconds)
-			p.ReplayInfo.MinSessionTime = float64(sessionTime)
+		} else if p.ReplayInfo.MinTimestamp == nil {
+			p.ReplayInfo.MinTimestamp = timestamppb.New(payload.Timestamp.AsTime())
+			p.ReplayInfo.MinSessionTime = sessionTime
 		}
 	}
 }
