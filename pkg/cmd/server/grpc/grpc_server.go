@@ -96,6 +96,10 @@ func NewServerCmd() *cobra.Command {
 		"provider-token",
 		"",
 		"provider token value")
+	cmd.Flags().StringVar(&config.StaleDuration,
+		"stale-duration",
+		"1m",
+		"provider is removed if no data was received for this duration")
 	return cmd
 }
 
@@ -224,7 +228,12 @@ func startServer() error {
 func registerGrpcServices(pool *pgxpool.Pool) *http.ServeMux {
 	mux := http.NewServeMux()
 	myOtel, _ := otelconnect.NewInterceptor()
-	eventLookup := utils.NewEventLookup()
+	staleDuration, err := time.ParseDuration(config.StaleDuration)
+	if err != nil {
+		staleDuration = 1 * time.Minute
+	}
+	log.Debug("init with stale duration", log.Duration("duration", staleDuration))
+	eventLookup := utils.NewEventLookup(utils.WithStaleDuration(staleDuration))
 	registerEventServer(mux, pool, myOtel)
 	registerAnalysisServer(mux, pool, myOtel)
 	registerProviderServer(mux, pool, myOtel, eventLookup)

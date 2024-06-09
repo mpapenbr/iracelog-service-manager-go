@@ -18,6 +18,7 @@ var (
 	GrpcServerAddr     string // listen addr for gRPC server
 	ProviderToken      string // token for data provider access
 	AdminToken         string // token for admin access
+	StaleDuration      string // duration after which an event is considered stale
 
 )
 
