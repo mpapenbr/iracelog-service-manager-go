@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"sync"
+	"time"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
@@ -12,16 +14,40 @@ import (
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/broadcast"
 )
 
-func NewEventLookup() *EventLookup {
-	return &EventLookup{
-		lookup: make(map[string]*EventProcessingData),
+type Option func(*EventLookup)
+
+func WithContext(ctx context.Context) Option {
+	return func(el *EventLookup) {
+		el.ctx = ctx
 	}
+}
+
+// if staleDuration > 0, a watchdog will be started to remove stale events
+func WithStaleDuration(d time.Duration) Option {
+	return func(el *EventLookup) {
+		el.staleDuration = d
+	}
+}
+
+func NewEventLookup(opts ...Option) *EventLookup {
+	ret := &EventLookup{
+		lookup: make(map[string]*EventProcessingData),
+		ctx:    context.Background(),
+	}
+	for _, opt := range opts {
+		opt(ret)
+	}
+	if ret.staleDuration > 0 {
+		ret.setupWatchdog()
+	}
+	return ret
 }
 
 var ErrEventNotFound = errors.New("event not found")
@@ -40,10 +66,13 @@ type EventProcessingData struct {
 	LastAnalysisData    *analysisv1.Analysis
 	LastReplayInfo      *eventv1.ReplayInfo
 	RecordingMode       providerev1.RecordingMode
-	LastRsInfoId        int // holds the last rs_info_id for storing state data
+	LastRsInfoId        int       // holds the last rs_info_id for storing state data
+	LastDataEvent       time.Time // holds the time of the last incoming data event
 }
 type EventLookup struct {
-	lookup map[string]*EventProcessingData
+	lookup        map[string]*EventProcessingData
+	ctx           context.Context
+	staleDuration time.Duration
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -87,6 +116,7 @@ func (e *EventLookup) AddEvent(
 		SpeedmapBroadcast:   broadcast.NewBroadcastServer("speedmap", speedmapSource),
 		ReplayInfoBroadcast: broadcast.NewBroadcastServer("replayInfo", replayInfoSource),
 		Mutex:               sync.Mutex{},
+		LastDataEvent:       time.Now(),
 	}
 	epd.setupOwnListeners()
 	e.lookup[event.Key] = epd
@@ -165,6 +195,45 @@ func (e *EventLookup) GetEvents() []*EventProcessingData {
 	return ret
 }
 
+// removes all events from the lookup
 func (e *EventLookup) Clear() {
 	e.lookup = make(map[string]*EventProcessingData)
+}
+
+// removes all events and signals shutdown to internal services (for example: watchdogs)
+func (e *EventLookup) Close() {
+	e.Clear()
+	e.ctx.Done()
+}
+
+// setup watchdog for event processing data
+//
+//nolint:gocognit //false positive
+func (e *EventLookup) setupWatchdog() {
+	go func() {
+		for {
+			// use select to be able to break out of the loop
+			select {
+			case <-e.ctx.Done():
+				log.Debug("event lookup watchdog shutting down")
+				return
+			default:
+
+				time.Sleep(1 * time.Second)
+
+				toRemove := make([]*EventProcessingData, 0)
+				for _, epd := range e.lookup {
+					if time.Since(epd.LastDataEvent) > e.staleDuration {
+						log.Info("watchdog detected stale event",
+							log.String("event", epd.Event.Key),
+							log.Duration("stale", time.Since(epd.LastDataEvent)))
+						toRemove = append(toRemove, epd)
+					}
+				}
+				for _, epd := range toRemove {
+					delete(e.lookup, epd.Event.Key)
+				}
+			}
+		}
+	}()
 }
