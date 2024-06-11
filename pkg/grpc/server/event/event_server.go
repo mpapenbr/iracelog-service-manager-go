@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
@@ -10,6 +11,7 @@ import (
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -103,34 +105,60 @@ func (s *eventsServer) GetEvent(
 	var err error
 	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
 	if err != nil {
+		log.Error("error resolving event",
+			log.Any("selector", req.Msg.EventSelector),
+			log.ErrorField(err))
 		return nil, err
 	}
 
 	a, err = aProto.LoadByEventId(ctx, s.pool, int(e.Id))
 	if err != nil {
+		log.Error("error loading event",
+			log.Uint32("eventId", e.Id),
+			log.ErrorField(err))
 		return nil, err
 	}
 
 	t, err := track.LoadById(ctx, s.pool, int(e.TrackId))
 	if err != nil {
+		log.Error("error loading track",
+			log.Uint32("eventId", e.Id),
+			log.Uint32("trackId", e.TrackId),
+			log.ErrorField(err))
 		return nil, err
 	}
 	cd, err := cProto.LoadLatest(ctx, s.pool, int(e.Id))
 	if err != nil {
+		log.Error("error loading car proto data",
+			log.Uint32("eventId", e.Id),
+			log.ErrorField(err))
 		return nil, err
 	}
 	sd, err := rProto.LoadLatest(ctx, s.pool, int(e.Id))
 	if err != nil {
+		log.Error("error loading race proto data",
+			log.Uint32("eventId", e.Id),
+			log.ErrorField(err))
 		return nil, err
 	}
 	m, err := rProto.CollectMessages(ctx, s.pool, int(e.Id))
 	if err != nil {
+		log.Error("error collecting messages",
+			log.Uint32("eventId", e.Id),
+			log.ErrorField(err))
 		return nil, err
 	}
 	log.Debug("message collected", log.Int("num", len(m)))
 	sm, err := smProto.LoadLatest(ctx, s.pool, int(e.Id))
 	if err != nil {
-		return nil, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			sm = &racestatev1.PublishSpeedmapRequest{}
+		} else {
+			log.Error("error loading speedmap proto data",
+				log.Uint32("eventId", e.Id),
+				log.ErrorField(err))
+			return nil, err
+		}
 	}
 
 	return connect.NewResponse(&eventv1.GetEventResponse{

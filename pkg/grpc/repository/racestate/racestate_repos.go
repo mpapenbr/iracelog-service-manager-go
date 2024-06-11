@@ -173,7 +173,11 @@ order by ri.id asc
 		eventId,
 	)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return []*racestatev1.MessageContainer{}, nil
+		} else {
+			return nil, err
+		}
 	}
 	ret := make([]*racestatev1.MessageContainer, 0)
 	for row.Next() {
