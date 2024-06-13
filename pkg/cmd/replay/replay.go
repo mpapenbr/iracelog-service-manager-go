@@ -31,6 +31,10 @@ func NewReplayCmd() *cobra.Command {
 		"key", "", "event key to use for replay")
 	cmd.PersistentFlags().BoolVar(&util.DoNotPersist,
 		"do-not-persist", false, "do not persist data")
+	cmd.PersistentFlags().StringVar(&util.FastForward,
+		"fast-forward",
+		"",
+		"replay this duration with max speed")
 	cmd.AddCommand(grpc.NewReplayGrpcCmd())
 	cmd.AddCommand(wamp.NewReplayWampCmd())
 	return cmd

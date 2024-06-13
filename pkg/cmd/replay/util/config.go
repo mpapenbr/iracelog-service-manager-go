@@ -7,4 +7,5 @@ var (
 	Token        = ""
 	EventKey     = ""
 	DoNotPersist = false
+	FastForward  = ""
 )
