@@ -23,9 +23,20 @@ type ReplayDataProvider interface {
 	NextStateData() *racestatev1.PublishStateRequest
 	NextSpeedmapData() *racestatev1.PublishSpeedmapRequest
 }
+type ReplayOption func(*ReplayTask)
 
-func NewReplayTask(dataProvider ReplayDataProvider) *ReplayTask {
-	return &ReplayTask{dataProvider: dataProvider}
+func NewReplayTask(dataProvider ReplayDataProvider, opts ...ReplayOption) *ReplayTask {
+	ret := &ReplayTask{dataProvider: dataProvider}
+	for _, opt := range opts {
+		opt(ret)
+	}
+	return ret
+}
+
+func WithFastForward(ff time.Duration) ReplayOption {
+	return func(r *ReplayTask) {
+		r.fastForward = ff
+	}
 }
 
 type ReplayTask struct {
@@ -41,6 +52,8 @@ type ReplayTask struct {
 	stateChan      chan *racestatev1.PublishStateRequest
 	speedmapChan   chan *racestatev1.PublishSpeedmapRequest
 	driverDataChan chan *racestatev1.PublishDriverDataRequest
+	fastForward    time.Duration
+	ffStopTime     time.Time // time when fast forward should stop
 }
 
 func (p *peekDriverData) ts() time.Time {
@@ -155,6 +168,7 @@ func (r *ReplayTask) sendData() {
 		}
 	}
 	lastTs := time.Time{}
+
 	var selector providerType
 	var current peek
 	for {
@@ -162,6 +176,7 @@ func (r *ReplayTask) sendData() {
 		var currentIdx int
 		// create a max time from  (don't use time.Unix(1<<63-1), that's not what we want)
 		nextTs := time.Unix(0, 0).Add(1<<63 - 1)
+
 		for i, p := range pData {
 			if p.ts().Before(nextTs) {
 				nextTs = p.ts()
@@ -170,11 +185,11 @@ func (r *ReplayTask) sendData() {
 				currentIdx = i
 			}
 		}
+		r.computeFastForwardStop(nextTs)
 
 		if !lastTs.IsZero() {
-			delta = nextTs.Sub(lastTs)
-			if delta > 0 && Speed > 0 {
-				wait := time.Duration(int(delta.Nanoseconds()) / Speed)
+			wait := r.calcWaitTime(nextTs, lastTs)
+			if wait > 0 {
 				log.Debug("Sleeping",
 					log.Time("time", nextTs),
 					log.Duration("delta", delta),
@@ -197,6 +212,27 @@ func (r *ReplayTask) sendData() {
 				return
 			}
 		}
+	}
+}
+
+func (r *ReplayTask) computeFastForwardStop(cur time.Time) {
+	if r.fastForward > 0 && r.ffStopTime.IsZero() {
+		r.ffStopTime = cur.Add(r.fastForward)
+		log.Debug("Fast forward stop time set", log.Time("time", r.ffStopTime))
+	}
+}
+
+func (r *ReplayTask) calcWaitTime(nextTs, lastTs time.Time) time.Duration {
+	delta := nextTs.Sub(lastTs)
+
+	// handle fast forward
+	if nextTs.Before(r.ffStopTime) {
+		return 0
+	}
+	if Speed > 0 {
+		return time.Duration(int(delta.Nanoseconds()) / Speed)
+	} else {
+		return delta
 	}
 }
 

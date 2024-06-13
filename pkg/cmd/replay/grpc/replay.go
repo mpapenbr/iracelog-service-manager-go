@@ -69,12 +69,13 @@ func startReplay(eventArg string) error {
 	if err != nil {
 		return err
 	}
-	wampReplay, err := newWampReplayTask(pool, eventId)
+	grpcReplay, err := newGrpcReplayTask(pool, eventId)
 	if err != nil {
 		return err
 	}
+
 	log.Info("Starting replay")
-	r := util.NewReplayTask(wampReplay)
+	r := util.NewReplayTask(grpcReplay, util.CollectReplayOptions()...)
 	if err := r.Replay(eventId); err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ type grpcReplayTask struct {
 	driverDataFetcher myFetcher[racestatev1.PublishDriverDataRequest]
 }
 
-func newWampReplayTask(pool *pgxpool.Pool, eventId int) (*grpcReplayTask, error) {
+func newGrpcReplayTask(pool *pgxpool.Pool, eventId int) (*grpcReplayTask, error) {
 	var err error
 	ret := &grpcReplayTask{pool: pool, eventId: eventId}
 
