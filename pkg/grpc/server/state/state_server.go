@@ -99,6 +99,7 @@ func (s *stateServer) PublishState(
 		log.Error("error storing state", log.ErrorField(err))
 	}
 	epd.Mutex.Lock()
+	epd.MarkDataEvent()
 	defer epd.Mutex.Unlock()
 	epd.Processor.ProcessState(req.Msg)
 	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil

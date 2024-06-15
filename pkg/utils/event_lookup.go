@@ -123,6 +123,10 @@ func (e *EventLookup) AddEvent(
 	return epd
 }
 
+func (epd *EventProcessingData) MarkDataEvent() {
+	epd.LastDataEvent = time.Now()
+}
+
 func findRaceSession(e *eventv1.Event) uint32 {
 	for _, s := range e.Sessions {
 		if s.Name == "RACE" {
