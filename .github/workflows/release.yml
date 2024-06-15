@@ -34,7 +34,7 @@ jobs:
           echo "${{ steps.rd.outputs.body }}" > /tmp/CHANGELOG.md
 
       - name: Release via goreleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           args: release --release-notes=/tmp/CHANGELOG.md
         env:
