@@ -4,17 +4,17 @@ go 1.22
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.16.2-20240531140606-7b7655704e96.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.34.1-20240531140606-7b7655704e96.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.34.2-20240531140606-7b7655704e96.1
 	connectrpc.com/connect v1.16.2
 	connectrpc.com/otelconnect v0.7.0
 	github.com/docker/go-connections v0.5.0
-	github.com/exaring/otelpgx v0.5.4
+	github.com/exaring/otelpgx v0.6.1
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/rs/cors v1.11.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
@@ -34,7 +34,7 @@ require (
 	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611
 	golang.org/x/mod v0.18.0
 	golang.org/x/net v0.26.0
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 	gotest.tools/v3 v3.5.1
 )
 
