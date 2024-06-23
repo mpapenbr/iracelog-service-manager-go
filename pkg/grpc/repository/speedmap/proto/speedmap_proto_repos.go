@@ -114,6 +114,9 @@ func LoadSnapshots(
 	if err != nil {
 		return nil, err
 	}
+	if startTs == nil {
+		return []*analysisv1.SnapshotData{}, nil
+	}
 
 	row, err := conn.Query(ctx, `
 SELECT rs.record_stamp,rs.session_time, rs.time_of_day, rs.air_temp, rs.track_temp, rs.track_wetness, rs.precipitation, sp.protodata
@@ -199,7 +202,7 @@ order by rs.record_stamp asc
 		}
 
 	}
-	return 0, &time.Time{}, nil
+	return 0, nil, nil
 }
 
 // deletes an entry from the database, returns number of rows deleted.
