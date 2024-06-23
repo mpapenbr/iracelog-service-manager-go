@@ -70,3 +70,7 @@ func (s *EventService) DeleteEvent(ctx context.Context, eventId int) error {
 		return err
 	})
 }
+
+func (s *EventService) GetSnapshotData(ctx context.Context, eventId int) (int, error) {
+	return 0, nil
+}

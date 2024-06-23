@@ -2,19 +2,18 @@ package analysis
 
 import (
 	"context"
-	"errors"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/analysis/v1/analysisv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
-	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	aProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
+	smProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 )
 
 func NewServer(opts ...Option) *analysisServer {
@@ -52,23 +51,28 @@ func (s *analysisServer) GetAnalysis(
 	log.Debug("GetAnalysis called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
-	var data *analysisv1.Analysis
+	var analysisData *analysisv1.Analysis
+	var snapshots []*analysisv1.SnapshotData
 	var err error
-	switch req.Msg.EventSelector.Arg.(type) {
-	case *commonv1.EventSelector_Id:
-		data, err = aProto.LoadByEventId(ctx, s.pool, int(req.Msg.EventSelector.GetId()))
-	case *commonv1.EventSelector_Key:
-		data, err = aProto.LoadByEventKey(context.Background(), s.pool,
-			req.Msg.EventSelector.GetKey())
-	}
+	var e *eventv1.Event
 
+	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, utils.ErrEventNotFound)
-		}
+		log.Error("error resolving event",
+			log.Any("selector", req.Msg.EventSelector),
+			log.ErrorField(err))
+		return nil, err
+	}
+	analysisData, err = aProto.LoadByEventId(ctx, s.pool, int(e.GetId()))
+	if err != nil {
+		return nil, err
+	}
+	snapshots, err = smProto.LoadSnapshots(ctx, s.pool, int(e.GetId()), 300)
+	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&analysisv1.GetAnalysisResponse{
-		Analysis: data,
+		Analysis:  analysisData,
+		Snapshots: snapshots,
 	}), nil
 }

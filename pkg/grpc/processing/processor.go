@@ -2,24 +2,29 @@ package processing
 
 import (
 	"sort"
+	"time"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
 )
 
 type Processor struct {
-	carProcessor   *car.CarProcessor
-	raceProcessor  *race.RaceProcessor
-	analysisChan   chan *analysisv1.Analysis
-	racestateChan  chan *racestatev1.PublishStateRequest
-	driverDataChan chan *racestatev1.PublishDriverDataRequest
-	speedmapChan   chan *racestatev1.PublishSpeedmapRequest
-	replayInfoChan chan *eventv1.ReplayInfo
+	carProcessor     *car.CarProcessor
+	raceProcessor    *race.RaceProcessor
+	analysisChan     chan *analysisv1.Analysis
+	racestateChan    chan *racestatev1.PublishStateRequest
+	driverDataChan   chan *racestatev1.PublishDriverDataRequest
+	speedmapChan     chan *racestatev1.PublishSpeedmapRequest
+	replayInfoChan   chan *eventv1.ReplayInfo
+	snapshotChan     chan *analysisv1.SnapshotData
+	lastSnapshotTime time.Time
+	lastSessionData  *racestatev1.Session // used for environment data (weather, etc)
 }
 type ProcessorOption func(proc *Processor)
 
@@ -42,6 +47,7 @@ func WithPublishChannels(
 	driverDataChan chan *racestatev1.PublishDriverDataRequest,
 	speedmapChan chan *racestatev1.PublishSpeedmapRequest,
 	replayInfoChan chan *eventv1.ReplayInfo,
+	snapshotChan chan *analysisv1.SnapshotData,
 ) ProcessorOption {
 	return func(proc *Processor) {
 		proc.analysisChan = analysisChan
@@ -49,11 +55,14 @@ func WithPublishChannels(
 		proc.driverDataChan = driverDataChan
 		proc.speedmapChan = speedmapChan
 		proc.replayInfoChan = replayInfoChan
+		proc.snapshotChan = snapshotChan
 	}
 }
 
 func NewProcessor(opts ...ProcessorOption) *Processor {
-	ret := &Processor{}
+	ret := &Processor{
+		lastSnapshotTime: time.Time{},
+	}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -72,6 +81,8 @@ func (p *Processor) ProcessState(payload *racestatev1.PublishStateRequest) {
 	if p.replayInfoChan != nil {
 		p.replayInfoChan <- p.composeReplayInfo()
 	}
+	//nolint:errcheck // ignore error
+	p.lastSessionData = proto.Clone(payload.Session).(*racestatev1.Session)
 }
 
 func (p *Processor) ProcessCarData(payload *racestatev1.PublishDriverDataRequest) {
@@ -84,10 +95,29 @@ func (p *Processor) ProcessCarData(payload *racestatev1.PublishDriverDataRequest
 	}
 }
 
-// actually, there is no real processing here, just forwarding to broadcaster
 func (p *Processor) ProcessSpeedmap(payload *racestatev1.PublishSpeedmapRequest) {
 	if p.speedmapChan != nil {
 		p.speedmapChan <- payload
+	}
+	if p.snapshotChan != nil {
+		condition := payload.Timestamp.AsTime().Sub(p.lastSnapshotTime) > 2*time.Minute
+		if condition {
+			carClassLaptimes := make(map[string]float32)
+			for k, car := range payload.Speedmap.Data {
+				carClassLaptimes[k] = car.Laptime
+			}
+			p.snapshotChan <- &analysisv1.SnapshotData{
+				RecordStamp:      proto.Clone(payload.Timestamp).(*timestamppb.Timestamp),
+				SessionTime:      p.lastSessionData.SessionTime,
+				TimeOfDay:        p.lastSessionData.TimeOfDay,
+				AirTemp:          p.lastSessionData.AirTemp,
+				TrackTemp:        p.lastSessionData.TrackTemp,
+				TrackWetness:     p.lastSessionData.TrackWetness,
+				Precipitation:    p.lastSessionData.Precipitation,
+				CarClassLaptimes: carClassLaptimes,
+			}
+			p.lastSnapshotTime = payload.Timestamp.AsTime()
+		}
 	}
 }
 

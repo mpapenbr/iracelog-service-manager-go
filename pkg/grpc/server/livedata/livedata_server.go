@@ -153,6 +153,59 @@ func (s *liveDataServer) LiveSpeedmap(
 }
 
 //nolint:whitespace,dupl,funlen // can't make both editor and linter happy
+func (s *liveDataServer) LiveSnapshotData(
+	ctx context.Context,
+	req *connect.Request[livedatav1.LiveSnapshotDataRequest],
+	stream *connect.ServerStream[livedatav1.LiveSnapshotDataResponse],
+) error {
+	// get the epd
+	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	if err != nil {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	log.Debug("Sending live snapshot data",
+		log.String("event", epd.Event.Key),
+	)
+	if req.Msg.StartFrom == livedatav1.SnapshotStartMode_SNAPSHOT_START_MODE_BEGIN {
+		log.Debug("sending snapshots from beginning",
+			log.Int("snapshots", len(epd.SnapshotData)))
+		for _, a := range epd.SnapshotData {
+			if s.debugWire {
+				log.Debug("Sending snapshot data",
+					log.String("event", epd.Event.Key))
+			}
+			if err := stream.Send(&livedatav1.LiveSnapshotDataResponse{
+				Timestamp:    timestamppb.Now(),
+				SnapshotData: proto.Clone(a).(*analysisv1.SnapshotData),
+			}); err != nil {
+				log.Warn("Error sending live snapshot (first)", log.ErrorField(err))
+				return err
+			}
+		}
+	}
+
+	dataChan := epd.SnapshotBroadcast.Subscribe()
+	for a := range dataChan {
+		if s.debugWire {
+			log.Debug("Sending snapshot data",
+				log.String("event", epd.Event.Key))
+		}
+		if err := stream.Send(&livedatav1.LiveSnapshotDataResponse{
+			Timestamp:    timestamppb.Now(),
+			SnapshotData: proto.Clone(a).(*analysisv1.SnapshotData),
+		}); err != nil {
+			epd.Mutex.Lock()
+			//nolint:gocritic // by design
+			defer epd.Mutex.Unlock()
+			epd.SnapshotBroadcast.CancelSubscription(dataChan)
+			return err
+		}
+	}
+	log.Debug("LiveSnapshot stream closed")
+	return nil
+}
+
+//nolint:whitespace,dupl,funlen // can't make both editor and linter happy
 func (s *liveDataServer) LiveDriverData(
 	ctx context.Context,
 	req *connect.Request[livedatav1.LiveDriverDataRequest],
@@ -249,6 +302,11 @@ func (s *liveDataServer) LiveAnalysisSel(
 	log.Debug("Sending live analysis data by selector",
 		log.String("event", epd.Event.Key),
 	)
+	var snapshotsCopy []*analysisv1.SnapshotData
+	for _, snapshot := range epd.SnapshotData {
+		snapshotsCopy = append(snapshotsCopy,
+			proto.Clone(snapshot).(*analysisv1.SnapshotData))
+	}
 	dataChan := epd.AnalysisBroadcast.Subscribe()
 	//nolint:errcheck // by design
 	first := proto.Clone(<-dataChan).(*analysisv1.Analysis)
@@ -261,6 +319,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 		RaceOrder:        first.RaceOrder,
 		RaceGraph:        first.RaceGraph,
 		CarComputeStates: first.CarComputeStates,
+		Snapshots:        snapshotsCopy,
 	}
 	if err := stream.Send(firstResp); err != nil {
 		log.Warn("Error sending live analysis data by selector (first)", log.ErrorField(err))
