@@ -161,6 +161,11 @@ func (s *eventsServer) GetEvent(
 		}
 	}
 
+	snapshots, err := smProto.LoadSnapshots(ctx, s.pool, int(e.Id), 120)
+	if err != nil {
+		return nil, err
+	}
+
 	return connect.NewResponse(&eventv1.GetEventResponse{
 		Event: e, Track: t, Analysis: a,
 		Car: &carv1.CarContainer{
@@ -174,7 +179,8 @@ func (s *eventsServer) GetEvent(
 			Cars:     sd.Cars,
 			Messages: m,
 		},
-		Speedmap: sm.Speedmap,
+		Speedmap:  sm.Speedmap,
+		Snapshots: snapshots,
 	}), nil
 }
 

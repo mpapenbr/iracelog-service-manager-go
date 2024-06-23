@@ -18,6 +18,7 @@ func NewCheckCmd() *cobra.Command {
 
 	cmd.AddCommand(NewCheckConvertCmd())
 	cmd.AddCommand(NewCheckDataFetcherCmd())
+	cmd.AddCommand(NewCheckSnapshotsCmd())
 	return cmd
 }
 

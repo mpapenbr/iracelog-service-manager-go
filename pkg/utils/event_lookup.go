@@ -52,6 +52,7 @@ func NewEventLookup(opts ...Option) *EventLookup {
 
 var ErrEventNotFound = errors.New("event not found")
 
+//nolint:lll // readability
 type EventProcessingData struct {
 	Event               *eventv1.Event
 	Track               *trackv1.Track
@@ -61,13 +62,15 @@ type EventProcessingData struct {
 	DriverDataBroadcast broadcast.BroadcastServer[*racestatev1.PublishDriverDataRequest]
 	SpeedmapBroadcast   broadcast.BroadcastServer[*racestatev1.PublishSpeedmapRequest]
 	ReplayInfoBroadcast broadcast.BroadcastServer[*eventv1.ReplayInfo]
+	SnapshotBroadcast   broadcast.BroadcastServer[*analysisv1.SnapshotData]
 	Mutex               sync.Mutex
 	LastDriverData      *racestatev1.PublishDriverDataRequest
 	LastAnalysisData    *analysisv1.Analysis
 	LastReplayInfo      *eventv1.ReplayInfo
 	RecordingMode       providerev1.RecordingMode
-	LastRsInfoId        int       // holds the last rs_info_id for storing state data
-	LastDataEvent       time.Time // holds the time of the last incoming data event
+	LastRsInfoId        int                        // holds the last rs_info_id for storing state data
+	LastDataEvent       time.Time                  // holds the time of the last incoming data event
+	SnapshotData        []*analysisv1.SnapshotData // holds the snapshot data for current event
 }
 type EventLookup struct {
 	lookup        map[string]*EventProcessingData
@@ -75,7 +78,7 @@ type EventLookup struct {
 	staleDuration time.Duration
 }
 
-//nolint:whitespace // can't make both editor and linter happy
+//nolint:whitespace,funlen // can't make both editor and linter happy
 func (e *EventLookup) AddEvent(
 	event *eventv1.Event,
 	track *trackv1.Track,
@@ -89,6 +92,7 @@ func (e *EventLookup) AddEvent(
 	driverDataSource := make(chan *racestatev1.PublishDriverDataRequest)
 	speedmapSource := make(chan *racestatev1.PublishSpeedmapRequest)
 	replayInfoSource := make(chan *eventv1.ReplayInfo)
+	snapshotSource := make(chan *analysisv1.SnapshotData)
 
 	cp := car.NewCarProcessor()
 	rp := race.NewRaceProcessor(
@@ -108,6 +112,7 @@ func (e *EventLookup) AddEvent(
 				driverDataSource,
 				speedmapSource,
 				replayInfoSource,
+				snapshotSource,
 			),
 		),
 		AnalysisBroadcast:   broadcast.NewBroadcastServer("analysis", analysisSource),
@@ -115,8 +120,10 @@ func (e *EventLookup) AddEvent(
 		DriverDataBroadcast: broadcast.NewBroadcastServer("driverdata", driverDataSource),
 		SpeedmapBroadcast:   broadcast.NewBroadcastServer("speedmap", speedmapSource),
 		ReplayInfoBroadcast: broadcast.NewBroadcastServer("replayInfo", replayInfoSource),
+		SnapshotBroadcast:   broadcast.NewBroadcastServer("snapshot", snapshotSource),
 		Mutex:               sync.Mutex{},
 		LastDataEvent:       time.Now(),
+		SnapshotData:        make([]*analysisv1.SnapshotData, 0),
 	}
 	epd.setupOwnListeners()
 	e.lookup[event.Key] = epd
@@ -158,6 +165,14 @@ func (epd *EventProcessingData) setupOwnListeners() {
 			epd.LastReplayInfo = proto.Clone(data).(*eventv1.ReplayInfo)
 		}
 	}()
+	go func() {
+		ch := epd.SnapshotBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.SnapshotData = append(epd.SnapshotData,
+				proto.Clone(data).(*analysisv1.SnapshotData))
+		}
+	}()
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -187,6 +202,7 @@ func (e *EventLookup) RemoveEvent(selector *commonv1.EventSelector) {
 		epd.DriverDataBroadcast.Close()
 		epd.SpeedmapBroadcast.Close()
 		epd.ReplayInfoBroadcast.Close()
+		epd.SnapshotBroadcast.Close()
 		delete(e.lookup, epd.Event.Key)
 	}
 }
