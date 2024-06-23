@@ -180,6 +180,7 @@ order by ri.id asc
 		}
 	}
 	ret := make([]*racestatev1.MessageContainer, 0)
+	defer row.Close()
 	for row.Next() {
 		var binaryMessage []byte
 		var recordStamp time.Time
@@ -224,6 +225,7 @@ order by ri.id asc limit $3
 	}
 	ret := make([]*racestatev1.PublishStateRequest, 0, limit)
 	var latestRecordStamp time.Time
+	defer row.Close()
 	for row.Next() {
 		var binaryMessage []byte
 		if err := row.Scan(&binaryMessage, &latestRecordStamp); err != nil {

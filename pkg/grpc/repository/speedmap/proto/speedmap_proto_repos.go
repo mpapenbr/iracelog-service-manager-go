@@ -87,6 +87,7 @@ order by ri.id asc limit $3
 	}
 	ret := make([]*racestatev1.PublishSpeedmapRequest, 0, limit)
 	var latestRecordStamp time.Time
+	defer row.Close()
 	for row.Next() {
 		var binaryMessage []byte
 		if err := row.Scan(&binaryMessage, &latestRecordStamp); err != nil {
@@ -134,7 +135,9 @@ order by rs.record_stamp
 	if err != nil {
 		return nil, err
 	}
+	defer row.Close()
 	ret := make([]*analysisv1.SnapshotData, 0)
+
 	for row.Next() {
 		var binaryMessage []byte
 		var sd analysisv1.SnapshotData
@@ -173,6 +176,7 @@ order by rs.record_stamp asc
 	if err != nil {
 		return 0, nil, err
 	}
+	defer row.Close()
 	for row.Next() {
 		var binaryMessage []byte
 

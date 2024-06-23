@@ -74,6 +74,7 @@ func LoadAll(ctx context.Context, conn repository.Querier) (
 		return nil, err
 	}
 	ret := make([]*eventv1.Event, 0)
+	defer row.Close()
 	for row.Next() {
 		item, err := readData(row)
 		if err != nil {
