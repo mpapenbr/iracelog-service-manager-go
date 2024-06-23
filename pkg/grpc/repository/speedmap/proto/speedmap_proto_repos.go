@@ -199,7 +199,7 @@ order by rs.record_stamp asc
 		}
 
 	}
-	return 0, nil, nil
+	return 0, &time.Time{}, nil
 }
 
 // deletes an entry from the database, returns number of rows deleted.
