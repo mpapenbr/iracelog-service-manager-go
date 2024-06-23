@@ -109,7 +109,13 @@ func (s *providerServer) RegisterEvent(
 		log.Error("error creating data", log.ErrorField(err))
 		return nil, err
 	}
-	epd := s.lookup.AddEvent(req.Msg.Event, req.Msg.Track, req.Msg.RecordingMode)
+	// read track from db to include pit stop info if already there
+	dbTrack, err := trackrepos.LoadById(ctx, s.pool, int(req.Msg.Event.TrackId))
+	if err != nil {
+		log.Error("error loading track", log.ErrorField(err))
+		dbTrack = req.Msg.Track
+	}
+	epd := s.lookup.AddEvent(req.Msg.Event, dbTrack, req.Msg.RecordingMode)
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
 	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
