@@ -84,6 +84,7 @@ order by ri.id asc limit $3
 	}
 	ret := make([]*racestatev1.PublishDriverDataRequest, 0, limit)
 	var latestRecordStamp time.Time
+	defer row.Close()
 	for row.Next() {
 		var binaryMessage []byte
 		if err := row.Scan(&binaryMessage, &latestRecordStamp); err != nil {
