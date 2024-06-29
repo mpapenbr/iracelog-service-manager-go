@@ -240,7 +240,7 @@ func (s *stateServer) GetDriverData(
 }
 
 //nolint:whitespace,dupl // false positive
-func (s *stateServer) GetStatesData(
+func (s *stateServer) GetStates(
 	ctx context.Context,
 	req *connect.Request[racestatev1.GetStatesRequest]) (
 	*connect.Response[racestatev1.GetStatesResponse], error,
@@ -269,7 +269,7 @@ func (s *stateServer) GetStatesData(
 }
 
 //nolint:whitespace,dupl // false positive
-func (s *stateServer) GetSpeedmapsData(
+func (s *stateServer) GetSpeedmaps(
 	ctx context.Context,
 	req *connect.Request[racestatev1.GetSpeedmapsRequest]) (
 	*connect.Response[racestatev1.GetSpeedmapsResponse], error,
