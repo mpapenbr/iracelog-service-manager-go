@@ -40,6 +40,7 @@ func NewEventLookup(opts ...Option) *EventLookup {
 	ret := &EventLookup{
 		lookup: make(map[string]*EventProcessingData),
 		ctx:    context.Background(),
+		mutex:  sync.Mutex{},
 	}
 	for _, opt := range opts {
 		opt(ret)
@@ -76,6 +77,7 @@ type EventLookup struct {
 	lookup        map[string]*EventProcessingData
 	ctx           context.Context
 	staleDuration time.Duration
+	mutex         sync.Mutex
 }
 
 //nolint:whitespace,funlen // can't make both editor and linter happy
@@ -84,6 +86,8 @@ func (e *EventLookup) AddEvent(
 	track *trackv1.Track,
 	recordingMode providerev1.RecordingMode,
 ) *EventProcessingData {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	if _, ok := e.lookup[event.Key]; ok {
 		return nil
 	}
@@ -179,6 +183,16 @@ func (epd *EventProcessingData) setupOwnListeners() {
 func (e *EventLookup) GetEvent(selector *commonv1.EventSelector) (
 	*EventProcessingData, error,
 ) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	return e.getEvent(selector)
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (e *EventLookup) getEvent(selector *commonv1.EventSelector) (
+	*EventProcessingData, error,
+) {
 	switch selector.Arg.(type) {
 	case *commonv1.EventSelector_Id:
 		for _, v := range e.lookup {
@@ -196,7 +210,9 @@ func (e *EventLookup) GetEvent(selector *commonv1.EventSelector) (
 }
 
 func (e *EventLookup) RemoveEvent(selector *commonv1.EventSelector) {
-	if epd, err := e.GetEvent(selector); err == nil {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	if epd, err := e.getEvent(selector); err == nil {
 		epd.AnalysisBroadcast.Close()
 		epd.RacestateBroadcast.Close()
 		epd.DriverDataBroadcast.Close()
@@ -208,6 +224,8 @@ func (e *EventLookup) RemoveEvent(selector *commonv1.EventSelector) {
 }
 
 func (e *EventLookup) GetEvents() []*EventProcessingData {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	ret := make([]*EventProcessingData, 0, len(e.lookup))
 	for _, v := range e.lookup {
 		ret = append(ret, v)
@@ -217,6 +235,8 @@ func (e *EventLookup) GetEvents() []*EventProcessingData {
 
 // removes all events from the lookup
 func (e *EventLookup) Clear() {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	e.lookup = make(map[string]*EventProcessingData)
 }
 

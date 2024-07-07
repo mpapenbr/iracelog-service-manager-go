@@ -118,6 +118,7 @@ func (s *providerServer) RegisterEvent(
 	epd := s.lookup.AddEvent(req.Msg.Event, dbTrack, req.Msg.RecordingMode)
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
+	log.Debug("event registered")
 	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
 		nil
 }
@@ -141,6 +142,8 @@ func (s *providerServer) UnregisterEvent(
 	s.storeAnalysisData(epd)
 	s.storeReplayInfo(epd)
 	s.lookup.RemoveEvent(req.Msg.EventSelector)
+	log.Debug("Event unregistered",
+		log.Any("event", req.Msg.EventSelector))
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
 
