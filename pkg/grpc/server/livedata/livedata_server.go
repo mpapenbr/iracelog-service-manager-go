@@ -2,6 +2,7 @@ package livedata
 
 import (
 	"context"
+	"errors"
 	"sort"
 
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
@@ -312,6 +313,12 @@ func (s *liveDataServer) LiveAnalysisSel(
 	dataChan := epd.AnalysisBroadcast.Subscribe()
 	//nolint:errcheck // by design
 	first := proto.Clone(<-dataChan).(*analysisv1.Analysis)
+	if first == nil {
+		s.cancelSubscription(epd, dataChan)
+		return connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("no analysis data"))
+
+	}
 	firstResp := &livedatav1.LiveAnalysisSelResponse{
 		Timestamp:        timestamppb.Now(),
 		CarOccupancies:   first.CarOccupancies,
@@ -323,6 +330,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 		CarComputeStates: first.CarComputeStates,
 		Snapshots:        snapshotsCopy,
 	}
+
 	if err := stream.Send(firstResp); err != nil {
 		log.Warn("Error sending live analysis data by selector (first)", log.ErrorField(err))
 		s.cancelSubscription(epd, dataChan)

@@ -88,9 +88,10 @@ func (b *broadcastServer[T]) serve() {
 			for i, listener := range b.listeners {
 				if listener == ch {
 					b.listeners = append(b.listeners[:i], b.listeners[i+1:]...)
+
 					log.Debug("removed listener",
 						log.String("name", b.name), log.Int("len", len(b.listeners)))
-					break
+					// break
 				}
 			}
 			log.Debug("unlocking",
