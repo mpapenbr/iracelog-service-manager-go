@@ -231,9 +231,11 @@ func (s *liveDataServer) LiveDriverData(
 			CurrentDrivers: a.CurrentDrivers,
 		}
 	}
-	if err := stream.Send(composeResp(epd.LastDriverData)); err != nil {
-		log.Warn("Error sending live driver (first)", log.ErrorField(err))
-		return err
+	if epd.LastDriverData != nil {
+		if err := stream.Send(composeResp(epd.LastDriverData)); err != nil {
+			log.Warn("Error sending live driver (first)", log.ErrorField(err))
+			return err
+		}
 	}
 	dataChan := epd.DriverDataBroadcast.Subscribe()
 	for a := range dataChan {
