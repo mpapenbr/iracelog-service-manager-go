@@ -19,7 +19,9 @@
         "debug",
         "--enable-telemetry",
         "--admin-token",
-        "admin"
+        "admin",
+        "--stale-duration",
+        "10s"
       ]
     },
     {
