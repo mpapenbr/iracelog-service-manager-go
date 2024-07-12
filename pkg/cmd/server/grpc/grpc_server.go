@@ -100,6 +100,10 @@ func NewServerCmd() *cobra.Command {
 		"stale-duration",
 		"1m",
 		"provider is removed if no data was received for this duration")
+	cmd.Flags().IntVar(&config.MaxConcurrentStreams,
+		"max-concurrent-streams",
+		100,
+		"max number of concurrent streams per connection")
 	return cmd
 }
 
@@ -194,8 +198,10 @@ func startServer() error {
 		log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
 		//nolint:gosec // by design
 		server := &http.Server{
-			Addr:    config.GrpcServerAddr,
-			Handler: h2c.NewHandler(newCORS().Handler(mux), &http2.Server{}),
+			Addr: config.GrpcServerAddr,
+			Handler: h2c.NewHandler(newCORS().Handler(mux), &http2.Server{
+				MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
+			}),
 		}
 		return server.ListenAndServe()
 	}
