@@ -6,7 +6,7 @@ require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.16.2-20240623151922-fb549bddc8ee.1
 	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.34.2-20240623151922-fb549bddc8ee.2
 	connectrpc.com/connect v1.16.2
-	connectrpc.com/otelconnect v0.7.0
+	connectrpc.com/otelconnect v0.7.1
 	github.com/docker/go-connections v0.5.0
 	github.com/exaring/otelpgx v0.6.2
 	github.com/golang-migrate/migrate/v4 v4.17.1
