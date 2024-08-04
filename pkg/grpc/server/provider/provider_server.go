@@ -25,7 +25,7 @@ import (
 )
 
 func NewServer(opts ...Option) *providerServer {
-	ret := &providerServer{}
+	ret := &providerServer{log: log.Default().Named("grpc.provider")}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -59,6 +59,7 @@ type providerServer struct {
 	pool   *pgxpool.Pool
 	pe     permission.PermissionEvaluator
 	lookup *utils.EventLookup
+	log    *log.Logger
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -66,7 +67,7 @@ func (s *providerServer) ListLiveEvents(
 	ctx context.Context,
 	req *connect.Request[providerv1.ListLiveEventsRequest],
 ) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
-	log.Debug("ListLiveEvents called")
+	s.log.Debug("ListLiveEvents called")
 	ec := []*providerv1.LiveEventContainer{}
 	for _, v := range s.lookup.GetEvents() {
 		ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
@@ -79,13 +80,13 @@ func (s *providerServer) RegisterEvent(
 	ctx context.Context,
 	req *connect.Request[providerv1.RegisterEventRequest],
 ) (*connect.Response[providerv1.RegisterEventResponse], error) {
-	log.Debug("RegisterEvent called", log.Any("header", req.Header()))
+	s.log.Debug("RegisterEvent called", log.Any("header", req.Header()))
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
-	log.Debug("RegisterEvent",
+	s.log.Debug("RegisterEvent",
 		log.Any("track", req.Msg.Track),
 		log.Any("event", req.Msg.Event))
 
@@ -106,19 +107,19 @@ func (s *providerServer) RegisterEvent(
 			}
 			return eventrepos.Create(ctx, tx, req.Msg.Event)
 		}); err != nil {
-		log.Error("error creating data", log.ErrorField(err))
+		s.log.Error("error creating data", log.ErrorField(err))
 		return nil, err
 	}
 	// read track from db to include pit stop info if already there
 	dbTrack, err := trackrepos.LoadById(ctx, s.pool, int(req.Msg.Event.TrackId))
 	if err != nil {
-		log.Error("error loading track", log.ErrorField(err))
+		s.log.Error("error loading track", log.ErrorField(err))
 		dbTrack = req.Msg.Track
 	}
 	epd := s.lookup.AddEvent(req.Msg.Event, dbTrack, req.Msg.RecordingMode)
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
-	log.Debug("event registered")
+	s.log.Debug("event registered")
 	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
 		nil
 }
@@ -128,7 +129,7 @@ func (s *providerServer) UnregisterEvent(
 	ctx context.Context,
 	req *connect.Request[providerv1.UnregisterEventRequest],
 ) (*connect.Response[providerv1.UnregisterEventResponse], error) {
-	log.Debug("UnregisterEvent",
+	s.log.Debug("UnregisterEvent",
 		log.Any("event", req.Msg.EventSelector))
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasRole(a, auth.RoleProvider) {
@@ -142,7 +143,7 @@ func (s *providerServer) UnregisterEvent(
 	s.storeAnalysisData(epd)
 	s.storeReplayInfo(epd)
 	s.lookup.RemoveEvent(req.Msg.EventSelector)
-	log.Debug("Event unregistered",
+	s.log.Debug("Event unregistered",
 		log.Any("event", req.Msg.EventSelector))
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
@@ -211,7 +212,7 @@ func (s *providerServer) storeAnalysisDataWorker(
 					s.pool,
 					int(epd.Event.Id),
 					data); err != nil {
-					log.Error("error storing analysis data", log.ErrorField(err))
+					s.log.Error("error storing analysis data", log.ErrorField(err))
 				}
 			}
 		}
@@ -239,7 +240,7 @@ func (s *providerServer) storeReplayInfoWorker(
 					s.pool,
 					int(epd.Event.Id),
 					data); err != nil {
-					log.Error("error storing replay info data", log.ErrorField(err))
+					s.log.Error("error storing replay info data", log.ErrorField(err))
 				}
 			}
 		}
@@ -260,7 +261,7 @@ func (s *providerServer) storeAnalysisData(
 				int(epd.Event.Id),
 				epd.LastAnalysisData)
 		}); err != nil {
-		log.Error("error storing analysis data", log.ErrorField(err))
+		s.log.Error("error storing analysis data", log.ErrorField(err))
 	}
 }
 
@@ -278,7 +279,7 @@ func (s *providerServer) storeReplayInfo(
 				int(epd.Event.Id),
 				epd.LastReplayInfo)
 		}); err != nil {
-		log.Error("error storing replay info", log.ErrorField(err))
+		s.log.Error("error storing replay info", log.ErrorField(err))
 	}
 }
 

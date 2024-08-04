@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gammazero/nexus/v3/client"
+	"github.com/pgx-contrib/pgxtrace"
 	"github.com/spf13/cobra"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 
@@ -142,25 +143,31 @@ func startServer() error {
 
 	waitForRequiredServices()
 
-	pgTraceOption := postgres.WithTracer(sqlLogger, log.DebugLevel)
+	pgTracer := pgxtrace.CompositeQueryTracer{
+		postgres.NewMyTracer(sqlLogger, log.DebugLevel),
+	}
+
 	if config.EnableTelemetry {
-		log.Info("Enabling telemetry")
+		logger.Info("Enabling telemetry")
 		var err error
 		if telemetry, err = config.SetupTelemetry(context.Background()); err == nil {
-			pgTraceOption = postgres.WithOtlpTracer()
+			pgTracer = append(pgTracer, postgres.NewOtlpTracer())
 		} else {
-			log.Warn("Could not setup telemetry", log.ErrorField(err))
+			logger.Warn("Could not setup telemetry", log.ErrorField(err))
 		}
 		err = otlpruntime.Start(otlpruntime.WithMinimumReadMemStatsInterval(time.Second))
 		if err != nil {
-			log.Warn("Could not start runtime metrics", log.ErrorField(err))
+			logger.Warn("Could not start runtime metrics", log.ErrorField(err))
 		}
 	}
 
+	pgOptions := []postgres.PoolConfigOption{
+		postgres.WithTracer(pgTracer),
+	}
 	log.Info("Starting server")
 	pool := postgres.InitWithUrl(
 		config.DB,
-		pgTraceOption,
+		pgOptions...,
 	)
 
 	pm, err := provider.NewProviderManager(

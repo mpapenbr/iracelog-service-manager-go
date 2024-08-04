@@ -17,7 +17,9 @@ import (
 )
 
 func NewServer(opts ...Option) *analysisServer {
-	ret := &analysisServer{}
+	ret := &analysisServer{
+		log: log.Default().Named("grpc.analysis"),
+	}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -42,13 +44,14 @@ type analysisServer struct {
 	x.UnimplementedAnalysisServiceHandler
 	pe   permission.PermissionEvaluator
 	pool *pgxpool.Pool
+	log  *log.Logger
 }
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *analysisServer) GetAnalysis(
 	ctx context.Context, req *connect.Request[analysisv1.GetAnalysisRequest],
 ) (*connect.Response[analysisv1.GetAnalysisResponse], error) {
-	log.Debug("GetAnalysis called",
+	s.log.Debug("GetAnalysis called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var analysisData *analysisv1.Analysis
@@ -58,7 +61,7 @@ func (s *analysisServer) GetAnalysis(
 
 	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
 	if err != nil {
-		log.Error("error resolving event",
+		s.log.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
 		return nil, err

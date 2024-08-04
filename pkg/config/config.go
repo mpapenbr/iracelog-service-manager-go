@@ -12,6 +12,7 @@ var (
 	LogLevel             string // sets the log level (zap log level values)
 	SQLLogLevel          string // sets the log level for sql subsystem
 	LogFormat            string // text vs json
+	LogConfig            string // path to log config file
 	MigrationSourceUrl   string // location of migration files
 	EnableTelemetry      bool   // enable telemetry
 	TelemetryEndpoint    string // endpoint for telemetry

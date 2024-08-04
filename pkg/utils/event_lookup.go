@@ -41,6 +41,7 @@ func NewEventLookup(opts ...Option) *EventLookup {
 		lookup: make(map[string]*EventProcessingData),
 		ctx:    context.Background(),
 		mutex:  sync.Mutex{},
+		log:    log.Default().Named("grpc.eventmgr"),
 	}
 	for _, opt := range opts {
 		opt(ret)
@@ -78,6 +79,7 @@ type EventLookup struct {
 	ctx           context.Context
 	staleDuration time.Duration
 	mutex         sync.Mutex
+	log           *log.Logger
 }
 
 //nolint:whitespace,funlen // can't make both editor and linter happy
@@ -255,7 +257,7 @@ func (e *EventLookup) setupWatchdog() {
 			// use select to be able to break out of the loop
 			select {
 			case <-e.ctx.Done():
-				log.Debug("event lookup watchdog shutting down")
+				e.log.Debug("event lookup watchdog shutting down")
 				return
 			default:
 
@@ -264,7 +266,7 @@ func (e *EventLookup) setupWatchdog() {
 				toRemove := make([]*EventProcessingData, 0)
 				for _, epd := range e.lookup {
 					if time.Since(epd.LastDataEvent) > e.staleDuration {
-						log.Info("watchdog detected stale event",
+						e.log.Info("watchdog detected stale event",
 							log.String("event", epd.Event.Key),
 							log.Duration("stale", time.Since(epd.LastDataEvent)))
 						toRemove = append(toRemove, epd)

@@ -20,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pgx-contrib/pgxtrace"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
@@ -39,7 +40,10 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
-var appConfig config.Config // holds processed config values
+var (
+	appConfig config.Config // holds processed config values
+	logger    *log.Logger
+)
 
 //nolint:funlen // by design
 func NewServerCmd() *cobra.Command {
@@ -51,7 +55,8 @@ func NewServerCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return startServer()
+			logger = log.GetFromContext(cmd.Context()).Named("grpc")
+			return startServer(cmd.Context())
 		},
 	}
 	cmd.Flags().StringVarP(&config.GrpcServerAddr,
@@ -107,117 +112,125 @@ func NewServerCmd() *cobra.Command {
 	return cmd
 }
 
-func parseLogLevel(l string, defaultVal log.Level) log.Level {
-	level, err := log.ParseLevel(l)
-	if err != nil {
-		return defaultVal
-	}
-	return level
+type grpcServer struct {
+	ctx         context.Context
+	log         *log.Logger
+	pool        *pgxpool.Pool
+	mux         *http.ServeMux
+	telemetry   *config.Telemetry
+	otel        *otelconnect.Interceptor
+	eventLookup *utils.EventLookup
 }
 
 //nolint:funlen,cyclop // by design
-func startServer() error {
-	var logger *log.Logger
-	var sqlLogger *log.Logger
-	var telemetry *config.Telemetry
-	switch config.LogFormat {
-	case "json":
-		logger = log.New(
-			os.Stderr,
-			parseLogLevel(config.LogLevel, log.InfoLevel),
-			log.WithCaller(true),
-			log.AddCallerSkip(1))
-		sqlLogger = log.New(
-			os.Stderr,
-			parseLogLevel(config.SQLLogLevel, log.InfoLevel),
-			log.WithCaller(true),
-			log.AddCallerSkip(1))
-
-	default:
-		logger = log.DevLogger(
-			os.Stderr,
-			parseLogLevel(config.LogLevel, log.DebugLevel),
-			log.WithCaller(true),
-			log.AddCallerSkip(1))
-
-		sqlLogger = log.DevLogger(
-			os.Stderr,
-			parseLogLevel(config.SQLLogLevel, log.InfoLevel),
-			log.WithCaller(true),
-			log.AddCallerSkip(1))
+func startServer(ctx context.Context) error {
+	srv := grpcServer{
+		ctx: ctx,
 	}
+	srv.SetupLogger()
+	srv.waitForRequiredServices()
+	srv.SetupProfiling()
+	srv.SetupTelemetry()
+	srv.SetupDb()
+	srv.SetupGrpcServices()
+	return srv.Start()
+}
 
-	log.ResetDefault(logger)
+func (s *grpcServer) SetupTelemetry() {
+	if config.EnableTelemetry {
+		s.log.Info("Enabling telemetry")
+		err := otlpruntime.Start(otlpruntime.WithMinimumReadMemStatsInterval(time.Second))
+		if err != nil {
+			s.log.Warn("Could not start runtime metrics", log.ErrorField(err))
+		}
+	}
+}
 
-	log.Debug("Config:",
-		log.String("url", config.URL),
-		log.String("db", config.DB),
-		log.String("realm", config.Realm),
-		log.String("password", config.Password),
-	)
-
+func (s *grpcServer) SetupProfiling() {
 	if config.ProfilingPort > 0 {
-		log.Info("Starting profiling server on port", log.Int("port", config.ProfilingPort))
+		s.log.Info("Starting profiling server on port",
+			log.Int("port", config.ProfilingPort))
 		go func() {
 			//nolint:gosec // by design
 			err := http.ListenAndServe(
 				fmt.Sprintf("localhost:%d", config.ProfilingPort),
 				nil)
 			if err != nil {
-				log.Error("Profiling server stopped", log.ErrorField(err))
+				s.log.Error("Profiling server stopped", log.ErrorField(err))
 			}
 		}()
 	}
+}
 
-	waitForRequiredServices()
+func (s *grpcServer) SetupLogger() {
+	s.log = log.GetFromContext(s.ctx).Named("grpc")
+}
 
-	pgTraceOption := postgres.WithTracer(sqlLogger, log.DebugLevel)
+func (s *grpcServer) SetupDb() {
+	pgTracer := pgxtrace.CompositeQueryTracer{
+		postgres.NewMyTracer(log.Default().Named("sql"), log.DebugLevel),
+	}
+
 	if config.EnableTelemetry {
-		log.Info("Enabling telemetry")
 		var err error
-		if telemetry, err = config.SetupTelemetry(context.Background()); err == nil {
-			pgTraceOption = postgres.WithOtlpTracer()
+		if s.telemetry, err = config.SetupTelemetry(context.Background()); err == nil {
+			pgTracer = append(pgTracer, postgres.NewOtlpTracer())
 		} else {
-			log.Warn("Could not setup telemetry", log.ErrorField(err))
-		}
-		err = otlpruntime.Start(otlpruntime.WithMinimumReadMemStatsInterval(time.Second))
-		if err != nil {
-			log.Warn("Could not start runtime metrics", log.ErrorField(err))
+			s.log.Warn("Could not setup db telemetry", log.ErrorField(err))
 		}
 	}
 
-	log.Info("Starting server")
-	pool := postgres.InitWithUrl(
+	pgOptions := []postgres.PoolConfigOption{
+		postgres.WithTracer(pgTracer),
+	}
+	s.log.Info("Init database connection")
+	s.pool = postgres.InitWithUrl(
 		config.DB,
-		pgTraceOption,
+		pgOptions...,
 	)
+}
 
-	mux := registerGrpcServices(pool)
+func (s *grpcServer) SetupGrpcServices() {
+	s.mux = http.NewServeMux()
+	s.otel, _ = otelconnect.NewInterceptor()
+	staleDuration, err := time.ParseDuration(config.StaleDuration)
+	if err != nil {
+		staleDuration = 1 * time.Minute
+	}
+	s.log.Debug("init with stale duration", log.Duration("duration", staleDuration))
+	s.eventLookup = utils.NewEventLookup(utils.WithStaleDuration(staleDuration))
+	s.registerEventServer()
+	s.registerAnalysisServer()
+	s.registerProviderServer()
+	s.registerLiveDataServer()
+	s.registerStateServer()
+}
 
+func (s *grpcServer) Start() error {
+	setupGoRoutinesDump()
 	startServer := func() error {
-		log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
+		s.log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
 		//nolint:gosec // by design
 		server := &http.Server{
 			Addr: config.GrpcServerAddr,
-			Handler: h2c.NewHandler(newCORS().Handler(mux), &http2.Server{
+			Handler: h2c.NewHandler(newCORS().Handler(s.mux), &http2.Server{
 				MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
 			}),
 		}
 		return server.ListenAndServe()
 	}
 	if err := startServer(); err != nil {
-		log.Error("server could not be started", log.ErrorField(err))
+		s.log.Error("server could not be started", log.ErrorField(err))
 		return err
 	}
-	log.Info("Server started")
-	setupGoRoutinesDump()
+	s.log.Info("Server started")
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 	v := <-sigChan
-	log.Debug("Got signal ", log.Any("signal", v))
-	if telemetry != nil {
-		telemetry.Shutdown()
+	logger.Debug("Got signal ", log.Any("signal", v))
+	if s.telemetry != nil {
+		s.telemetry.Shutdown()
 	}
 
 	//nolint:all // keeping by design
@@ -227,113 +240,97 @@ func startServer() error {
 	// 	pm.Shutdown()
 	// }
 
-	log.Info("Server terminated")
+	s.log.Info("Server terminated")
 	return nil
 }
 
-func registerGrpcServices(pool *pgxpool.Pool) *http.ServeMux {
-	mux := http.NewServeMux()
-	myOtel, _ := otelconnect.NewInterceptor()
-	staleDuration, err := time.ParseDuration(config.StaleDuration)
+func (s *grpcServer) waitForRequiredServices() {
+	timeout, err := time.ParseDuration(config.WaitForServices)
 	if err != nil {
-		staleDuration = 1 * time.Minute
+		s.log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
+		timeout = 60 * time.Second
 	}
-	log.Debug("init with stale duration", log.Duration("duration", staleDuration))
-	eventLookup := utils.NewEventLookup(utils.WithStaleDuration(staleDuration))
-	registerEventServer(mux, pool, myOtel)
-	registerAnalysisServer(mux, pool, myOtel)
-	registerProviderServer(mux, pool, myOtel, eventLookup)
-	registerStateServer(mux, pool, myOtel, eventLookup)
-	registerLiveDataServer(mux, myOtel, eventLookup)
-	return mux
+
+	wg := sync.WaitGroup{}
+	checkTcp := func(addr string) {
+		if err = utils.WaitForTCP(addr, timeout); err != nil {
+			s.log.Fatal("required services not ready", log.ErrorField(err))
+		}
+		wg.Done()
+	}
+
+	if postgresAddr := utils.ExtractFromDBUrl(config.DB); postgresAddr != "" {
+		wg.Add(1)
+		go checkTcp(postgresAddr)
+	}
+	s.log.Debug("Waiting for connection checks to return")
+	wg.Wait()
+	s.log.Debug("Required services are available")
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func registerEventServer(
-	mux *http.ServeMux, pool *pgxpool.Pool, otel connect.Interceptor,
-) {
+func (s *grpcServer) registerEventServer() {
 	eventService := event.NewServer(
-		event.WithPool(pool),
+		event.WithPool(s.pool),
 		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := eventv1connect.NewEventServiceHandler(
 		eventService,
-		connect.WithInterceptors(otel,
+		connect.WithInterceptors(s.otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
 				auth.WithProviderToken(config.ProviderToken)),
 		),
 	)
-	mux.Handle(path, handler)
+	s.mux.Handle(path, handler)
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func registerAnalysisServer(
-	mux *http.ServeMux, pool *pgxpool.Pool, otel connect.Interceptor,
-) {
+func (s *grpcServer) registerAnalysisServer() {
 	analysisService := analysis.NewServer(
-		analysis.WithPool(pool),
+		analysis.WithPool(s.pool),
 		analysis.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := analysisv1connect.NewAnalysisServiceHandler(
 		analysisService,
-		connect.WithInterceptors(otel,
+		connect.WithInterceptors(s.otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken)),
 		),
 	)
-	mux.Handle(path, handler)
+	s.mux.Handle(path, handler)
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func registerProviderServer(
-	mux *http.ServeMux,
-	pool *pgxpool.Pool,
-	otel connect.Interceptor,
-	eventLookup *utils.EventLookup,
-) {
+func (s *grpcServer) registerProviderServer() {
 	providerService := provider.NewServer(
-		provider.WithPersistence(pool),
-		provider.WithEventLookup(eventLookup),
+		provider.WithPersistence(s.pool),
+		provider.WithEventLookup(s.eventLookup),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
-		connect.WithInterceptors(otel,
+		connect.WithInterceptors(s.otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
 				auth.WithProviderToken(config.ProviderToken))),
 	)
-	mux.Handle(path, handler)
+	s.mux.Handle(path, handler)
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func registerStateServer(
-	mux *http.ServeMux,
-	pool *pgxpool.Pool,
-	otel connect.Interceptor,
-	eventLookup *utils.EventLookup,
-) {
+func (s *grpcServer) registerStateServer() {
 	stateService := state.NewServer(
-		state.WithPool(pool),
-		state.WithEventLookup(eventLookup),
+		state.WithPool(s.pool),
+		state.WithEventLookup(s.eventLookup),
 		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := racestatev1connect.NewRaceStateServiceHandler(
 		stateService,
-		connect.WithInterceptors(otel,
+		connect.WithInterceptors(s.otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
 				auth.WithProviderToken(config.ProviderToken))),
 	)
-	mux.Handle(path, handler)
+	s.mux.Handle(path, handler)
 }
 
-//nolint:whitespace // can't make both editor and linter happy
-func registerLiveDataServer(
-	mux *http.ServeMux,
-	otel connect.Interceptor,
-	eventLookup *utils.EventLookup,
-) {
+func (s *grpcServer) registerLiveDataServer() {
 	liveDataService := livedata.NewServer(
-		livedata.WithEventLookup(eventLookup))
+		livedata.WithEventLookup(s.eventLookup))
 	path, handler := livedatav1connect.NewLiveDataServiceHandler(
 		liveDataService,
-		connect.WithInterceptors(otel),
+		connect.WithInterceptors(s.otel),
 	)
-	mux.Handle(path, handler)
+	s.mux.Handle(path, handler)
 }
 
 func setupGoRoutinesDump() {
@@ -348,30 +345,6 @@ func setupGoRoutinesDump() {
 				buf[:stacklen])
 		}
 	}()
-}
-
-func waitForRequiredServices() {
-	timeout, err := time.ParseDuration(config.WaitForServices)
-	if err != nil {
-		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
-		timeout = 60 * time.Second
-	}
-
-	wg := sync.WaitGroup{}
-	checkTcp := func(addr string) {
-		if err = utils.WaitForTCP(addr, timeout); err != nil {
-			log.Fatal("required services not ready", log.ErrorField(err))
-		}
-		wg.Done()
-	}
-
-	if postgresAddr := utils.ExtractFromDBUrl(config.DB); postgresAddr != "" {
-		wg.Add(1)
-		go checkTcp(postgresAddr)
-	}
-	log.Debug("Waiting for connection checks to return")
-	wg.Wait()
-	log.Debug("Required services are available")
 }
 
 func newCORS() *cors.Cors {

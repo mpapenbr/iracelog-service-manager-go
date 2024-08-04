@@ -3,7 +3,6 @@ package event
 import (
 	"context"
 	"errors"
-	"time"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
@@ -28,7 +27,9 @@ import (
 )
 
 func NewServer(opts ...Option) *eventsServer {
-	ret := &eventsServer{}
+	ret := &eventsServer{
+		log: log.Default().Named("grpc.event"),
+	}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -55,6 +56,7 @@ type eventsServer struct {
 	service *eventservice.EventService
 	pe      permission.PermissionEvaluator
 	pool    *pgxpool.Pool
+	log     *log.Logger
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -68,13 +70,11 @@ func (s *eventsServer) GetEvents(
 		return err
 	}
 	for i := range data {
-
 		if err := stream.Send(
 			&eventv1.GetEventsResponse{Event: data[i]}); err != nil {
-			log.Error("Error sending event", log.ErrorField(err))
+			s.log.Error("Error sending event", log.ErrorField(err))
 			return err
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func (s *eventsServer) GetLatestEvents(
 func (s *eventsServer) GetEvent(
 	ctx context.Context, req *connect.Request[eventv1.GetEventRequest],
 ) (*connect.Response[eventv1.GetEventResponse], error) {
-	log.Debug("GetEvent called",
+	s.log.Debug("GetEvent called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var e *eventv1.Event
@@ -105,7 +105,7 @@ func (s *eventsServer) GetEvent(
 	var err error
 	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
 	if err != nil {
-		log.Error("error resolving event",
+		s.log.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
 		return nil, err
@@ -113,7 +113,7 @@ func (s *eventsServer) GetEvent(
 
 	a, err = aProto.LoadByEventId(ctx, s.pool, int(e.Id))
 	if err != nil {
-		log.Error("error loading event",
+		s.log.Error("error loading event",
 			log.Uint32("eventId", e.Id),
 			log.ErrorField(err))
 		return nil, err
@@ -121,7 +121,7 @@ func (s *eventsServer) GetEvent(
 
 	t, err := track.LoadById(ctx, s.pool, int(e.TrackId))
 	if err != nil {
-		log.Error("error loading track",
+		s.log.Error("error loading track",
 			log.Uint32("eventId", e.Id),
 			log.Uint32("trackId", e.TrackId),
 			log.ErrorField(err))
@@ -129,32 +129,32 @@ func (s *eventsServer) GetEvent(
 	}
 	cd, err := cProto.LoadLatest(ctx, s.pool, int(e.Id))
 	if err != nil {
-		log.Error("error loading car proto data",
+		s.log.Error("error loading car proto data",
 			log.Uint32("eventId", e.Id),
 			log.ErrorField(err))
 		return nil, err
 	}
 	sd, err := rProto.LoadLatest(ctx, s.pool, int(e.Id))
 	if err != nil {
-		log.Error("error loading race proto data",
+		s.log.Error("error loading race proto data",
 			log.Uint32("eventId", e.Id),
 			log.ErrorField(err))
 		return nil, err
 	}
 	m, err := rProto.CollectMessages(ctx, s.pool, int(e.Id))
 	if err != nil {
-		log.Error("error collecting messages",
+		s.log.Error("error collecting messages",
 			log.Uint32("eventId", e.Id),
 			log.ErrorField(err))
 		return nil, err
 	}
-	log.Debug("message collected", log.Int("num", len(m)))
+	s.log.Debug("message collected", log.Int("num", len(m)))
 	sm, err := smProto.LoadLatest(ctx, s.pool, int(e.Id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			sm = &racestatev1.PublishSpeedmapRequest{}
 		} else {
-			log.Error("error loading speedmap proto data",
+			s.log.Error("error loading speedmap proto data",
 				log.Uint32("eventId", e.Id),
 				log.ErrorField(err))
 			return nil, err
@@ -192,7 +192,7 @@ func (s *eventsServer) DeleteEvent(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	log.Debug("DeleteEvent called",
+	s.log.Debug("DeleteEvent called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var data *eventv1.Event
