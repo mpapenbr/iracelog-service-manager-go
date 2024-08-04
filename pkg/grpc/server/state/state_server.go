@@ -26,7 +26,11 @@ import (
 )
 
 func NewServer(opts ...Option) *stateServer {
-	ret := &stateServer{debugWire: false}
+	ret := &stateServer{
+		debugWire: false,
+		log:       log.Default().Named("grpc.state"),
+		wireLog:   log.Default().Named("grpc.state.wire"),
+	}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -61,10 +65,11 @@ func WithDebugWire(arg bool) Option {
 
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
-	pool   *pgxpool.Pool
-	pe     permission.PermissionEvaluator
-	lookup *utils.EventLookup
-
+	pool      *pgxpool.Pool
+	pe        permission.PermissionEvaluator
+	lookup    *utils.EventLookup
+	log       *log.Logger
+	wireLog   *log.Logger
 	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
 }
 
@@ -84,7 +89,7 @@ func (s *stateServer) PublishState(
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	if s.debugWire {
-		log.Debug("PublishState called",
+		s.wireLog.Debug("PublishState called",
 			log.String("event", epd.Event.Key),
 			log.Int("car entries", len(req.Msg.Cars)))
 	}
@@ -96,7 +101,7 @@ func (s *stateServer) PublishState(
 		}
 		return err
 	}); err != nil {
-		log.Error("error storing state", log.ErrorField(err))
+		s.log.Error("error storing state", log.ErrorField(err))
 	}
 	epd.Mutex.Lock()
 	epd.MarkDataEvent()
@@ -121,7 +126,7 @@ func (s *stateServer) PublishSpeedmap(
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	if s.debugWire {
-		log.Debug("PublishSpeedmap called",
+		s.wireLog.Debug("PublishSpeedmap called",
 			log.String("event", epd.Event.Key),
 			log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
 	}
@@ -129,7 +134,7 @@ func (s *stateServer) PublishSpeedmap(
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 		return speedmapprotorepos.Create(ctx, tx, epd.LastRsInfoId, req.Msg)
 	}); err != nil {
-		log.Error("error storing speedmap", log.ErrorField(err))
+		s.log.Error("error storing speedmap", log.ErrorField(err))
 	}
 
 	epd.Processor.ProcessSpeedmap(req.Msg)
@@ -153,26 +158,26 @@ func (s *stateServer) PublishDriverData(
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	if s.debugWire {
-		log.Debug("PublishDriverData called", log.String("event", epd.Event.Key))
+		s.wireLog.Debug("PublishDriverData called", log.String("event", epd.Event.Key))
 	}
 
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 		// Note: carrepos uses eventId, carprotorepos rsInfoId
 		if err := carrepos.Create(ctx, tx, int(epd.Event.Id), req.Msg); err != nil {
-			log.Error("error storing car data", log.ErrorField(err))
+			s.log.Error("error storing car data", log.ErrorField(err))
 		}
 		if epd.LastRsInfoId == 0 {
 			var rsErr error
 			epd.LastRsInfoId, rsErr = racestaterepos.CreateDummyRaceStateInfo(
 				ctx, tx, int(epd.Event.Id), req.Msg.Timestamp.AsTime())
 			if rsErr != nil {
-				log.Error("error creating dummy racestate info", log.ErrorField(rsErr))
+				s.log.Error("error creating dummy racestate info", log.ErrorField(rsErr))
 				return rsErr
 			}
 		}
 		return carprotorepos.Create(ctx, tx, epd.LastRsInfoId, req.Msg)
 	}); err != nil {
-		log.Error("error storing car state", log.ErrorField(err))
+		s.log.Error("error storing car state", log.ErrorField(err))
 	}
 
 	epd.Mutex.Lock()
@@ -198,13 +203,13 @@ func (s *stateServer) PublishEventExtraInfo(
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 	if s.debugWire {
-		log.Debug("PublishEventExtraInfo called", log.String("event", epd.Event.Key))
+		s.wireLog.Debug("PublishEventExtraInfo called", log.String("event", epd.Event.Key))
 	}
 
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 		return eventextrepos.Upsert(ctx, tx, int(epd.Event.Id), req.Msg.ExtraInfo)
 	}); err != nil {
-		log.Error("error storing event extra info", log.ErrorField(err))
+		s.log.Error("error storing event extra info", log.ErrorField(err))
 	}
 
 	return connect.NewResponse(&racestatev1.PublishEventExtraInfoResponse{}), nil

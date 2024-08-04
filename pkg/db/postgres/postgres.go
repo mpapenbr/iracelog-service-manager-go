@@ -16,16 +16,18 @@ var DbPool *pgxpool.Pool
 
 type PoolConfigOption func(cfg *pgxpool.Config)
 
-func WithTracer(logger *log.Logger, level log.Level) PoolConfigOption {
+func WithTracer(t pgx.QueryTracer) PoolConfigOption {
 	return func(cfg *pgxpool.Config) {
-		cfg.ConnConfig.Tracer = &myQueryTracer{log: logger, level: level}
+		cfg.ConnConfig.Tracer = t
 	}
 }
 
-func WithOtlpTracer() PoolConfigOption {
-	return func(cfg *pgxpool.Config) {
-		cfg.ConnConfig.Tracer = otelpgx.NewTracer()
-	}
+func NewOtlpTracer() pgx.QueryTracer {
+	return otelpgx.NewTracer()
+}
+
+func NewMyTracer(logger *log.Logger, level log.Level) pgx.QueryTracer {
+	return &myQueryTracer{log: logger, level: level}
 }
 
 func InitDB() *pgxpool.Pool {

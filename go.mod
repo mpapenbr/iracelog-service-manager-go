@@ -1,6 +1,6 @@
 module github.com/mpapenbr/iracelog-service-manager-go
 
-go 1.22
+go 1.22.0
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.16.2-20240623151922-fb549bddc8ee.1
@@ -81,6 +81,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
+	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
@@ -105,6 +106,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
+	moul.io/zapfilter v1.7.0 // indirect
 )
 
 require (

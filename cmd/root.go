@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	checkCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/check"
 	clientCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/client"
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
@@ -34,6 +36,25 @@ var rootCmd = &cobra.Command{
 	Short:   "Message processing backend for iRacelog",
 	Long:    ``,
 	Version: version.FullVersion,
+
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// util.SetupLogger(config.DefaultCliArgs())
+		// if _, err := log.InitLoggerManager(config.DefaultCliArgs()); err != nil {
+		// 	fmt.Fprintf(os.Stderr, "Error initializing logger: %v", err)
+		// 	os.Exit(1)
+		// }
+		logConfig := log.DefaultDevConfig()
+		if config.LogConfig != "" {
+			var err error
+			logConfig, err = log.LoadConfig(config.LogConfig)
+			if err != nil {
+				log.Fatal("could not load log config", log.ErrorField(err))
+			}
+		}
+		l := log.NewWithConfig(logConfig, config.LogLevel)
+		cmd.SetContext(log.AddToContext(context.Background(), l))
+		log.ResetDefault(l)
+	},
 
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
@@ -71,6 +92,10 @@ func init() {
 		"wait-for-services",
 		"15s",
 		"Duration to wait for other services to be ready")
+	rootCmd.PersistentFlags().StringVar(&config.LogConfig,
+		"log-config",
+		"",
+		"configuration file for logger")
 
 	// add commands here
 	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())

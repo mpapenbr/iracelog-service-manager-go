@@ -19,7 +19,10 @@ import (
 )
 
 func NewServer(opts ...Option) *liveDataServer {
-	ret := &liveDataServer{}
+	ret := &liveDataServer{
+		log:     log.Default().Named("grpc.live"),
+		wireLog: log.Default().Named("grpc.live.wire"),
+	}
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -44,6 +47,8 @@ type liveDataServer struct {
 	livedatav1connect.UnimplementedLiveDataServiceHandler
 
 	lookup    *utils.EventLookup
+	log       *log.Logger
+	wireLog   *log.Logger
 	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
 }
 
@@ -58,14 +63,14 @@ func (s *liveDataServer) LiveRaceState(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live race states",
+	s.log.Debug("Sending live race states",
 		log.String("event", epd.Event.Key),
 	)
 	dataChan := epd.RacestateBroadcast.Subscribe()
 
 	for d := range dataChan {
 		if s.debugWire {
-			log.Debug("Send racestate data",
+			s.wireLog.Debug("Send racestate data",
 				log.String("event", epd.Event.Key))
 		}
 		if err := stream.Send(&livedatav1.LiveRaceStateResponse{
@@ -82,7 +87,7 @@ func (s *liveDataServer) LiveRaceState(
 		}
 
 	}
-	log.Debug("LiveRaceState stream closed")
+	s.log.Debug("LiveRaceState stream closed")
 	return nil
 }
 
@@ -97,13 +102,13 @@ func (s *liveDataServer) LiveAnalysis(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live race states",
+	s.log.Debug("Sending live race states",
 		log.String("event", epd.Event.Key),
 	)
 	dataChan := epd.AnalysisBroadcast.Subscribe()
 	for a := range dataChan {
 		if s.debugWire {
-			log.Debug("Received racestate data",
+			s.wireLog.Debug("Received racestate data",
 				log.String("event", epd.Event.Key))
 		}
 		if err := stream.Send(&livedatav1.LiveAnalysisResponse{
@@ -114,7 +119,7 @@ func (s *liveDataServer) LiveAnalysis(
 			return err
 		}
 	}
-	log.Debug("LiveAnalysis stream closed")
+	s.log.Debug("LiveAnalysis stream closed")
 	return nil
 }
 
@@ -129,13 +134,13 @@ func (s *liveDataServer) LiveSpeedmap(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live speedmap data",
+	s.log.Debug("Sending live speedmap data",
 		log.String("event", epd.Event.Key),
 	)
 	dataChan := epd.SpeedmapBroadcast.Subscribe()
 	for a := range dataChan {
 		if s.debugWire {
-			log.Debug("Sending speedmap data",
+			s.wireLog.Debug("Sending speedmap data",
 				log.String("event", epd.Event.Key))
 		}
 		if err := stream.Send(&livedatav1.LiveSpeedmapResponse{
@@ -149,7 +154,7 @@ func (s *liveDataServer) LiveSpeedmap(
 			return err
 		}
 	}
-	log.Debug("LiveSpeedmap stream closed")
+	s.log.Debug("LiveSpeedmap stream closed")
 	return nil
 }
 
@@ -164,22 +169,22 @@ func (s *liveDataServer) LiveSnapshotData(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live snapshot data",
+	s.log.Debug("Sending live snapshot data",
 		log.String("event", epd.Event.Key),
 	)
 	if req.Msg.StartFrom == livedatav1.SnapshotStartMode_SNAPSHOT_START_MODE_BEGIN {
-		log.Debug("sending snapshots from beginning",
+		s.log.Debug("sending snapshots from beginning",
 			log.Int("snapshots", len(epd.SnapshotData)))
 		for _, a := range epd.SnapshotData {
 			if s.debugWire {
-				log.Debug("Sending snapshot data",
+				s.wireLog.Debug("Sending snapshot data",
 					log.String("event", epd.Event.Key))
 			}
 			if err := stream.Send(&livedatav1.LiveSnapshotDataResponse{
 				Timestamp:    timestamppb.Now(),
 				SnapshotData: proto.Clone(a).(*analysisv1.SnapshotData),
 			}); err != nil {
-				log.Warn("Error sending live snapshot (first)", log.ErrorField(err))
+				s.log.Warn("Error sending live snapshot (first)", log.ErrorField(err))
 				return err
 			}
 		}
@@ -188,7 +193,7 @@ func (s *liveDataServer) LiveSnapshotData(
 	dataChan := epd.SnapshotBroadcast.Subscribe()
 	for a := range dataChan {
 		if s.debugWire {
-			log.Debug("Sending snapshot data",
+			s.wireLog.Debug("Sending snapshot data",
 				log.String("event", epd.Event.Key))
 		}
 		if err := stream.Send(&livedatav1.LiveSnapshotDataResponse{
@@ -202,7 +207,7 @@ func (s *liveDataServer) LiveSnapshotData(
 			return err
 		}
 	}
-	log.Debug("LiveSnapshot stream closed")
+	s.log.Debug("LiveSnapshot stream closed")
 	return nil
 }
 
@@ -217,7 +222,7 @@ func (s *liveDataServer) LiveDriverData(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live driver data",
+	s.log.Debug("Sending live driver data",
 		log.String("event", epd.Event.Key),
 	)
 
@@ -234,14 +239,14 @@ func (s *liveDataServer) LiveDriverData(
 	}
 	if epd.LastDriverData != nil {
 		if err := stream.Send(composeResp(epd.LastDriverData)); err != nil {
-			log.Warn("Error sending live driver (first)", log.ErrorField(err))
+			s.log.Warn("Error sending live driver (first)", log.ErrorField(err))
 			return err
 		}
 	}
 	dataChan := epd.DriverDataBroadcast.Subscribe()
 	for a := range dataChan {
 		if s.debugWire {
-			log.Debug("Sending driver data",
+			s.wireLog.Debug("Sending driver data",
 				log.String("event", epd.Event.Key))
 		}
 		//nolint:errcheck // by design
@@ -254,7 +259,7 @@ func (s *liveDataServer) LiveDriverData(
 			return err
 		}
 	}
-	log.Debug("LiveDriverData stream closed")
+	s.log.Debug("LiveDriverData stream closed")
 	return nil
 }
 
@@ -269,13 +274,13 @@ func (s *liveDataServer) LiveCarOccupancies(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live carinfo data",
+	s.log.Debug("Sending live carinfo data",
 		log.String("event", epd.Event.Key),
 	)
 	dataChan := epd.AnalysisBroadcast.Subscribe()
 	for a := range dataChan {
 		if s.debugWire {
-			log.Debug("Sending carinfo data",
+			s.wireLog.Debug("Sending carinfo data",
 				log.String("event", epd.Event.Key))
 		}
 		//nolint:errcheck // by design
@@ -287,7 +292,7 @@ func (s *liveDataServer) LiveCarOccupancies(
 			return err
 		}
 	}
-	log.Debug("LiveCarInfo stream closed")
+	s.log.Debug("LiveCarInfo stream closed")
 	return nil
 }
 
@@ -302,7 +307,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	log.Debug("Sending live analysis data by selector",
+	s.log.Debug("Sending live analysis data by selector",
 		log.String("event", epd.Event.Key),
 	)
 	var snapshotsCopy []*analysisv1.SnapshotData
@@ -332,25 +337,26 @@ func (s *liveDataServer) LiveAnalysisSel(
 	}
 
 	if err := stream.Send(firstResp); err != nil {
-		log.Warn("Error sending live analysis data by selector (first)", log.ErrorField(err))
+		s.log.Warn("Error sending live analysis data by selector (first)",
+			log.ErrorField(err))
 		s.cancelSubscription(epd, dataChan)
 		return err
 	}
 	for a := range dataChan {
 		if s.debugWire {
-			log.Debug("Sending carinfo data",
+			s.wireLog.Debug("Sending carinfo data",
 				log.String("event", epd.Event.Key))
 		}
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*analysisv1.Analysis)
 		if err := stream.Send(
 			s.composeAnalysisResponse(work, req.Msg.Selector)); err != nil {
-			log.Warn("Error sending live analysis data by selector", log.ErrorField(err))
+			s.log.Warn("Error sending live analysis data by selector", log.ErrorField(err))
 			s.cancelSubscription(epd, dataChan)
 			return err
 		}
 	}
-	log.Debug("LiveAnalysisSel stream closed")
+	s.log.Debug("LiveAnalysisSel stream closed")
 	return nil
 }
 
