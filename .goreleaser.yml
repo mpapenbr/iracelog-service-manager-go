@@ -1,3 +1,4 @@
+version: 2
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 before:
@@ -6,6 +7,10 @@ before:
     - go mod tidy
     # you may remove this if you don't need go generate
     - go generate ./...
+
+# Whether to enable the size reporting or not.
+report_sizes: true
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -28,8 +33,9 @@ archives:
         format: zip
 
 dockers:
-  - image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
+  - id: backend-amd64
+    image_templates:
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-amd64"
 
     build_flag_templates:
       - "--pull"
@@ -37,15 +43,46 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://{{.ModulePath}}"
+      - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
+      - "--label=org.opencontainers.image.description=Backend for iRacelog"
+      - "--label=org.opencontainers.image.licenses=MIT license"
       - "--platform=linux/amd64"
 
     extra_files:
       - pkg/db/migrate/migrations
+    use: buildx
+    goarch: amd64
+
+  - id: backend-arm64
+    image_templates:
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-arm64"
+
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://{{.ModulePath}}"
+      - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
+      - "--label=org.opencontainers.image.description=Backend for iRacelog"
+      - "--label=org.opencontainers.image.licenses=MIT license"
+      - "--platform=linux/arm64"
+
+    extra_files:
+      - pkg/db/migrate/migrations
+    use: buildx
+    goarch: arm64
 
 docker_manifests:
   - name_template: "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
     image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-arm64"
+
+sboms:
+  - artifacts: archive
 
 checksum:
   name_template: "checksums.txt"
@@ -75,6 +112,7 @@ changelog:
       - go mod tidy
 
 release:
+  prerelease: auto
   footer: |
     ---
     _Released with [GoReleaser](https://goreleaser.com)!_
