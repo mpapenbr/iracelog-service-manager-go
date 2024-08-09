@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec // by design
@@ -40,10 +41,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
-var (
-	appConfig config.Config // holds processed config values
-	logger    *log.Logger
-)
+var appConfig config.Config // holds processed config values
 
 //nolint:funlen // by design
 func NewServerCmd() *cobra.Command {
@@ -55,7 +53,6 @@ func NewServerCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logger = log.GetFromContext(cmd.Context()).Named("grpc")
 			return startServer(cmd.Context())
 		},
 	}
@@ -63,8 +60,19 @@ func NewServerCmd() *cobra.Command {
 		"grpc-server-addr",
 		"a",
 		"localhost:8080",
-		"gRPC server listen address")
-
+		"gRPC server listen address (insecure)")
+	cmd.Flags().StringVar(&config.TLSServerAddr,
+		"tls-server-addr",
+		"localhost:8081",
+		"gRPC server listen address (TLS)")
+	cmd.Flags().StringVar(&config.TLSCertFile,
+		"tls-cert",
+		"",
+		"file containing the TLS certificate")
+	cmd.Flags().StringVar(&config.TLSKeyFile,
+		"tls-key",
+		"",
+		"file containing the TLS private key")
 	cmd.Flags().StringVar(&config.LogLevel,
 		"log-level",
 		"info",
@@ -206,9 +214,52 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerStateServer()
 }
 
+//nolint:funlen // by design
 func (s *grpcServer) Start() error {
 	setupGoRoutinesDump()
-	startServer := func() error {
+	ch := make(chan error, 2)
+	if config.TLSCertFile != "" && config.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(config.TLSCertFile, config.TLSKeyFile)
+		if err != nil {
+			s.log.Error("could not load TLS key pair", log.ErrorField(err))
+		}
+		//nolint:gocritic // keep it as sample
+		// caCert, err := os.ReadFile(config.TLSCertFile)
+		// if err != nil {
+		// 	s.log.Error("could not read TLS cert file", log.ErrorField(err))
+		// }
+		// caCertPool := x509.NewCertPool()
+		// if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		// 	s.log.Error("could not append cert to pool")
+		// }
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS13,
+			// keep it as sample
+			// ClientCAs:    caCertPool,
+			// ClientAuth: tls.NoClientCert,
+		}
+
+		startServerTLS := func() {
+			s.log.Info("Starting TLS gRPC server", log.String("addr", config.TLSServerAddr))
+			//nolint:gosec // by design
+			server := &http.Server{
+				Addr:      config.TLSServerAddr,
+				TLSConfig: tlsConfig,
+				Handler: h2c.NewHandler(newCORS().Handler(s.mux), &http2.Server{
+					MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
+				}),
+			}
+
+			// don't need to pass cert and key here, already done by TLSConfig above
+			err := server.ListenAndServeTLS("", "")
+			s.log.Error("TLS Server not started", log.ErrorField(err))
+			ch <- err
+		}
+		go startServerTLS()
+	}
+
+	startServer := func() {
 		s.log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
 		//nolint:gosec // by design
 		server := &http.Server{
@@ -217,28 +268,25 @@ func (s *grpcServer) Start() error {
 				MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
 			}),
 		}
-		return server.ListenAndServe()
+
+		err := server.ListenAndServe()
+		s.log.Error("Server not started", log.ErrorField(err))
+		ch <- err
 	}
-	if err := startServer(); err != nil {
-		s.log.Error("server could not be started", log.ErrorField(err))
-		return err
-	}
-	s.log.Info("Server started")
+	go startServer()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
-	v := <-sigChan
-	logger.Debug("Got signal ", log.Any("signal", v))
+
+	select {
+	case v := <-sigChan:
+		s.log.Debug("Got signal", log.Any("signal", v))
+	case err := <-ch:
+		s.log.Debug("Server terminated", log.ErrorField(err))
+	}
 	if s.telemetry != nil {
 		s.telemetry.Shutdown()
 	}
-
-	//nolint:all // keeping by design
-	// select {
-	// case <-sigChan:
-	// 	log.Logger.Debug("Got signal")
-	// 	pm.Shutdown()
-	// }
 
 	s.log.Info("Server terminated")
 	return nil

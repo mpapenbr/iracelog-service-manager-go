@@ -18,7 +18,10 @@ var (
 	TelemetryEndpoint    string // endpoint for telemetry
 	ProfilingPort        int    // port for profiling
 	PrintMessage         bool   // if true, the message payload will be print on debug level
-	GrpcServerAddr       string // listen addr for gRPC server
+	GrpcServerAddr       string // listen addr for gRPC server (insecure)
+	TLSServerAddr        string // listen addr for gRPC server (tls)
+	TLSCertFile          string // path to TLS certificate
+	TLSKeyFile           string // path to TLS key
 	ProviderToken        string // token for data provider access
 	AdminToken           string // token for admin access
 	StaleDuration        string // duration after which an event is considered stale
