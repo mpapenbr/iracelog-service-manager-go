@@ -8,11 +8,11 @@
 [![Semantic Versioning](https://img.shields.io/badge/versioning-semantic-black?style=for-the-badge&logo=semver)][github-releases]
 [![Pre-Commit Enabled](https://img.shields.io/badge/Pre--Commit-Enabled-blue?style=for-the-badge&logo=pre-commit)][precommit-config]
 [![License](https://img.shields.io/github/license/mpapenbr/iracelog-service-manager-go?color=red&style=for-the-badge)][project-license]
-[![Go v1.20](https://img.shields.io/badge/Go-%20v1.20-black?style=for-the-badge&logo=go)][gomod-file]
+[![Go v1.22](https://img.shields.io/badge/Go-%20v1.22-black?style=for-the-badge&logo=go)][gomod-file]
 
-This repository contains the service backend for processing WAMP messages of the iRacelog project.
+This repository contains the service backend for processing gRPC messages of the iRacelog project.
 
-This project ~~is~~ will be the replacement of Python implementation of [iracelog-service-manager] in the [iRacelog project][iracelog-documentation-link]
+This project is the replacement of Python implementation of [iracelog-service-manager] in the [iRacelog project][iracelog-documentation-link]
 
 </div>
 
@@ -183,6 +183,16 @@ and [all tests](#running-tests) one after the other!
 
 ## Additional Resources
 
+## TLS management
+In general the app is designed to run behind a proxy. The proxy takes care about the TLS termination. In the productive environment this is done by [Traefik] using [Let's encrypt][letsencrypt] certificates.
+
+There is another entry point available bypassing the proxy. This entry point is dedicated for the racelogger and uses self signed certificates. Here is sample on how to create them.
+
+```
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1  -keyout key.pem -out cert.pem  -nodes -subj "/CN=localhost/O=iRacelog" -addext "subjectAltName=DNS:localhost" -days 365
+```
+**Note:** You have to adjust the `localhost` value to the destination host when generating the cert. The file `cert.pem` has to be configured at the racelogger as well.
+
 ### Makefile help
 
 <details>
@@ -305,7 +315,7 @@ Labels allowed;
 -   `minor`, `enhancement`, `update`, `feature`: Affects the `<minor>` version number for semantic versioning
 -   all other labels affect the `<patch>` version number
 
-Whenever a pull request with one of these labels is merged to the `master` branch,
+Whenever a pull request with one of these labels is merged to the `main` branch,
 the corresponding version number will be bumped by one digit!
 
 ### List of Labels
@@ -374,3 +384,5 @@ The remaining labels can be created as needed!
 [iracelog-documentation-link]: https://github.com/mpapenbr/iracelog-documentation
 [zap-package-log]: https://www.sobyte.net/post/2022-03/uber-zap-advanced-usage/
 [go-logging]: https://betterstack.com/community/guides/logging/logging-in-go/
+[traefik]: https://traefik.io
+[letsencrypt]: https://letsencrypt.org/
