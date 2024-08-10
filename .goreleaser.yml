@@ -51,6 +51,7 @@ dockers:
 
     extra_files:
       - pkg/db/migrate/migrations
+      - samples
     use: buildx
     goarch: amd64
 
@@ -72,6 +73,7 @@ dockers:
 
     extra_files:
       - pkg/db/migrate/migrations
+      - samples
     use: buildx
     goarch: arm64
 

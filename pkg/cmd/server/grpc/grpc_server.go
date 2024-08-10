@@ -40,6 +40,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/certs/traefik"
+	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
 
 var appConfig config.Config // holds processed config values
@@ -148,6 +149,7 @@ func startServer(ctx context.Context) error {
 	}
 	srv.SetupLogger()
 	srv.waitForRequiredServices()
+	srv.log.Info("Starting iRaclog backend", log.String("version", version.FullVersion))
 	srv.SetupProfiling()
 	srv.SetupTelemetry()
 	srv.SetupDb()
