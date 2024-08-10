@@ -1,0 +1,7 @@
+log-config: logger-prod.yml
+log-level: info
+migrationSourceUrl: file:///workspaces/iracelog-service-manager-go/pkg/db/migrate/migrations
+enable-telemetry: true
+telemetry-endpoint: localhost:4317
+grpc-server-addr: 0.0.0.0:8080
+max-concurrent-streams: 1000
