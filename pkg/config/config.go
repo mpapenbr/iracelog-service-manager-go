@@ -22,6 +22,8 @@ var (
 	TLSServerAddr        string // listen addr for gRPC server (tls)
 	TLSCertFile          string // path to TLS certificate
 	TLSKeyFile           string // path to TLS key
+	TraefikCerts         string // path to traefik certs file
+	TraefikCertDomain    string // the domain to lookup within the traefik certs
 	ProviderToken        string // token for data provider access
 	AdminToken           string // token for admin access
 	StaleDuration        string // duration after which an event is considered stale
