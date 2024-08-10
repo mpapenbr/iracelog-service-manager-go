@@ -13,6 +13,8 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
+	github.com/ohler55/ojg v1.24.0
+	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
@@ -36,6 +38,7 @@ require (
 	golang.org/x/net v0.27.0
 	google.golang.org/protobuf v1.34.2
 	gotest.tools/v3 v3.5.1
+	moul.io/zapfilter v1.7.0
 )
 
 require (
@@ -81,7 +84,6 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
-	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
@@ -106,7 +108,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
-	moul.io/zapfilter v1.7.0 // indirect
 )
 
 require (
@@ -130,5 +131,5 @@ require (
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )

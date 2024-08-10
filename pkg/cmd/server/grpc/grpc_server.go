@@ -39,6 +39,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/certs/traefik"
 )
 
 var appConfig config.Config // holds processed config values
@@ -73,6 +74,15 @@ func NewServerCmd() *cobra.Command {
 		"tls-key",
 		"",
 		"file containing the TLS private key")
+	cmd.Flags().StringVar(&config.TraefikCertDomain,
+		"traefik-cert-domain",
+		"",
+		"look fo this domain in the traefik certs")
+	cmd.Flags().StringVar(&config.TraefikCerts,
+		"traefik-certs",
+		"",
+		"file containing the certs managed by traefik")
+
 	cmd.Flags().StringVar(&config.LogLevel,
 		"log-level",
 		"info",
@@ -128,6 +138,7 @@ type grpcServer struct {
 	telemetry   *config.Telemetry
 	otel        *otelconnect.Interceptor
 	eventLookup *utils.EventLookup
+	cert        *tls.Certificate
 }
 
 //nolint:funlen,cyclop // by design
@@ -141,6 +152,7 @@ func startServer(ctx context.Context) error {
 	srv.SetupTelemetry()
 	srv.SetupDb()
 	srv.SetupGrpcServices()
+	srv.SetupTLS()
 	return srv.Start()
 }
 
@@ -214,15 +226,38 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerStateServer()
 }
 
+func (s *grpcServer) SetupTLS() {
+	if config.TraefikCerts != "" && config.TraefikCertDomain != "" {
+		s.log.Info("Looking up traefik certs",
+			log.String("file", config.TraefikCerts),
+			log.String("domain", config.TraefikCertDomain))
+		cert, err := traefik.GetCertFromTraefik(
+			config.TraefikCerts,
+			config.TraefikCertDomain)
+		if err != nil {
+			s.log.Error("could not load traefik certs", log.ErrorField(err))
+			return
+		}
+		s.cert = &cert
+	}
+	if config.TLSCertFile != "" && config.TLSKeyFile != "" {
+		s.log.Info("Loading cert",
+			log.String("key", config.TLSKeyFile),
+			log.String("cert", config.TLSCertFile))
+		cert, err := tls.LoadX509KeyPair(config.TLSCertFile, config.TLSKeyFile)
+		if err != nil {
+			s.log.Error("could not load TLS key pair", log.ErrorField(err))
+			return
+		}
+		s.cert = &cert
+	}
+}
+
 //nolint:funlen // by design
 func (s *grpcServer) Start() error {
 	setupGoRoutinesDump()
 	ch := make(chan error, 2)
-	if config.TLSCertFile != "" && config.TLSKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(config.TLSCertFile, config.TLSKeyFile)
-		if err != nil {
-			s.log.Error("could not load TLS key pair", log.ErrorField(err))
-		}
+	if s.cert != nil {
 		//nolint:gocritic // keep it as sample
 		// caCert, err := os.ReadFile(config.TLSCertFile)
 		// if err != nil {
@@ -233,7 +268,7 @@ func (s *grpcServer) Start() error {
 		// 	s.log.Error("could not append cert to pool")
 		// }
 		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
+			Certificates: []tls.Certificate{*s.cert},
 			MinVersion:   tls.VersionTLS13,
 			// keep it as sample
 			// ClientCAs:    caCertPool,
