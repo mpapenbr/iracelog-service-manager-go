@@ -17,9 +17,10 @@ __debug_bin*
 # Ignore config files from project root, keeping sample config files
 /configs**
 !/configs.**.sample
-# Ignore private dotfiles
+# Ignore private files
 .gitconfig.local*
 .npmrc
 .ism.yml
 .env
 *.pem
+certs/

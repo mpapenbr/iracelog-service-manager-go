@@ -184,14 +184,26 @@ and [all tests](#running-tests) one after the other!
 ## Additional Resources
 
 ## TLS management
+
 In general the app is designed to run behind a proxy. The proxy takes care about the TLS termination. In the productive environment this is done by [Traefik] using [Let's encrypt][letsencrypt] certificates.
 
-There is another entry point available bypassing the proxy. This entry point is dedicated for the racelogger and uses self signed certificates. Here is sample on how to create them.
+There is another entry point available bypassing the proxy. This entry point is dedicated for the racelogger and can be used with self signed certificates or by using the [Let's encrypt][letsencrypt] certs.
 
-```
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1  -keyout key.pem -out cert.pem  -nodes -subj "/CN=localhost/O=iRacelog" -addext "subjectAltName=DNS:localhost" -days 365
-```
-**Note:** You have to adjust the `localhost` value to the destination host when generating the cert. The file `cert.pem` has to be configured at the racelogger as well.
+| Param                   | Description                                | Usage                 |
+| ----------------------- | ------------------------------------------ | --------------------- |
+| `--tls-server-addr`     | gRPC server listen address (TLS)           | Traefik + Self-signed |
+| `--tls-ca`              | file containing the root certificate       | Self-signed           |
+| `--tls-key`             | file containing the server key             | Self-signed           |
+| `--tls-cert`            | file containing the server cert            | Self-signed           |
+| `--traefik-certs`       | file containing LE-cert managed by Traefik | Traefik               |
+| `--traefik-cert-domain` | the domain containing the cert             | Traefik               |
+
+### Self signed
+
+The [createCerts.sh](./createCerts.sh) script shows an example for creating the required files for both server and client certs to be used for `localhost`.
+The generated `rootCA.pem` needs to configured on both sides, server and client.
+
+**Note:** You have to adjust the `localhost` value to the destination host when generating the cert.
 
 ### Makefile help
 
