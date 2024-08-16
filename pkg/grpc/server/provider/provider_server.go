@@ -75,7 +75,7 @@ func (s *providerServer) ListLiveEvents(
 	return connect.NewResponse(&providerv1.ListLiveEventsResponse{Events: ec}), nil
 }
 
-//nolint:whitespace // can't make both editor and linter happy
+//nolint:whitespace,funlen // can't make both editor and linter happy
 func (s *providerServer) RegisterEvent(
 	ctx context.Context,
 	req *connect.Request[providerv1.RegisterEventRequest],
@@ -102,7 +102,7 @@ func (s *providerServer) RegisterEvent(
 		ctx,
 		req.Msg.RecordingMode,
 		func(ctx context.Context, tx pgx.Tx) error {
-			if err := trackrepos.EndsureTrack(ctx, tx, req.Msg.Track); err != nil {
+			if err := trackrepos.EnsureTrack(ctx, tx, req.Msg.Track); err != nil {
 				return err
 			}
 			return eventrepos.Create(ctx, tx, req.Msg.Event)
@@ -120,7 +120,10 @@ func (s *providerServer) RegisterEvent(
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
 	s.log.Debug("event registered")
-	return connect.NewResponse(&providerv1.RegisterEventResponse{Event: req.Msg.Event}),
+	return connect.NewResponse(&providerv1.RegisterEventResponse{
+			Event: req.Msg.Event,
+			Track: dbTrack,
+		}),
 		nil
 }
 

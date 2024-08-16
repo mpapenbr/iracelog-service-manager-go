@@ -8,6 +8,7 @@ import (
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
+	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,6 +22,7 @@ import (
 	eventextrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event/ext"
 	racestaterepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -207,12 +209,48 @@ func (s *stateServer) PublishEventExtraInfo(
 	}
 
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
+		s.handlePitInfoUpdate(ctx, tx, int(epd.Event.TrackId), req.Msg.ExtraInfo.PitInfo)
+
 		return eventextrepos.Upsert(ctx, tx, int(epd.Event.Id), req.Msg.ExtraInfo)
 	}); err != nil {
 		s.log.Error("error storing event extra info", log.ErrorField(err))
 	}
 
 	return connect.NewResponse(&racestatev1.PublishEventExtraInfoResponse{}), nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *stateServer) handlePitInfoUpdate(
+	ctx context.Context,
+	tx pgx.Tx,
+	trackId int,
+	pitInfo *trackv1.PitInfo,
+) {
+	if pitInfo == nil {
+		return
+	}
+	if pitInfo.Entry == 0 && pitInfo.Exit == 0 && pitInfo.LaneLength == 0 {
+		return
+	}
+	//nolint:nestif // by design
+	if t, err := trackrepos.LoadById(ctx, tx, trackId); err != nil {
+		s.log.Error("error loading track", log.ErrorField(err))
+		return
+	} else {
+		if t.PitInfo == nil {
+			t.PitInfo = &trackv1.PitInfo{}
+		} else if t.PitInfo.LaneLength != 0 {
+			// pit info already set, do not overwrite
+			return
+		}
+		t.PitInfo.Entry = pitInfo.Entry
+		t.PitInfo.Exit = pitInfo.Exit
+		t.PitInfo.LaneLength = pitInfo.LaneLength
+		_, err := trackrepos.UpdatePitInfo(ctx, tx, trackId, t.PitInfo)
+		if err != nil {
+			s.log.Error("error updating pit info", log.ErrorField(err))
+		}
+	}
 }
 
 //nolint:whitespace,dupl // false positive
