@@ -64,7 +64,7 @@ func LoadById(ctx context.Context, conn repository.Querier, id int) (
 }
 
 //nolint:whitespace //can't make both the linter and editor happy :(
-func EndsureTrack(
+func EnsureTrack(
 	ctx context.Context,
 	conn repository.Querier,
 	track *trackv1.Track,
