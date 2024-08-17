@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.16.2-20240815092744-9ff8c9a4483a.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.34.2-20240815092744-9ff8c9a4483a.2
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.34.2-20240817085957-be9b2dbb1f75.2
 	connectrpc.com/connect v1.16.2
 	connectrpc.com/otelconnect v0.7.1
 	github.com/docker/go-connections v0.5.0
@@ -111,7 +111,7 @@ require (
 )
 
 require (
-	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gammazero/nexus/v3 v3.2.2
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
