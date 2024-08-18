@@ -17,10 +17,7 @@ func NewTransferCmd() *cobra.Command {
 		Use:   "transfer",
 		Short: "commands to transfer data to new database",
 	}
-	cmd.PersistentFlags().StringVar(&logLevel,
-		"log-level",
-		"info",
-		"controls the log level (debug, info, warn, error, fatal)")
+
 	cmd.PersistentFlags().StringVar(&sourceDbUrl,
 		"source-db-url",
 		"postgresql://DB_USERNAME:DB_USER_PASSWORD@DB_HOST:5432/iracelog",

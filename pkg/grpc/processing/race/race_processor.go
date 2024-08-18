@@ -24,6 +24,7 @@ type RaceProcessor struct {
 
 	raceSession          uint32
 	raceStartMarkerFound bool
+	timeInfos            map[string]*racestatev1.TimeInfo // key carNum
 }
 
 type RaceProcessorOption func(rp *RaceProcessor)
@@ -47,6 +48,7 @@ func NewRaceProcessor(opts ...RaceProcessorOption) *RaceProcessor {
 		CarLaps:              make(map[string]*analysisv1.CarLaps),
 		ReplayInfo:           eventv1.ReplayInfo{},
 		raceStartMarkerFound: false,
+		timeInfos:            make(map[string]*racestatev1.TimeInfo),
 	}
 	for _, opt := range opts {
 		opt(ret)
@@ -240,20 +242,44 @@ func (p *RaceProcessor) processCarLaps(payload *racestatev1.PublishStateRequest)
 				Laps:   make([]*analysisv1.Lap, 0),
 			}
 		}
+		if carMsgEntry.TimeInfo != nil {
+			p.timeInfos[carNum] = carMsgEntry.TimeInfo
+		}
 		if idx := slices.IndexFunc(carEntry.Laps,
 			func(item *analysisv1.Lap) bool { return item.LapNo == lap }); idx != -1 {
 			// lap may be updated, so add replace it
 			carEntry.Laps[idx] = &analysisv1.Lap{
 				LapNo:   lap,
 				LapTime: laptime.Time,
+				LapInfo: carEntry.Laps[idx].LapInfo,
 			}
 		} else {
+			lapInfo := p.getLapInfo(carMsgEntry)
 			carEntry.Laps = append(carEntry.Laps, &analysisv1.Lap{
 				LapNo:   lap,
 				LapTime: laptime.Time,
+				LapInfo: lapInfo,
 			})
 		}
 		p.CarLaps[carNum] = carEntry
+	}
+}
+
+func (p *RaceProcessor) getLapInfo(carMsgEntry *racestatev1.Car) *analysisv1.LapInfo {
+	carNum := p.carProcessor.NumByIdx[uint32(carMsgEntry.CarIdx)]
+	ti, ok := p.timeInfos[carNum]
+	if !ok {
+		return nil
+	}
+	if ti.LapNo != carMsgEntry.Lc {
+		return nil
+	}
+	// delete entry from map
+	delete(p.timeInfos, carNum)
+
+	return &analysisv1.LapInfo{
+		Mode: ti.LapMode,
+		Time: ti.Time,
 	}
 }
 

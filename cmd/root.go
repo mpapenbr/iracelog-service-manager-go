@@ -96,6 +96,10 @@ func init() {
 		"log-config",
 		"",
 		"configuration file for logger")
+	rootCmd.PersistentFlags().StringVar(&config.LogLevel,
+		"log-level",
+		"info",
+		"controls the log level (debug, info, warn, error, fatal)")
 
 	// add commands here
 	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())

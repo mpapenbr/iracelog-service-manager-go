@@ -16,6 +16,7 @@ zap:
 filters:
   - "info:sql"
   - "*:grpc*"
+  - "*:check"
   # - "info+:*"
   # - "*:stress.worker.*"
   # - "*:summary"

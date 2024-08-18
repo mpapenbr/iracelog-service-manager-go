@@ -87,18 +87,6 @@ func NewServerCmd() *cobra.Command {
 		"",
 		"file containing the certs managed by traefik")
 
-	cmd.Flags().StringVar(&config.LogLevel,
-		"log-level",
-		"info",
-		"controls the log level (debug, info, warn, error, fatal)")
-	cmd.Flags().StringVar(&config.SQLLogLevel,
-		"sql-log-level",
-		"debug",
-		"controls the log level for sql methods")
-	cmd.Flags().StringVar(&config.LogFormat,
-		"log-format",
-		"json",
-		"controls the log output format")
 	cmd.Flags().BoolVar(&config.EnableTelemetry,
 		"enable-telemetry",
 		false,
