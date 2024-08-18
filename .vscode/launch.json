@@ -85,6 +85,23 @@
       ]
     },
     {
+      "name": "check inout",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "inout",
+        "23",
+        "--log-level",
+        "debug",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_grpc"
+      ]
+    },
+    {
       "name": "Wamp-Server",
       "type": "go",
       "request": "launch",

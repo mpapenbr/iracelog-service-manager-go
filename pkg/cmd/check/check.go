@@ -11,14 +11,12 @@ func NewCheckCmd() *cobra.Command {
 		Use:   "check",
 		Short: "commands to check",
 	}
-	cmd.PersistentFlags().StringVar(&logLevel,
-		"log-level",
-		"info",
-		"controls the log level (debug, info, warn, error, fatal)")
 
 	cmd.AddCommand(NewCheckConvertCmd())
 	cmd.AddCommand(NewCheckDataFetcherCmd())
 	cmd.AddCommand(NewCheckSnapshotsCmd())
+	cmd.AddCommand(NewCheckStateInoutlapCmd())
+	cmd.AddCommand(NewDisplayLapsCmd())
 	return cmd
 }
 

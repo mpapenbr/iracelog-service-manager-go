@@ -13,10 +13,6 @@ func NewReplayCmd() *cobra.Command {
 		Use:   "replay",
 		Short: "commands to replay an event from database",
 	}
-	cmd.PersistentFlags().StringVar(&util.LogLevel,
-		"log-level",
-		"info",
-		"controls the log level (debug, info, warn, error, fatal)")
 
 	cmd.PersistentFlags().IntVar(&util.Speed, "speed", 1,
 		"Recording speed (0 means: go as fast as possible)")
