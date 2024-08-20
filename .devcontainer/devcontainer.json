@@ -1,11 +1,10 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.231.2/containers/go
+// See base idea https://github.com/devcontainers + https://github.com/devcontainers/features/
+// In short: use the base image and add the features we need
 {
   "name": "Go",
 
-  "image": "mcr.microsoft.com/devcontainers/go:1.22",
-  // alternative: use the bullseye image
-  // "image": "mcr.microsoft.com/devcontainers/go:1.20-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+
   "runArgs": [
     "--cap-add=SYS_PTRACE",
     "--security-opt",
@@ -57,6 +56,9 @@
   // Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
   "remoteUser": "vscode",
   "features": {
+    "ghcr.io/devcontainers/features/go": {
+      "version": "1.23"
+    },
     "ghcr.io/devcontainers/features/docker-in-docker": "latest",
     "ghcr.io/devcontainers-contrib/features/pre-commit": "latest"
   }
