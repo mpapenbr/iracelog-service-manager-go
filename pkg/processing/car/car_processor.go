@@ -2,8 +2,7 @@ package car
 
 import (
 	"fmt"
-
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/processing/util"

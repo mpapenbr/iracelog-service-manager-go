@@ -13,8 +13,6 @@
       "envFile": "${workspaceFolder}/.env",
       "args": [
         "grpc",
-        "--log-format",
-        "text",
         "--log-level",
         "debug",
         "--enable-telemetry",

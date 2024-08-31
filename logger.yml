@@ -13,10 +13,5 @@ zap:
     timeEncoder:
       layout: "15:04:05.000"
     durationEncoder: "string"
-filters:
-  - "info:sql"
-  - "*:grpc*"
-  - "*:check"
-  # - "info+:*"
-  # - "*:stress.worker.*"
-  # - "*:summary"
+loggers:
+  sql: info
