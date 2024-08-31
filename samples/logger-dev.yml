@@ -13,6 +13,5 @@ zap:
     timeEncoder:
       layout: "15:04:05.000"
     durationEncoder: "string"
-filters:
-  - "info:sql"
-  - "*:grpc*"
+loggers:
+  sql: info

@@ -12,6 +12,3 @@ zap:
     timeEncoder:
       layout: "2006-02-01 15:04:05.000Z0700"
     durationEncoder: "string"
-filters:
-  - "info:sql"
-  - "*:grpc*"
