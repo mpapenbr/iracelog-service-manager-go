@@ -35,8 +35,6 @@ func NewCheckConvertCmd() *cobra.Command {
 	return cmd
 }
 
-var startTS float64
-
 func checkConvert(eventArg string) {
 	logger := log.DevLogger(
 		os.Stderr,

@@ -47,6 +47,25 @@
       ]
     },
     {
+      "name": "check predict",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "predict",
+        "4",
+        "--session-time",
+        "95m",
+        "--car-num",
+        "20",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_aer"
+      ]
+    },
+    {
       "name": "check convert",
       "type": "go",
       "request": "launch",
