@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"time"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/racestints"
 	"github.com/samber/lo"
 )
 
@@ -45,11 +47,26 @@ func NewPrediction(
 		l:        log.Default().Named("predict"),
 	}
 	pd.init()
+	pd.calcWithLatest()
 	return &Prediction{}
 }
 
 func (dd *driveData) getStintStats() []*stintStats {
 	return dd.stints
+}
+
+func (pd *predictData) calcWithLatest() {
+	simpleCalc := racestints.NewSimpleStintCalc(&racestints.SimpleCalcParams{
+		RaceDur: time.Duration(pd.curState.Session.TimeRemain * float32(time.Second)),
+		Lps:     pd.myData.stints[len(pd.myData.stints)-1].numLaps,
+		PitTime: time.Duration(pd.myData.pits[len(pd.myData.pits)-1].timeUsed * float32(time.Second)),
+		AvgLap:  time.Duration(pd.myData.stints[len(pd.myData.stints)-1].rAvg * float32(time.Second)),
+	})
+	res, _ := simpleCalc.Calc()
+
+	for i, p := range res.Parts {
+		pd.l.Info("part", log.Int("i", i), log.String("output", p.Output()))
+	}
 }
 
 func (pd *predictData) init() error {
