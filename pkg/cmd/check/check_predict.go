@@ -6,6 +6,7 @@ import (
 	"time"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/predict"
 	aRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
 	carRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
+	eventRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	rsRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -54,6 +56,7 @@ type predictData struct {
 	l           *log.Logger
 	analyis     *analysisv1.Analysis
 	carInfo     *racestatev1.PublishDriverDataRequest
+	event       *eventv1.Event
 	stintLaps   int
 	stintAvg    float32
 }
@@ -61,6 +64,11 @@ type predictData struct {
 func (pd *predictData) loadData(eventId int) error {
 	var err error
 	ctx := context.Background()
+	if pd.event, err = eventRepo.LoadById(ctx, pd.pool, eventId); err != nil {
+		pd.l.Error("error loading event data", log.ErrorField(err))
+		return err
+	}
+
 	if pd.analyis, err = aRepo.LoadByEventId(ctx, pd.pool, eventId); err != nil {
 		pd.l.Error("error loading analysis data", log.ErrorField(err))
 		return err
@@ -80,10 +88,26 @@ func (pd *predictData) loadData(eventId int) error {
 		pd.l.Error("error loading state", log.ErrorField(err))
 		return err
 	}
-	pred := predict.NewPrediction(pd.analyis, pd.carInfo, states[0], pd.carNum)
+	pd.debug()
+	pred := predict.NewPrediction(pd.analyis, pd.carInfo, states[0], pd.event, pd.carNum)
 	pd.l.Info("predicting", log.Any("data", pred))
 
 	return nil
+}
+
+func (pd *predictData) debug() {
+	if states, _, err := rsRepo.LoadRangeBySessionTime(
+		context.Background(),
+		pd.pool,
+		int(pd.event.Id),
+		float64(pd.event.ReplayInfo.MinSessionTime)-5,
+		10); err != nil || len(states) == 0 {
+		pd.l.Error("error loading state", log.ErrorField(err))
+	} else {
+		for _, s := range states {
+			pd.l.Debug("state", log.Any("session", s.Session))
+		}
+	}
 }
 
 func (pd *predictData) analyze() {
