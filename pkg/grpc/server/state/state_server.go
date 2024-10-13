@@ -267,6 +267,7 @@ func (s *stateServer) GetDriverData(
 	}
 	var requests []*racestatev1.PublishDriverDataRequest
 	var lastTs time.Time
+	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
 	requests, lastTs, err = carprotorepos.LoadRange(
 		ctx,
 		s.pool,
@@ -296,6 +297,7 @@ func (s *stateServer) GetStates(
 	}
 	var requests []*racestatev1.PublishStateRequest
 	var lastTs time.Time
+	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
 	requests, lastTs, err = racestaterepos.LoadRange(
 		ctx,
 		s.pool,
@@ -325,6 +327,7 @@ func (s *stateServer) GetSpeedmaps(
 	}
 	var requests []*racestatev1.PublishSpeedmapRequest
 	var lastTs time.Time
+	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
 	requests, lastTs, err = speedmapprotorepos.LoadRange(
 		ctx,
 		s.pool,

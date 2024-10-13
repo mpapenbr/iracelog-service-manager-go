@@ -17,10 +17,13 @@ func NewCheckCmd() *cobra.Command {
 	cmd.AddCommand(NewCheckSnapshotsCmd())
 	cmd.AddCommand(NewCheckStateInoutlapCmd())
 	cmd.AddCommand(NewDisplayLapsCmd())
+	cmd.AddCommand(NewPredictCmd())
 	return cmd
 }
 
 var logLevel string
+
+var startTS float64
 
 func parseLogLevel(l string, defaultVal log.Level) log.Level {
 	level, err := log.ParseLevel(l)
