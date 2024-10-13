@@ -22,7 +22,7 @@ type RaceProcessor struct {
 	// internal
 	carProcessor *car.CarProcessor
 
-	raceSession          uint32
+	raceSessions         []uint32
 	raceStartMarkerFound bool
 	timeInfos            map[string]*racestatev1.TimeInfo // key carNum
 }
@@ -35,9 +35,9 @@ func WithCarProcessor(cp *car.CarProcessor) RaceProcessorOption {
 	}
 }
 
-func WithRaceSession(raceSession uint32) RaceProcessorOption {
+func WithRaceSessions(raceSessions []uint32) RaceProcessorOption {
 	return func(rp *RaceProcessor) {
-		rp.raceSession = raceSession
+		rp.raceSessions = raceSessions
 	}
 }
 
@@ -89,7 +89,7 @@ func (p *RaceProcessor) processReplayInfo(
 	payload *racestatev1.PublishStateRequest,
 	sessionTime float32,
 ) {
-	if payload.Session.SessionNum != p.raceSession {
+	if !slices.Contains(p.raceSessions, payload.Session.SessionNum) {
 		return
 	}
 

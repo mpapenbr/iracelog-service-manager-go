@@ -103,7 +103,7 @@ func (e *EventLookup) AddEvent(
 	cp := car.NewCarProcessor()
 	rp := race.NewRaceProcessor(
 		race.WithCarProcessor(cp),
-		race.WithRaceSession(findRaceSession(event)),
+		race.WithRaceSessions(collectRaceSessions(event)),
 	)
 	epd := &EventProcessingData{
 		Event:         event,
@@ -140,13 +140,14 @@ func (epd *EventProcessingData) MarkDataEvent() {
 	epd.LastDataEvent = time.Now()
 }
 
-func findRaceSession(e *eventv1.Event) uint32 {
+func collectRaceSessions(e *eventv1.Event) []uint32 {
+	ret := make([]uint32, 0)
 	for _, s := range e.Sessions {
-		if s.Name == "RACE" {
-			return s.Num
+		if s.Type == commonv1.SessionType_SESSION_TYPE_RACE {
+			ret = append(ret, s.Num)
 		}
 	}
-	return 0
+	return ret
 }
 
 func (epd *EventProcessingData) setupOwnListeners() {
