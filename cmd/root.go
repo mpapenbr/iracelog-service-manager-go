@@ -136,9 +136,20 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	bindFlags(rootCmd, viper.GetViper())
-	for _, cmd := range rootCmd.Commands() {
+	// we want all commands to be processed by the bindFlags function
+	// even those N levels deep
+	cmds := []*cobra.Command{}
+	collectCommands(rootCmd, &cmds)
+
+	for _, cmd := range cmds {
 		bindFlags(cmd, viper.GetViper())
+	}
+}
+
+func collectCommands(cmd *cobra.Command, commands *[]*cobra.Command) {
+	*commands = append(*commands, cmd)
+	for _, subCmd := range cmd.Commands() {
+		collectCommands(subCmd, commands)
 	}
 }
 
