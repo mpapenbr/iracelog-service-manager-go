@@ -19,6 +19,7 @@ import (
 	carRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
 	eventRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	rsRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -79,33 +80,38 @@ func (pd *predictData) loadData(eventId int) error {
 		return err
 	}
 
-	var states []*racestatev1.PublishStateRequest
-	if states, _, err = rsRepo.LoadRangeBySessionTime(
+	var states *util.RangeContainer[racestatev1.PublishStateRequest]
+	if states, err = rsRepo.LoadRangeBySessionTime(
 		ctx,
 		pd.pool,
 		eventId,
 		pd.sessionTime.Seconds(),
-		1); err != nil || len(states) == 0 {
+		1); err != nil || len(states.Data) == 0 {
 		pd.l.Error("error loading state", log.ErrorField(err))
 		return err
 	}
 	pd.debug()
-	pred := predict.NewPrediction(pd.analyis, pd.carInfo, states[0], pd.event, pd.carNum)
+	pred := predict.NewPrediction(
+		pd.analyis,
+		pd.carInfo,
+		states.Data[0],
+		pd.event,
+		pd.carNum)
 	pd.l.Info("predicting", log.Any("data", pred))
 
 	return nil
 }
 
 func (pd *predictData) debug() {
-	if states, _, err := rsRepo.LoadRangeBySessionTime(
+	if states, err := rsRepo.LoadRangeBySessionTime(
 		context.Background(),
 		pd.pool,
 		int(pd.event.Id),
 		float64(pd.event.ReplayInfo.MinSessionTime)-5,
-		10); err != nil || len(states) == 0 {
+		10); err != nil || len(states.Data) == 0 {
 		pd.l.Error("error loading state", log.ErrorField(err))
 	} else {
-		for _, s := range states {
+		for _, s := range states.Data {
 			pd.l.Debug("state", log.Any("session", s.Session))
 		}
 	}

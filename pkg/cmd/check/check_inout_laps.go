@@ -47,9 +47,9 @@ func checkStateInoutMarker(ctx context.Context, eventArg string) {
 	}
 	pool := postgres.InitWithUrl(config.DB)
 	defer pool.Close()
-	data, _, _ := stateRepo.LoadRange(ctx, pool, eventId, time.Time{}, 1500)
-	logger.Info("got racestates: ", log.Int("count", len(data)))
-	for i, d := range data {
+	states, _ := stateRepo.LoadRange(ctx, pool, eventId, time.Time{}, 1500)
+	logger.Info("got racestates: ", log.Int("count", len(states.Data)))
+	for i, d := range states.Data {
 		for _, c := range d.Cars {
 			if c.TimeInfo != nil {
 				logger.Info("car", log.Int("idx", i),

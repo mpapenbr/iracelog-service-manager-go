@@ -2,9 +2,9 @@ package state
 
 import (
 	"context"
-	"time"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
@@ -24,6 +24,7 @@ import (
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
+	mainUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -265,21 +266,31 @@ func (s *stateServer) GetDriverData(
 	if err != nil {
 		return nil, err
 	}
-	var requests []*racestatev1.PublishDriverDataRequest
-	var lastTs time.Time
-	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
-	requests, lastTs, err = carprotorepos.LoadRange(
-		ctx,
-		s.pool,
-		int(data.Id),
-		req.Msg.Start.AsTime(),
-		int(req.Msg.Num))
+	var tmp *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
+	switch req.Msg.Start.Arg.(type) {
+	case *commonv1.StartSelector_RecordStamp:
+		tmp, err = carprotorepos.LoadRange(
+			ctx,
+			s.pool,
+			int(data.Id),
+			req.Msg.Start.GetRecordStamp().AsTime(),
+			int(req.Msg.Num))
+	case *commonv1.StartSelector_SessionTime:
+		tmp, err = carprotorepos.LoadRangeBySessionTime(
+			ctx,
+			s.pool,
+			int(data.Id),
+			float64(req.Msg.Start.GetSessionTime()),
+			int(req.Msg.Num))
+
+	}
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&racestatev1.GetDriverDataResponse{
-		DriverData: requests,
-		LastTs:     timestamppb.New(lastTs),
+		DriverData:      tmp.Data,
+		LastTs:          timestamppb.New(tmp.LastTimestamp),
+		LastSessionTime: tmp.LastSessionTime,
 	}), nil
 }
 
@@ -295,21 +306,31 @@ func (s *stateServer) GetStates(
 	if err != nil {
 		return nil, err
 	}
-	var requests []*racestatev1.PublishStateRequest
-	var lastTs time.Time
-	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
-	requests, lastTs, err = racestaterepos.LoadRange(
-		ctx,
-		s.pool,
-		int(data.Id),
-		req.Msg.Start.AsTime(),
-		int(req.Msg.Num))
+	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
+	switch req.Msg.Start.Arg.(type) {
+	case *commonv1.StartSelector_RecordStamp:
+		tmp, err = racestaterepos.LoadRange(
+			ctx,
+			s.pool,
+			int(data.Id),
+			req.Msg.Start.GetRecordStamp().AsTime(),
+			int(req.Msg.Num))
+	case *commonv1.StartSelector_SessionTime:
+		tmp, err = racestaterepos.LoadRangeBySessionTime(
+			ctx,
+			s.pool,
+			int(data.Id),
+			float64(req.Msg.Start.GetSessionTime()),
+			int(req.Msg.Num))
+
+	}
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&racestatev1.GetStatesResponse{
-		States: requests,
-		LastTs: timestamppb.New(lastTs),
+		States:          tmp.Data,
+		LastTs:          timestamppb.New(tmp.LastTimestamp),
+		LastSessionTime: tmp.LastSessionTime,
 	}), nil
 }
 
@@ -325,21 +346,35 @@ func (s *stateServer) GetSpeedmaps(
 	if err != nil {
 		return nil, err
 	}
-	var requests []*racestatev1.PublishSpeedmapRequest
-	var lastTs time.Time
+
+	var tmp *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
 	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
-	requests, lastTs, err = speedmapprotorepos.LoadRange(
-		ctx,
-		s.pool,
-		int(data.Id),
-		req.Msg.Start.AsTime(),
-		int(req.Msg.Num))
+
+	switch req.Msg.Start.Arg.(type) {
+	case *commonv1.StartSelector_RecordStamp:
+		tmp, err = speedmapprotorepos.LoadRange(
+			ctx,
+			s.pool,
+			int(data.Id),
+			req.Msg.Start.GetRecordStamp().AsTime(),
+			int(req.Msg.Num))
+	case *commonv1.StartSelector_SessionTime:
+		tmp, err = speedmapprotorepos.LoadRangeBySessionTime(
+			ctx,
+			s.pool,
+			int(data.Id),
+			float64(req.Msg.Start.GetSessionTime()),
+			int(req.Msg.Num))
+
+	}
+
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&racestatev1.GetSpeedmapsResponse{
-		Speedmaps: requests,
-		LastTs:    timestamppb.New(lastTs),
+		Speedmaps:       tmp.Data,
+		LastTs:          timestamppb.New(tmp.LastTimestamp),
+		LastSessionTime: tmp.LastSessionTime,
 	}), nil
 }
 
