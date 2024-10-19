@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
@@ -209,36 +210,21 @@ func LoadRange(
 	eventId int,
 	startTS time.Time,
 	limit int,
-) ([]*racestatev1.PublishStateRequest, time.Time, error) {
-	row, err := conn.Query(ctx, `
-select p.protodata,ri.record_stamp from race_state_proto p
+) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
+	provider := func() (row pgx.Rows, err error) {
+		row, err = conn.Query(ctx, `
+select p.protodata,ri.record_stamp,ri.session_time from race_state_proto p
 join rs_info ri on ri.id=p.rs_info_id
 where
 ri.event_id=$1
 and ri.record_stamp > $2
 order by ri.id asc limit $3
 		`,
-		eventId, startTS, limit,
-	)
-	if err != nil {
-		return nil, time.Time{}, err
+			eventId, startTS, limit,
+		)
+		return row, err
 	}
-	ret := make([]*racestatev1.PublishStateRequest, 0, limit)
-	var latestRecordStamp time.Time
-	defer row.Close()
-	for row.Next() {
-		var binaryMessage []byte
-		if err := row.Scan(&binaryMessage, &latestRecordStamp); err != nil {
-			return nil, time.Time{}, err
-		}
-		racesate := &racestatev1.PublishStateRequest{}
-		if err := proto.Unmarshal(binaryMessage, racesate); err != nil {
-			return nil, time.Time{}, err
-		}
-		ret = append(ret, racesate)
-	}
-
-	return ret, latestRecordStamp, nil
+	return loadRange(provider, limit)
 }
 
 func LoadRangeBySessionTime(
@@ -247,10 +233,10 @@ func LoadRangeBySessionTime(
 	eventId int,
 	sessionTime float64,
 	limit int,
-) ([]*racestatev1.PublishStateRequest, time.Time, error) {
-	provider := func() (row pgx.Rows, err error) {
-		row, err = conn.Query(ctx, `
-		select p.protodata,ri.record_stamp from race_state_proto p
+) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
+	provider := func() (rows pgx.Rows, err error) {
+		rows, err = conn.Query(ctx, `
+		select p.protodata,ri.record_stamp,ri.session_time from race_state_proto p
 		join rs_info ri on ri.id=p.rs_info_id
 		where
 		ri.event_id=$1
@@ -259,38 +245,42 @@ func LoadRangeBySessionTime(
 		`,
 			eventId, sessionTime, limit,
 		)
-		return row, err
+		return rows, err
 	}
-	ret, latestRecordStamp, err := loadRange(provider, limit)
-	return ret, latestRecordStamp, err
+	return loadRange(provider, limit)
 }
 
 // loadRange loads a range of racestate entries from the database
-// queryProvider must include
+// queryProvider must include the following columns in the following order:
+// protodata, record_stamp, session_time
 func loadRange(
 	queryProvider func() (pgx.Rows, error),
 	limit int,
-) ([]*racestatev1.PublishStateRequest, time.Time, error) {
+) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 	row, err := queryProvider()
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
-	ret := make([]*racestatev1.PublishStateRequest, 0, limit)
-	var latestRecordStamp time.Time
+
 	defer row.Close()
+	ret := util.RangeContainer[racestatev1.PublishStateRequest]{
+		Data: make([]*racestatev1.PublishStateRequest, 0, limit),
+	}
 	for row.Next() {
 		var binaryMessage []byte
-		if err := row.Scan(&binaryMessage, &latestRecordStamp); err != nil {
-			return nil, time.Time{}, err
+		if err := row.Scan(&binaryMessage,
+			&ret.LastTimestamp,
+			&ret.LastSessionTime); err != nil {
+			return nil, err
 		}
 		racesate := &racestatev1.PublishStateRequest{}
 		if err := proto.Unmarshal(binaryMessage, racesate); err != nil {
-			return nil, time.Time{}, err
+			return nil, err
 		}
-		ret = append(ret, racesate)
+		ret.Data = append(ret.Data, racesate)
 	}
 
-	return ret, latestRecordStamp, nil
+	return &ret, nil
 }
 
 // deletes all entries for an event from the database, returns number of rows deleted.

@@ -15,6 +15,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	csRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
 	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -79,7 +80,7 @@ func checkDriverDataFetcher(eventArg string) {
 func initDriverDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishDriverDataRequest] {
 	df := &commonFetcher[racestatev1.PublishDriverDataRequest]{
 		lastTS: lastTS,
-		loader: func(startTs time.Time) ([]*racestatev1.PublishDriverDataRequest, time.Time, error) {
+		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 			return csRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
 		},
 	}
@@ -87,7 +88,7 @@ func initDriverDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, li
 	return df
 }
 
-type myLoaderFunc[E any] func(startTs time.Time) ([]*E, time.Time, error)
+type myLoaderFunc[E any] func(startTs time.Time) (*util.RangeContainer[E], error)
 
 type myFetcher[E any] interface {
 	next() *E
@@ -117,9 +118,10 @@ func (f *commonFetcher[E]) next() *E {
 //nolint:unused // false positive
 func (f *commonFetcher[E]) fetch() {
 	var err error
-	f.buffer, f.lastTS, err = f.loader(f.lastTS)
+	c, err := f.loader(f.lastTS)
 	if err != nil {
 		log.Fatal("error loading data", log.ErrorField(err))
 	}
+	f.buffer = c.Data
 	log.Debug("loaded data", log.Int("count", len(f.buffer)))
 }

@@ -11,13 +11,14 @@ import (
 	csRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
 	rsRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	smRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 )
 
 //nolint:lll // readablity
 func initDriverDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishDriverDataRequest] {
 	df := &commonFetcher[racestatev1.PublishDriverDataRequest]{
 		lastTS: lastTS,
-		loader: func(startTs time.Time) ([]*racestatev1.PublishDriverDataRequest, time.Time, error) {
+		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 			return csRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
 		},
 	}
@@ -29,7 +30,7 @@ func initDriverDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, li
 func initStateDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishStateRequest] {
 	df := &commonFetcher[racestatev1.PublishStateRequest]{
 		lastTS: lastTS,
-		loader: func(startTs time.Time) ([]*racestatev1.PublishStateRequest, time.Time, error) {
+		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 			return rsRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
 		},
 	}
@@ -41,7 +42,7 @@ func initStateDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, lim
 func initSpeedmapDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishSpeedmapRequest] {
 	df := &commonFetcher[racestatev1.PublishSpeedmapRequest]{
 		lastTS: lastTS,
-		loader: func(startTs time.Time) ([]*racestatev1.PublishSpeedmapRequest, time.Time, error) {
+		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 			return smRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
 		},
 	}
@@ -53,7 +54,7 @@ type myFetcher[E any] interface {
 	next() *E
 }
 
-type myLoaderFunc[E any] func(startTs time.Time) ([]*E, time.Time, error)
+type myLoaderFunc[E any] func(startTs time.Time) (*util.RangeContainer[E], error)
 
 //nolint:unused // false positive
 type commonFetcher[E any] struct {
@@ -79,9 +80,10 @@ func (f *commonFetcher[E]) next() *E {
 //nolint:unused // false positive
 func (f *commonFetcher[E]) fetch() {
 	var err error
-	f.buffer, f.lastTS, err = f.loader(f.lastTS)
+	c, err := f.loader(f.lastTS)
 	if err != nil {
 		log.Fatal("error loading data", log.ErrorField(err))
 	}
+	f.buffer = c.Data
 	log.Debug("loaded data", log.Int("count", len(f.buffer)))
 }

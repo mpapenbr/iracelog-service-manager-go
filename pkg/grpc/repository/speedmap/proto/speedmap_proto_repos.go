@@ -8,9 +8,11 @@ import (
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
@@ -71,36 +73,75 @@ func LoadRange(
 	eventId int,
 	startTS time.Time,
 	limit int,
-) ([]*racestatev1.PublishSpeedmapRequest, time.Time, error) {
-	row, err := conn.Query(ctx, `
-select p.protodata, ri.record_stamp from speedmap_proto p
-join rs_info ri on ri.id=p.rs_info_id
-where
-ri.event_id=$1
-and ri.record_stamp > $2
-order by ri.id asc limit $3
+) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
+	provider := func() (rows pgx.Rows, err error) {
+		return conn.Query(ctx, `
+		select p.protodata, ri.record_stamp,ri.session_time from speedmap_proto p
+		join rs_info ri on ri.id=p.rs_info_id
+		where
+		ri.event_id=$1
+		and ri.record_stamp > $2
+		order by ri.id asc limit $3
 		`,
-		eventId, startTS, limit,
-	)
-	if err != nil {
-		return nil, time.Time{}, err
+			eventId, startTS, limit,
+		)
 	}
-	ret := make([]*racestatev1.PublishSpeedmapRequest, 0, limit)
-	var latestRecordStamp time.Time
+	return loadRange(provider, limit)
+}
+
+func LoadRangeBySessionTime(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId int,
+	sessionTime float64,
+	limit int,
+) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
+	provider := func() (rows pgx.Rows, err error) {
+		return conn.Query(ctx, `
+		select p.protodata, ri.record_stamp,ri.session_time from speedmap_proto p
+		join rs_info ri on ri.id=p.rs_info_id
+		where
+		ri.event_id=$1
+		and ri.session_time > $2
+		order by ri.id asc limit $3
+		`,
+			eventId, sessionTime, limit,
+		)
+	}
+	return loadRange(provider, limit)
+}
+
+// loadRange loads a range of speedmap entries from the database
+// queryProvider must include the following columns in the following order:
+// protodata, record_stamp, session_time
+func loadRange(
+	queryProvider func() (pgx.Rows, error),
+	limit int,
+) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
+	row, err := queryProvider()
+	if err != nil {
+		return nil, err
+	}
+
 	defer row.Close()
+	ret := util.RangeContainer[racestatev1.PublishSpeedmapRequest]{
+		Data: make([]*racestatev1.PublishSpeedmapRequest, 0, limit),
+	}
 	for row.Next() {
 		var binaryMessage []byte
-		if err := row.Scan(&binaryMessage, &latestRecordStamp); err != nil {
-			return nil, time.Time{}, err
+		if err := row.Scan(&binaryMessage,
+			&ret.LastTimestamp,
+			&ret.LastSessionTime); err != nil {
+			return nil, err
 		}
 		speedmap := &racestatev1.PublishSpeedmapRequest{}
 		if err := proto.Unmarshal(binaryMessage, speedmap); err != nil {
-			return nil, time.Time{}, err
+			return nil, err
 		}
-		ret = append(ret, speedmap)
+		ret.Data = append(ret.Data, speedmap)
 	}
 
-	return ret, latestRecordStamp, nil
+	return &ret, nil
 }
 
 //nolint:lll,funlen // readability
