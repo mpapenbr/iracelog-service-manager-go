@@ -2,6 +2,8 @@ package state
 
 import (
 	"context"
+	"errors"
+	"slices"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
@@ -66,6 +68,8 @@ func WithDebugWire(arg bool) Option {
 	}
 }
 
+var ErrInvalidStartSelector = errors.New("invalid or missing start selector")
+
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
 	pool      *pgxpool.Pool
@@ -97,20 +101,38 @@ func (s *stateServer) PublishState(
 			log.Int("car entries", len(req.Msg.Cars)))
 	}
 
-	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
-		id, err := racestaterepos.CreateRaceState(ctx, tx, int(epd.Event.Id), req.Msg)
-		if err == nil {
-			epd.LastRsInfoId = id
+	if s.isRaceSession(epd, req.Msg) {
+		if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
+			id, err := racestaterepos.CreateRaceState(ctx, tx, int(epd.Event.Id), req.Msg)
+			if err == nil {
+				epd.LastRsInfoId = id
+			}
+			return err
+		}); err != nil {
+			s.log.Error("error storing state", log.ErrorField(err))
 		}
-		return err
-	}); err != nil {
-		s.log.Error("error storing state", log.ErrorField(err))
 	}
 	epd.Mutex.Lock()
 	epd.MarkDataEvent()
 	defer epd.Mutex.Unlock()
 	epd.Processor.ProcessState(req.Msg)
 	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *stateServer) isRaceSession(
+	edp *utils.EventProcessingData,
+	req *racestatev1.PublishStateRequest,
+) bool {
+	ret := slices.Contains(edp.RaceSessions, req.Session.SessionNum)
+	if !ret {
+		if s.debugWire {
+			s.log.Debug("not in race session",
+				log.Uint32("session", req.Session.SessionNum),
+				log.Any("raceSessions", edp.RaceSessions))
+		}
+	}
+	return ret
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -307,6 +329,9 @@ func (s *stateServer) GetStates(
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
+	if req.Msg.Start == nil {
+		return nil, ErrInvalidStartSelector
+	}
 	switch req.Msg.Start.Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
 		tmp, err = racestaterepos.LoadRange(
@@ -322,6 +347,8 @@ func (s *stateServer) GetStates(
 			int(data.Id),
 			float64(req.Msg.Start.GetSessionTime()),
 			int(req.Msg.Num))
+	default:
+		err = ErrInvalidStartSelector
 
 	}
 	if err != nil {
@@ -348,8 +375,10 @@ func (s *stateServer) GetSpeedmaps(
 	}
 
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
-	//nolint:staticcheck // should only ignore SA1019 but don't know how to config single)
 
+	if req.Msg.Start == nil {
+		return nil, ErrInvalidStartSelector
+	}
 	switch req.Msg.Start.Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
 		tmp, err = speedmapprotorepos.LoadRange(
@@ -366,6 +395,8 @@ func (s *stateServer) GetSpeedmaps(
 			float64(req.Msg.Start.GetSessionTime()),
 			int(req.Msg.Num))
 
+	default:
+		err = ErrInvalidStartSelector
 	}
 
 	if err != nil {
