@@ -73,6 +73,7 @@ type EventProcessingData struct {
 	LastRsInfoId        int                        // holds the last rs_info_id for storing state data
 	LastDataEvent       time.Time                  // holds the time of the last incoming data event
 	SnapshotData        []*analysisv1.SnapshotData // holds the snapshot data for current event
+	RaceSessions        []uint32                   // holds the ids of race sessions
 }
 type EventLookup struct {
 	lookup        map[string]*EventProcessingData
@@ -100,11 +101,13 @@ func (e *EventLookup) AddEvent(
 	replayInfoSource := make(chan *eventv1.ReplayInfo)
 	snapshotSource := make(chan *analysisv1.SnapshotData)
 
+	raceSessions := collectRaceSessions(event)
 	cp := car.NewCarProcessor()
 	rp := race.NewRaceProcessor(
 		race.WithCarProcessor(cp),
-		race.WithRaceSessions(collectRaceSessions(event)),
+		race.WithRaceSessions(raceSessions),
 	)
+
 	epd := &EventProcessingData{
 		Event:         event,
 		Track:         track,
@@ -130,6 +133,7 @@ func (e *EventLookup) AddEvent(
 		Mutex:               sync.Mutex{},
 		LastDataEvent:       time.Now(),
 		SnapshotData:        make([]*analysisv1.SnapshotData, 0),
+		RaceSessions:        raceSessions,
 	}
 	epd.setupOwnListeners()
 	e.lookup[event.Key] = epd

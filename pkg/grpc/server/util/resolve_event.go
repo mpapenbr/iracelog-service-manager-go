@@ -14,6 +14,11 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
+var (
+	ErrMissingEventSelector = errors.New("missing event selector")
+	ErrInvalidEventSelector = errors.New("invalid event selector")
+)
+
 // returns the event for the given selector
 // if the event is not found, a connect error with code NotFound is returned
 //
@@ -25,12 +30,16 @@ func ResolveEvent(
 ) (*eventv1.Event, error) {
 	var data *eventv1.Event
 	var err error
+	if sel.Arg == nil {
+		return nil, ErrMissingEventSelector
+	}
 	switch sel.Arg.(type) {
 	case *commonv1.EventSelector_Id:
 		data, err = event.LoadById(ctx, conn, int(sel.GetId()))
 	case *commonv1.EventSelector_Key:
 		data, err = event.LoadByKey(ctx, conn, sel.GetKey())
-
+	default:
+		err = ErrInvalidEventSelector
 	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
