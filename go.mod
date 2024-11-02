@@ -13,7 +13,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.1
-	github.com/ohler55/ojg v1.24.1
+	github.com/ohler55/ojg v1.25.0
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.47.0
@@ -113,7 +113,7 @@ require (
 )
 
 require (
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gammazero/nexus/v3 v3.2.2
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
