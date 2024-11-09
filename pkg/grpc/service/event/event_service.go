@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -69,6 +70,20 @@ func (s *EventService) DeleteEvent(ctx context.Context, eventId int) error {
 		_, err = event.DeleteById(ctx, tx.Conn(), eventId)
 		return err
 	})
+}
+
+//nolint:whitespace // can't make both editor and linter happy
+func (s *EventService) UpdateEvent(
+	ctx context.Context,
+	eventId int,
+	req *eventv1.UpdateEventRequest,
+) (*eventv1.Event, error) {
+	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		return event.UpdateEvent(ctx, tx.Conn(), eventId, req)
+	}); err != nil {
+		return nil, err
+	}
+	return event.LoadById(ctx, s.pool, eventId)
 }
 
 func (s *EventService) GetSnapshotData(ctx context.Context, eventId int) (int, error) {

@@ -209,6 +209,102 @@ func TestLoadByKey(t *testing.T) {
 	}
 }
 
+func TestUpdateEvent(t *testing.T) {
+	db := testdb.InitTestDb()
+	sample := createSampleEntry(db)
+
+	type args struct {
+		id          int
+		name        string
+		description string
+		key         string
+		replayInfo  *eventv1.ReplayInfo
+	}
+	tests := []struct {
+		name string
+
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "update name only",
+			args:    args{id: int(sample.Id), name: "changed"},
+			wantErr: false,
+		},
+		{
+			name:    "update description only",
+			args:    args{id: int(sample.Id), description: "changed"},
+			wantErr: false,
+		},
+		{
+			name:    "update key only",
+			args:    args{id: int(sample.Id), key: "changed"},
+			wantErr: false,
+		},
+		{
+			name: "update replayInfo only",
+			args: args{id: int(sample.Id), replayInfo: &eventv1.ReplayInfo{
+				MinTimestamp:   &timestamppb.Timestamp{Seconds: 1500},
+				MinSessionTime: 200,
+				MaxSessionTime: 300,
+			}},
+			wantErr: false,
+		},
+		{
+			name: "update combined",
+			args: args{
+				id:          int(sample.Id),
+				name:        "changedName",
+				description: "changedDescription",
+				key:         "changedKey",
+				replayInfo: &eventv1.ReplayInfo{
+					MinTimestamp:   &timestamppb.Timestamp{Seconds: 1500},
+					MinSessionTime: 200,
+					MaxSessionTime: 300,
+				},
+			},
+			wantErr: false,
+		},
+	}
+	checkChangedValues := func(t *testing.T, e *eventv1.Event, ref args) {
+		t.Helper()
+		t.Log(ref)
+		if ref.name != "" && e.Name != ref.name {
+			t.Errorf("Update() name = %v, want %v", e.Name, ref.name)
+		}
+		if ref.description != "" && e.Description != ref.description {
+			t.Errorf("Update() description = %v, want %v", e.Description, ref.description)
+		}
+		if ref.key != "" && e.Key != ref.key {
+			t.Errorf("Update() key = %v, want %v", e.Key, ref.key)
+		}
+		if ref.replayInfo != nil && !proto.Equal(e.ReplayInfo, ref.replayInfo) {
+			t.Errorf("Update() replayInfo = %v, want %v", e.ReplayInfo, ref.replayInfo)
+		}
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				err := UpdateEvent(ctx, c.Conn(), tt.args.id,
+					&eventv1.UpdateEventRequest{
+						Name:        tt.args.name,
+						Description: tt.args.description,
+						Key:         tt.args.key,
+						ReplayInfo:  tt.args.replayInfo,
+					})
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
+					return nil
+				}
+				updated, _ := LoadById(ctx, c.Conn(), tt.args.id)
+				checkChangedValues(t, updated, tt.args)
+				return nil
+			})
+		})
+	}
+}
+
 func TestDeleteById(t *testing.T) {
 	db := testdb.InitTestDb()
 	sample := createSampleEntry(db)

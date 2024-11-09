@@ -469,7 +469,7 @@ linters:
 
 
     # Additional
-    - cyclop
+    # - cyclop // too noisy
     # - depguard
     - dogsled
     - dupl
@@ -478,7 +478,7 @@ linters:
     - exhaustive
     - forbidigo
     - gci
-    - gocognit
+    # - gocognit // too noisy
     - goconst
     - gocritic
     - gocyclo
