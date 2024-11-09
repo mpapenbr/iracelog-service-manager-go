@@ -4,6 +4,7 @@ package event
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
@@ -86,7 +87,60 @@ func LoadAll(ctx context.Context, conn repository.Querier) (
 	return ret, nil
 }
 
-// deletes an entry from the database, returns number of rows deleted.
+// updates selected event attributes
+//
+//nolint:funlen,whitespace // by design
+func UpdateEvent(
+	ctx context.Context,
+	conn repository.Querier,
+	id int,
+	req *eventv1.UpdateEventRequest,
+) error {
+	args := []interface{}{}
+	stmtSet := []string{}
+	idx := 1
+	if req.Name != "" {
+		args = append(args, req.Name)
+		stmtSet = append(stmtSet, fmt.Sprintf("name=$%d", idx))
+		idx++
+	}
+	if req.Description != "" {
+		args = append(args, req.Description)
+		stmtSet = append(stmtSet, fmt.Sprintf("description=$%d", idx))
+		idx++
+	}
+	if req.Key != "" {
+		args = append(args, req.Key)
+		stmtSet = append(stmtSet, fmt.Sprintf("event_key=$%d", idx))
+		idx++
+	}
+	if req.ReplayInfo != nil {
+		if req.ReplayInfo.MinTimestamp != nil {
+			args = append(args, req.ReplayInfo.MinTimestamp.AsTime())
+			stmtSet = append(stmtSet, fmt.Sprintf("replay_min_timestamp=$%d", idx))
+			idx++
+		}
+		args = append(args, req.ReplayInfo.MinSessionTime)
+		stmtSet = append(stmtSet, fmt.Sprintf("replay_min_session_time=$%d", idx))
+		idx++
+		args = append(args, req.ReplayInfo.MaxSessionTime)
+		stmtSet = append(stmtSet, fmt.Sprintf("replay_max_session_time=$%d", idx))
+		idx++
+	}
+	stmtString := fmt.Sprintf("update event set %s where id=$%d",
+		strings.Join(stmtSet, ","), idx)
+	cmdTag, err := conn.Exec(ctx, stmtString, append(args, id)...)
+	if err != nil {
+		return err
+	}
+	if cmdTag.RowsAffected() != 1 {
+		log.Warn("UpdateEvent: no rows affected",
+			log.Int("eventId", id), log.Int("rowsAffected", int(cmdTag.RowsAffected())))
+	}
+	return nil
+}
+
+// updates the ReplayInfo in the database for an event.
 func UpdateReplayInfo(
 	ctx context.Context,
 	conn repository.Querier,

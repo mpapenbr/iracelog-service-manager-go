@@ -208,3 +208,27 @@ func (s *eventsServer) DeleteEvent(
 	}
 	return connect.NewResponse(&eventv1.DeleteEventResponse{}), nil
 }
+
+//nolint:whitespace,gocritic,funlen // can't make both editor and linter happy
+func (s *eventsServer) UpdateEvent(
+	ctx context.Context, req *connect.Request[eventv1.UpdateEventRequest],
+) (*connect.Response[eventv1.UpdateEventResponse], error) {
+	a := auth.FromContext(&ctx)
+	if !s.pe.HasRole(a, auth.RoleProvider) {
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+	}
+	s.log.Debug("UpdateEvent called",
+		log.Any("arg", req.Msg),
+		log.Int32("id", req.Msg.EventSelector.GetId()))
+	var data *eventv1.Event
+	var err error
+	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	if data, err = s.service.UpdateEvent(ctx, int(data.Id), req.Msg); err == nil {
+		return connect.NewResponse(&eventv1.UpdateEventResponse{Event: data}), nil
+	}
+	return nil, err
+}
