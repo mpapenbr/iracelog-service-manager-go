@@ -18,6 +18,7 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -38,6 +39,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/livedata"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
@@ -217,6 +219,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerProviderServer()
 	s.registerLiveDataServer()
 	s.registerStateServer()
+	s.registerTrackServer()
 }
 
 //nolint:funlen // by design
@@ -378,6 +381,19 @@ func (s *grpcServer) registerLiveDataServer() {
 	path, handler := livedatav1connect.NewLiveDataServiceHandler(
 		liveDataService,
 		connect.WithInterceptors(s.otel),
+	)
+	s.mux.Handle(path, handler)
+}
+
+func (s *grpcServer) registerTrackServer() {
+	trackService := track.NewServer(
+		track.WithPool(s.pool),
+		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+	path, handler := trackv1connect.NewTrackServiceHandler(
+		trackService,
+		connect.WithInterceptors(s.otel,
+			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
+				auth.WithProviderToken(config.ProviderToken))),
 	)
 	s.mux.Handle(path, handler)
 }
