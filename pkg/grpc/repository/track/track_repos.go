@@ -4,12 +4,17 @@ package track
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
+
+var selector = `select id, name, short_name, config, track_length,
+	sectors, pit_speed, pit_entry, pit_exit, pit_lane_length
+	from track`
 
 func Create(ctx context.Context, conn repository.Querier, track *trackv1.Track) error {
 	workPitInfo := track.PitInfo
@@ -36,31 +41,29 @@ func Create(ctx context.Context, conn repository.Querier, track *trackv1.Track) 
 func LoadById(ctx context.Context, conn repository.Querier, id int) (
 	*trackv1.Track, error,
 ) {
-	row := conn.QueryRow(ctx, `
-	select id, name, short_name, config, track_length, sectors,
-	pit_speed, pit_entry, pit_exit, pit_lane_length
-	from track where id=$1
-	`, id)
-	var item trackv1.Track
+	row := conn.QueryRow(ctx, fmt.Sprintf("%s where id=$1", selector), id)
 
-	var sectors []trackv1.Sector
-	var pitInfo trackv1.PitInfo
-	if err := row.Scan(
-		&item.Id,
-		&item.Name, &item.ShortName, &item.Config, &item.Length,
-		&sectors,
-		&item.PitSpeed, &pitInfo.Entry, &pitInfo.Exit, &pitInfo.LaneLength,
-	); err != nil {
+	return readData(row)
+}
+
+func LoadAll(ctx context.Context, conn repository.Querier) (
+	[]*trackv1.Track, error,
+) {
+	row, err := conn.Query(ctx, fmt.Sprintf("%s order by id asc", selector))
+	if err != nil {
 		return nil, err
 	}
+	ret := make([]*trackv1.Track, 0)
+	defer row.Close()
+	for row.Next() {
+		item, err := readData(row)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, item)
 
-	item.PitInfo = &pitInfo
-	item.Sectors = make([]*trackv1.Sector, len(sectors))
-	for i := range sectors {
-		item.Sectors[i] = &sectors[i]
 	}
-
-	return &item, nil
+	return ret, nil
 }
 
 //nolint:whitespace //can't make both the linter and editor happy :(
@@ -104,4 +107,23 @@ func DeleteById(ctx context.Context, conn repository.Querier, id int) (int, erro
 		return 0, err
 	}
 	return int(cmdTag.RowsAffected()), nil
+}
+
+func readData(row pgx.Row) (*trackv1.Track, error) {
+	var item trackv1.Track
+	var sectors []trackv1.Sector
+	var pitInfo trackv1.PitInfo
+
+	if err := row.Scan(&item.Id, &item.Name, &item.ShortName, &item.Config,
+		&item.Length, &sectors, &item.PitSpeed,
+		&pitInfo.Entry, &pitInfo.Exit, &pitInfo.LaneLength); err != nil {
+		return nil, err
+	}
+	item.Sectors = make([]*trackv1.Sector, len(sectors))
+	for i := range sectors {
+		item.Sectors[i] = &sectors[i]
+	}
+	item.PitInfo = &pitInfo
+
+	return &item, nil
 }
