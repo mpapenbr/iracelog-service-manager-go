@@ -19,11 +19,18 @@ type CarProcessor struct {
 	NumByIdx           map[uint32]string
 	CurrentDrivers     map[uint32]string
 	CarClasses         []*carv1.CarClass
+	raceSessions       []uint32
 }
 
 type CarProcessorOption func(cp *CarProcessor)
 
 const OUT_THRESHOLD = 60.0
+
+func WithRaceSessions(raceSessions []uint32) CarProcessorOption {
+	return func(cp *CarProcessor) {
+		cp.raceSessions = raceSessions
+	}
+}
 
 func NewCarProcessor(opts ...CarProcessorOption) *CarProcessor {
 	cp := &CarProcessor{
@@ -58,7 +65,10 @@ func (p *CarProcessor) ProcessCarPayload(payload *racestatev1.PublishDriverDataR
 			}
 		}
 	}
-
+	if !slices.Contains(p.raceSessions, payload.SessionNum) {
+		p.CurrentDrivers = payload.CurrentDrivers
+		return
+	}
 	p.updateCarInfo(payload)
 	p.CurrentDrivers = payload.CurrentDrivers
 }
@@ -162,6 +172,9 @@ func (p *CarProcessor) ProcessStatePayloads(payloads []*racestatev1.PublishState
 // gets called when a state message is received via "...live.state" topic
 func (p *CarProcessor) ProcessStatePayload(payload *racestatev1.PublishStateRequest) {
 	sessionTime := payload.Session.SessionTime
+
+	p.ensureCarOccupancy(payload)
+
 	for i := range payload.Cars {
 		carMsgEntry := payload.Cars[i]
 
@@ -176,6 +189,26 @@ func (p *CarProcessor) ProcessStatePayload(payload *racestatev1.PublishStateRequ
 
 		p.handleComputeState(carComputeState, carMsgEntry, sessionTime)
 		p.ComputeState[carNum] = carComputeState
+	}
+}
+
+// ensures that the car occupancy lookup is present for all cars in the state message
+func (p *CarProcessor) ensureCarOccupancy(payload *racestatev1.PublishStateRequest) {
+	for i := range payload.Cars {
+		carMsgEntry := payload.Cars[i]
+		carIdx := carMsgEntry.CarIdx
+		carNum := p.NumByIdx[uint32(carIdx)]
+		if _, ok := p.CarOccupancyLookup[carNum]; !ok {
+			p.CarOccupancyLookup[carNum] = &analysisv1.CarOccupancy{
+				CarNum:            carNum,
+				Name:              p.ByCarIdx[uint32(carIdx)].Team.Name,
+				CurrentDriverName: p.CurrentDrivers[uint32(carIdx)],
+				Drivers: []*analysisv1.Driver{
+					p.newDriverEntry(p.CurrentDrivers[uint32(carIdx)],
+						payload.Session.SessionTime),
+				},
+			}
+		}
 	}
 }
 

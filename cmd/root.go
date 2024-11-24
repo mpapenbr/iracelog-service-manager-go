@@ -18,6 +18,7 @@ import (
 	checkCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/check"
 	clientCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/client"
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/repair"
 	replayCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay"
 	grpcServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/grpc"
 	wampServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/wamp"
@@ -109,6 +110,7 @@ func init() {
 	rootCmd.AddCommand(checkCmd.NewCheckCmd())
 	rootCmd.AddCommand(clientCmd.NewLiveStateCmd())
 	rootCmd.AddCommand(transferCmd.NewTransferCmd())
+	rootCmd.AddCommand(repair.NewRepairCmd())
 }
 
 // initConfig reads in config file and ENV variables if set.

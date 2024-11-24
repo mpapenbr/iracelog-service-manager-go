@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	RequiredClientVersion string = "v0.16.0"
+	RequiredClientVersion string = "v0.18.0"
 )
 
 func CheckRaceloggerVersion(toCheck string) bool {

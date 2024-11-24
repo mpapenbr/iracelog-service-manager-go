@@ -102,7 +102,9 @@ func (e *EventLookup) AddEvent(
 	snapshotSource := make(chan *analysisv1.SnapshotData)
 
 	raceSessions := collectRaceSessions(event)
-	cp := car.NewCarProcessor()
+	cp := car.NewCarProcessor(
+		car.WithRaceSessions(raceSessions),
+	)
 	rp := race.NewRaceProcessor(
 		race.WithCarProcessor(cp),
 		race.WithRaceSessions(raceSessions),
