@@ -1,7 +1,7 @@
-buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-20241109194506-437da5e6e3fc.1 h1:RIOuQhK/bCtF2TYYH7fdQVPKC9fUKQ+tprnZVfFyslM=
-buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-20241109194506-437da5e6e3fc.1/go.mod h1:19aOCmu7HM2aQJOox0b2sQtFuMsJZquAhJ+riVLCK4A=
-buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.35.2-20241109194506-437da5e6e3fc.1 h1:/gfc9np1KQeXeqozdJvw/W1JwU3PF4oQCDntPjfsORI=
-buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.35.2-20241109194506-437da5e6e3fc.1/go.mod h1:UYZs3luM/l2WjdYPQNN6eQbbaqKa0ypY0suHCOw2knU=
+buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-20241122203353-c5c0957a3a46.1 h1:Ly+UJcrANkFHRn+ws53t0oFdZWNVZtNlFgFvHQszEJ4=
+buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-20241122203353-c5c0957a3a46.1/go.mod h1:aGORb/3iFLnVH7WUeTqxPMaRHkywpZXHzK6eAziTw0A=
+buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.35.2-20241122203353-c5c0957a3a46.1 h1:MOLN3zeepUJ6AJASrd9Kz2TyjCRmeiejw0tu8crxeV8=
+buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.35.2-20241122203353-c5c0957a3a46.1/go.mod h1:UYZs3luM/l2WjdYPQNN6eQbbaqKa0ypY0suHCOw2knU=
 connectrpc.com/connect v1.17.0 h1:W0ZqMhtVzn9Zhn2yATuUokDLO5N+gIuBWMOnsQrfmZk=
 connectrpc.com/connect v1.17.0/go.mod h1:0292hj1rnx8oFrStN7cB4jjVBeqs+Yx5yDIC2prWDO8=
 connectrpc.com/otelconnect v0.7.1 h1:scO5pOb0i4yUE66CnNrHeK1x51yq0bE0ehPg6WvzXJY=
