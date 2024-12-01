@@ -7,14 +7,13 @@ import (
 
 type (
 	ExpertCalcParams struct {
-		RaceDur          time.Duration // duration until end of race
-		LC               int           // laps completed
-		CurrentStintLaps int           // laps done in current stint
-		Lps              int           // laps per stint
-		PitTime          time.Duration // complete pit time
-		PitLaneTime      time.Duration // time to drive through pit lane
-		AvgLap           time.Duration // average lap time
-		RefuelRate       float64       // refuel rate in l/s
+		RaceDur     time.Duration // duration until end of race
+		LC          int           // laps completed
+		Lps         int           // laps per stint
+		PitTime     time.Duration // complete pit time
+		PitLaneTime time.Duration // time to drive through pit lane
+		AvgLap      time.Duration // average lap time
+		RefuelRate  float64       // refuel rate in l/s
 	}
 	Option       func(*expertStintCalc)
 	EndOfLapData struct {
@@ -48,13 +47,21 @@ func WithEolDur(eolDur eolComp) func(*expertStintCalc) {
 	}
 }
 
+// calc stints includig pitstops to the end of the race
+// Note: the calculation starts at the end of the current lap
+
 //nolint:funlen,lll,dupl,nestif // readability,wip
 func (c *expertStintCalc) Calc() (*Result, error) {
 	stintTime := c.param.AvgLap * time.Duration(c.param.Lps)
 	c.parts = make([]Part, 0)
-	curLap := c.param.LC
+	// curLap is the lap when the stint computation starts
+	// LC is the number of laps completed
+	// we add +2 because
+	// +1 for the current lap (this is our internal fast forward to the next reference point)
+	// +1 to have the lap number of the for the next lap
+	curLap := c.param.LC + 2
 	fillStint := func(sp *stintPart, laps int) {
-		sp.lapEnd = curLap + laps - 1
+		sp.lapEnd = sp.lapStart + laps - 1
 		sp.laps = laps
 		sp.stintTime = time.Duration(laps) * c.param.AvgLap
 	}
@@ -78,18 +85,34 @@ func (c *expertStintCalc) Calc() (*Result, error) {
 				stint := &stintPart{lapStart: curLap}
 				fillStint(stint, remain)
 				c.parts = append(c.parts, stint)
+				curLap += remain
+				curDur += time.Duration(remain)*c.param.AvgLap + c.param.PitTime
+				addPitstop()
 			} else {
 				// calc remaining laps in remaining time and quit
 				remain = int(math.Ceil((c.param.RaceDur - curDur).Seconds() / c.param.AvgLap.Seconds()))
+				if remain == 0 {
+					return &Result{Parts: c.parts}, nil
+				}
 				stint := &stintPart{lapStart: curLap}
 				fillStint(stint, remain)
 				c.parts = append(c.parts, stint)
 				return &Result{Parts: c.parts}, nil
 			}
 		} else {
+			// the end of the lap would be the last of that stint
 			addPitstop()
+
+			curDur += c.param.PitTime
+			// special case: the race duration ends while the car is in the pit
+			// we need to add another lap
+			if curDur >= c.param.RaceDur {
+				stint := &stintPart{lapStart: curLap + 1}
+				fillStint(stint, 1)
+				c.parts = append(c.parts, stint)
+				return &Result{Parts: c.parts}, nil
+			}
 		}
-		curLap++
 	}
 
 	// the not so difficult part: calc to the end of race
@@ -113,8 +136,8 @@ func (c *expertStintCalc) Calc() (*Result, error) {
 				curStint.stintTime = c.param.AvgLap
 			}
 		} else {
-			remain := c.param.RaceDur - curDur
-			laps := int(math.Ceil(remain.Seconds() / c.param.AvgLap.Seconds()))
+			remainDur := c.param.RaceDur - curDur
+			laps := int(math.Ceil(remainDur.Seconds() / c.param.AvgLap.Seconds()))
 			fillStint(curStint, laps)
 			curDur += curStint.stintTime
 		}

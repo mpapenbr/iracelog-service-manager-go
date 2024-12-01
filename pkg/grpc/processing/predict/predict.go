@@ -73,7 +73,7 @@ func (pd *predictData) calcWithLatest() {
 	}
 }
 
-//nolint:lll,gocritic // readability,wip
+//nolint:lll,funlen,gocritic // readability,wip
 func (pd *predictData) expertCalcWithLatest() {
 	// lastStint is the last complete stint. So we need at least 2 stints available
 	if len(pd.myData.stints) < 2 {
@@ -84,6 +84,8 @@ func (pd *predictData) expertCalcWithLatest() {
 	expertCalc := racestints.NewExpertStintCalc(&racestints.ExpertCalcParams{
 		LC: int(pd.myData.stateData.Lc),
 		// TODO: needs option to be set upfront (e.g. by computing race duration for race leader)
+		// TODO: Note on RaceDur: it shows "the correct" only if it is to the full race duration
+		// Need to rethink this. At the moment tests are also based on full duration
 		RaceDur: time.Duration(pd.curState.Session.TimeRemain * float32(time.Second)),
 		Lps:     lastStint.numLaps,
 		PitTime: time.Duration(pd.myData.pits[len(pd.myData.pits)-1].timeUsed * float32(time.Second)),
@@ -95,6 +97,7 @@ func (pd *predictData) expertCalcWithLatest() {
 		now := pd.curState.Session.SessionTime - pd.event.ReplayInfo.MinSessionTime
 		// TODO: handle 0.0 case
 		remainLapTime := (1 - pd.myData.stateData.TrackPos) * lastStint.rAvg
+
 		pd.l.Debug("calc eol",
 			log.Float32("trackPos", pd.myData.stateData.TrackPos),
 			log.String("state", pd.myData.stateData.State.String()),
@@ -103,7 +106,9 @@ func (pd *predictData) expertCalcWithLatest() {
 			log.Int32("StintLap", int32(pd.myData.stateData.StintLap)),
 			log.Duration("check", time.Duration((now+pd.curState.Session.TimeRemain)*float32(time.Second))),
 			log.Float32("sessionTimeNow", now),
-			log.Duration("now", time.Duration(now*float32(time.Second))))
+			log.Duration("now", time.Duration(now*float32(time.Second))),
+			log.Duration("timeRemain", time.Duration(pd.curState.Session.TimeRemain*float32(time.Second))),
+		)
 		// eol := pd.calcToEndOfLap(pd.myData)
 		return &racestints.EndOfLapData{
 			CarInPit:      pd.myData.stateData.State == racestatev1.CarState_CAR_STATE_PIT,
