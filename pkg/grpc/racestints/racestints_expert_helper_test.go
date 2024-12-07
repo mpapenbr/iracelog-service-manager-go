@@ -23,6 +23,12 @@ func withLps(arg int) calcParamOption {
 	}
 }
 
+func withEolParam(args ...EndOfLapDataOption) calcParamOption {
+	return func(p *ExpertCalcParams) {
+		p.EndOfLapDataFunc = func() *EndOfLapData { return NewEndOfLapData(args...) }
+	}
+}
+
 func createCopy(p *ExpertCalcParams, opts ...calcParamOption) *ExpertCalcParams {
 	ret := *p
 	for _, opt := range opts {

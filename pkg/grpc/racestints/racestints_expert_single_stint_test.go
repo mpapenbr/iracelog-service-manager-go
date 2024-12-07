@@ -15,9 +15,8 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 		AvgLap:  60 * time.Second,
 	}
 	type fields struct {
-		param  *ExpertCalcParams
-		parts  []Part
-		eolDur eolComp
+		param *ExpertCalcParams
+		parts []Part
 	}
 	tests := []struct {
 		name    string
@@ -26,15 +25,8 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 		wantErr bool
 	}{
 		{"on first lap", fields{
-			param: ecp,
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      1,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp,
+				withEolParam(WithStintLap(1), WithSessionAtEol(ecp.AvgLap))),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -42,15 +34,10 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 			},
 		}, false},
 		{"on second lap", fields{
-			param: createCopy(ecp, withLC(1)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      2,
-					RemainLapTime: 10 * time.Second,
-					SessionAtEol:  2 * ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp,
+				withLC(1),
+				withEolParam(WithStintLap(2), WithSessionAtEol(2*ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -58,15 +45,9 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 			},
 		}, false},
 		{"on second to last lap", fields{
-			param: createCopy(ecp, withLC(3)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      4,
-					RemainLapTime: 10 * time.Second,
-					SessionAtEol:  4 * ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp, withLC(3),
+				withEolParam(WithStintLap(4), WithSessionAtEol(4*ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -74,15 +55,9 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 			},
 		}, false},
 		{"on last lap", fields{
-			param: createCopy(ecp, withLC(4)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      5,
-					RemainLapTime: 10 * time.Second,
-					SessionAtEol:  5 * ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp, withLC(4),
+				withEolParam(WithStintLap(5), WithSessionAtEol(5*ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{},
 		}, false},
@@ -90,9 +65,8 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &expertStintCalc{
-				param:  tt.fields.param,
-				parts:  tt.fields.parts,
-				eolDur: tt.fields.eolDur,
+				param: tt.fields.param,
+				parts: tt.fields.parts,
 			}
 			got, err := c.Calc()
 			if (err != nil) != tt.wantErr {

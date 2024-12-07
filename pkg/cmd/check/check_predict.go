@@ -91,12 +91,13 @@ func (pd *predictData) loadData(eventId int) error {
 		return err
 	}
 	pd.debug()
-	pred := predict.NewPrediction(
+	pred, _ := predict.NewPrediction(
 		pd.analyis,
 		pd.carInfo,
 		states.Data[0],
 		pd.event,
 		pd.carNum)
+
 	pd.l.Info("predicting", log.Any("data", pred))
 
 	return nil

@@ -7,31 +7,60 @@ import (
 
 type (
 	ExpertCalcParams struct {
-		RaceDur     time.Duration // duration until end of race
-		LC          int           // laps completed
-		Lps         int           // laps per stint
-		PitTime     time.Duration // complete pit time
-		PitLaneTime time.Duration // time to drive through pit lane
-		AvgLap      time.Duration // average lap time
-		RefuelRate  float64       // refuel rate in l/s
+		RaceDur          time.Duration // duration until end of race
+		LC               int           // laps completed
+		Lps              int           // laps per stint
+		PitTime          time.Duration // complete pit time
+		PitLaneTime      time.Duration // time to drive through pit lane
+		AvgLap           time.Duration // average lap time
+		RefuelRate       float64       // refuel rate in l/s
+		EndOfLapDataFunc func() *EndOfLapData
 	}
 	Option       func(*expertStintCalc)
 	EndOfLapData struct {
-		CarInPit      bool          // pit vs track
-		StintLap      int           // lap in current stint
-		RemainLapTime time.Duration // time to finish current lap
-		SessionAtEol  time.Duration // session time at end of lap
+		CarInPit bool // pit vs track
+		StintLap int  // lap in current stint
+		// RemainLapTime time.Duration // time to finish current lap
+		SessionAtEol time.Duration // session time at end of lap
 	}
-	eolComp func() *EndOfLapData
+	EndOfLapDataOption func(*EndOfLapData)
+	eolComp            func() *EndOfLapData
 )
 
 type (
 	expertStintCalc struct {
-		param  *ExpertCalcParams
-		parts  []Part
-		eolDur eolComp
+		param *ExpertCalcParams
+		parts []Part
 	}
 )
+
+func NewEndOfLapData(opts ...EndOfLapDataOption) *EndOfLapData {
+	ret := &EndOfLapData{
+		CarInPit: false,
+	}
+	for _, opt := range opts {
+		opt(ret)
+	}
+	return ret
+}
+
+func WithCarInPit(arg bool) EndOfLapDataOption {
+	return func(e *EndOfLapData) {
+		e.CarInPit = arg
+	}
+}
+
+func WithStintLap(arg int) EndOfLapDataOption {
+	return func(e *EndOfLapData) {
+		e.StintLap = arg
+	}
+}
+
+func WithSessionAtEol(arg time.Duration) EndOfLapDataOption {
+	return func(e *EndOfLapData) {
+		e.SessionAtEol = arg
+	}
+}
 
 func NewExpertStintCalc(param *ExpertCalcParams, opts ...Option) CalcStints {
 	ret := &expertStintCalc{param: param}
@@ -39,12 +68,6 @@ func NewExpertStintCalc(param *ExpertCalcParams, opts ...Option) CalcStints {
 		opt(ret)
 	}
 	return ret
-}
-
-func WithEolDur(eolDur eolComp) func(*expertStintCalc) {
-	return func(c *expertStintCalc) {
-		c.eolDur = eolDur
-	}
 }
 
 // calc stints includig pitstops to the end of the race
@@ -69,7 +92,7 @@ func (c *expertStintCalc) Calc() (*Result, error) {
 		c.parts = append(c.parts, &pitPart{pitTime: c.param.PitTime})
 	}
 	// we may enter this function when the car is somewhere on the track
-	eol := c.eolDur()
+	eol := c.param.EndOfLapDataFunc()
 	curDur := time.Duration(0) // just init
 	// the difficult part: initialization from any possible point in race
 	if eol.CarInPit {

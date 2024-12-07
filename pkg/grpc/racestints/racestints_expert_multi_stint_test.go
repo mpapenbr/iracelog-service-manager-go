@@ -17,9 +17,8 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 		AvgLap:      60 * time.Second,
 	}
 	type fields struct {
-		param  *ExpertCalcParams
-		parts  []Part
-		eolDur eolComp
+		param *ExpertCalcParams
+		parts []Part
 	}
 	tests := []struct {
 		name    string
@@ -28,15 +27,9 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 		wantErr bool
 	}{
 		{"on first lap", fields{
-			param: ecp,
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      1,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp,
+				withEolParam(WithStintLap(1), WithSessionAtEol(ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -46,15 +39,10 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 			},
 		}, false},
 		{"need 3 stints", fields{
-			param: createCopy(ecp, withLps(4)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      1,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp,
+				withLps(4),
+				withEolParam(WithStintLap(1), WithSessionAtEol(ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -67,15 +55,9 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 		}, false},
 		// car can only do one more lap in stint
 		{"one more stint lap", fields{
-			param: createCopy(ecp, withLps(4), withLC(6)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      3,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  8 * ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp, withLps(4), withLC(6),
+				withEolParam(WithStintLap(3), WithSessionAtEol(8*ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -86,15 +68,9 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 		}, false},
 		// eol is stint end
 		{"on last stint lap", fields{
-			param: createCopy(ecp, withLps(4), withLC(7)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      4,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  8 * ecp.AvgLap,
-				}
-			},
+			param: createCopy(ecp, withLps(4), withLC(7),
+				withEolParam(WithStintLap(4), WithSessionAtEol(8*ecp.AvgLap)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -104,15 +80,9 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 		}, false},
 
 		{"next pit stop overlaps race end", fields{
-			param: createCopy(ecp, withLps(4), withLC(8)),
-			eolDur: func() *EndOfLapData {
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      4,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  10*ecp.AvgLap - 2*time.Second,
-				}
-			},
+			param: createCopy(ecp, withLps(4), withLC(8),
+				withEolParam(WithStintLap(4), WithSessionAtEol(10*ecp.AvgLap-2*time.Second)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -124,18 +94,13 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 		// Note: LC and lap nums are not important here
 		//
 		{"last stint ends just before race duration", fields{
-			param: createCopy(ecp, withLps(4), withLC(5)),
-			eolDur: func() *EndOfLapData {
-				// force eol to be the inlap
-				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      4,
-					RemainLapTime: ecp.AvgLap,
+			param: createCopy(ecp, withLps(4), withLC(5),
+				withEolParam(
+					WithStintLap(4),
 					// let's fake this to be a last full stint is possible
 					// by subtracting 2 seconds and the pit time
-					SessionAtEol: 6*ecp.AvgLap - ecp.PitTime - 2*time.Second,
-				}
-			},
+					WithSessionAtEol(6*ecp.AvgLap-ecp.PitTime-2*time.Second)),
+			),
 		}, &Result{
 			Parts: []Part{
 				// Note: result is based on end of current lap
@@ -149,9 +114,8 @@ func Test_expertStintCalc_Calc_multiStint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &expertStintCalc{
-				param:  tt.fields.param,
-				parts:  tt.fields.parts,
-				eolDur: tt.fields.eolDur,
+				param: tt.fields.param,
+				parts: tt.fields.parts,
 			}
 			got, err := c.Calc()
 			if (err != nil) != tt.wantErr {

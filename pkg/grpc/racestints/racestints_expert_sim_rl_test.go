@@ -28,13 +28,15 @@ func Test_expertStintCalc_Calc_simulated_rl_cases(t *testing.T) {
 		wantErr bool
 	}{
 		{"on first lap", fields{
-			param: ecp,
+			param: createCopy(ecp,
+				withEolParam(WithStintLap(1), WithSessionAtEol(ecp.AvgLap)),
+			),
 			eolDur: func() *EndOfLapData {
 				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      1,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  ecp.AvgLap,
+					CarInPit: false,
+					StintLap: 1,
+					// RemainLapTime: ecp.AvgLap,
+					SessionAtEol: ecp.AvgLap,
 				}
 			},
 		}, &Result{
@@ -56,13 +58,16 @@ func Test_expertStintCalc_Calc_simulated_rl_cases(t *testing.T) {
 			},
 		}, false},
 		{"at 93m", fields{
-			param: createCopy(ecp, withLC(53)),
+			param: createCopy(ecp,
+				withLC(53), withRaceDur(6*time.Hour+29*time.Minute),
+				withEolParam(WithStintLap(13), WithSessionAtEol(ecp.AvgLap)),
+			),
 			eolDur: func() *EndOfLapData {
 				return &EndOfLapData{
-					CarInPit:      false,
-					StintLap:      13,
-					RemainLapTime: ecp.AvgLap,
-					SessionAtEol:  93 * time.Minute,
+					CarInPit: false,
+					StintLap: 13,
+					// RemainLapTime: ecp.AvgLap,
+					SessionAtEol: 0,
 				}
 			},
 		}, &Result{
@@ -85,9 +90,8 @@ func Test_expertStintCalc_Calc_simulated_rl_cases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &expertStintCalc{
-				param:  tt.fields.param,
-				parts:  tt.fields.parts,
-				eolDur: tt.fields.eolDur,
+				param: tt.fields.param,
+				parts: tt.fields.parts,
 			}
 			got, err := c.Calc()
 			if (err != nil) != tt.wantErr {
