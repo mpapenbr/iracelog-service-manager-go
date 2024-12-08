@@ -15,6 +15,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/predict"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/racestints"
 	aRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
 	carRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
 	eventRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
@@ -24,10 +25,11 @@ import (
 )
 
 var (
-	sessionTimeArg string
-	carNum         string
-	stintLaps      int
-	stintAvg       float32
+	sessionTime time.Duration
+	carNum      string
+	stintLaps   int
+	stintAvg    time.Duration
+	calcMode    string
 )
 
 //nolint:lll // readability
@@ -43,10 +45,11 @@ func NewPredictCmd() *cobra.Command {
 			predictRace(cmd.Context(), args[0])
 		},
 	}
-	cmd.Flags().StringVar(&sessionTimeArg, "session-time", "", "session time when to predict")
+	cmd.Flags().DurationVar(&sessionTime, "session-time", 0, "session time when to predict")
 	cmd.Flags().StringVar(&carNum, "car-num", "", "start timestamp")
-	cmd.Flags().Float32Var(&stintAvg, "stint-avg", 0, "calc with this average lap time")
+	cmd.Flags().DurationVar(&stintAvg, "stint-avg", 0, "calc with this average lap time")
 	cmd.Flags().IntVar(&stintLaps, "stint-laps", 0, "calc with this laps per stint")
+	cmd.Flags().StringVar(&calcMode, "calc-mode", "simple", "calculation mode (simple, expert)")
 
 	return cmd
 }
@@ -61,6 +64,7 @@ type predictData struct {
 	event       *eventv1.Event
 	stintLaps   int
 	stintAvg    float32
+	dings       predict.PredictSupport
 }
 
 func (pd *predictData) loadData(eventId int) error {
@@ -91,14 +95,12 @@ func (pd *predictData) loadData(eventId int) error {
 		return err
 	}
 	pd.debug()
-	pred, _ := predict.NewPrediction(
+	pd.dings, _ = predict.NewPrediction(
 		pd.analyis,
 		pd.carInfo,
 		states.Data[0],
 		pd.event,
 		pd.carNum)
-
-	pd.l.Info("predicting", log.Any("data", pred))
 
 	return nil
 }
@@ -131,12 +133,6 @@ func predictRace(ctx context.Context, eventArg string) {
 	}
 	eventId, _ := strconv.Atoi(eventArg)
 
-	sessionTime, err := time.ParseDuration(sessionTimeArg)
-	if err != nil {
-		logger.Fatal("Invalid session-time value", log.ErrorField(err))
-		return
-	}
-
 	postgresAddr := utils.ExtractFromDBUrl(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		logger.Fatal("database  not ready", log.ErrorField(err))
@@ -149,11 +145,43 @@ func predictRace(ctx context.Context, eventArg string) {
 		sessionTime: sessionTime,
 		carNum:      carNum,
 		stintLaps:   stintLaps,
-		stintAvg:    stintAvg,
+		stintAvg:    float32(stintAvg.Seconds()),
 	}
 	if err := predictData.loadData(eventId); err != nil {
 		return
 	}
 
 	predictData.analyze()
+	handleCLIParam := func(p racestints.BaseCalcParams) {
+		if stintLaps > 0 {
+			p.SetLps(stintLaps)
+		}
+		if stintAvg > 0 {
+			p.SetAvgLap(stintAvg)
+		}
+	}
+	var calcType racestints.CalcType
+	var calc racestints.CalcStints
+	calcType, err = racestints.ParseCalcType(calcMode)
+	var results *racestints.Result
+	switch calcType {
+	case racestints.CalcTypeSimple:
+		logger.Info("simple calculation")
+		param := predictData.dings.SimpleCalcParams()
+		handleCLIParam(param)
+		calc = racestints.NewSimpleStintCalc(param)
+	case racestints.CalcTypeExpert:
+		logger.Info("expert calculation")
+		param := predictData.dings.ExpertCalcParams()
+		handleCLIParam(param)
+		calc = racestints.NewExpertStintCalc(param)
+	}
+
+	if results, err = calc.Calc(); err != nil {
+		logger.Error("error calculating", log.ErrorField(err))
+	} else {
+		for i, p := range results.Parts {
+			logger.Info("part", log.Int("i", i), log.String("output", p.Output()))
+		}
+	}
 }

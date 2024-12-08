@@ -35,6 +35,22 @@ func NewSimpleStintCalc(param *SimpleCalcParams) CalcStints {
 	return &simpleStintCalc{param: param}
 }
 
+func (p *SimpleCalcParams) SetAvgLap(arg time.Duration) {
+	p.AvgLap = arg
+}
+
+func (p *SimpleCalcParams) SetRaceDur(arg time.Duration) {
+	p.RaceDur = arg
+}
+
+func (p *SimpleCalcParams) SetPitTime(arg time.Duration) {
+	p.PitTime = arg
+}
+
+func (p *SimpleCalcParams) SetLps(arg int) {
+	p.Lps = arg
+}
+
 //nolint:funlen,lll,dupl,nestif // readability,wip
 func (c *simpleStintCalc) Calc() (*Result, error) {
 	stintTime := c.param.AvgLap * time.Duration(c.param.Lps)

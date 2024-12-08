@@ -63,11 +63,16 @@ func NewPrediction(
 
 //nolint:lll,unused // readability,wip
 func (pd *predictData) SimpleCalcParams() *racestints.SimpleCalcParams {
+	if len(pd.myData.stints) < 2 {
+		pd.l.Info("not enough data for expert calc")
+		return nil
+	}
+	lastStint := pd.myData.stints[len(pd.myData.stints)-2]
 	return &racestints.SimpleCalcParams{
 		RaceDur: time.Duration(pd.curState.Session.TimeRemain * float32(time.Second)),
-		Lps:     pd.myData.stints[len(pd.myData.stints)-1].numLaps,
+		Lps:     lastStint.numLaps,
 		PitTime: time.Duration(pd.myData.pits[len(pd.myData.pits)-1].timeUsed * float32(time.Second)),
-		AvgLap:  time.Duration(pd.myData.stints[len(pd.myData.stints)-1].rAvg * float32(time.Second)),
+		AvgLap:  time.Duration(lastStint.rAvg * float32(time.Second)),
 	}
 }
 

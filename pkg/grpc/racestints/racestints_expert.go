@@ -34,6 +34,22 @@ type (
 	}
 )
 
+func (p *ExpertCalcParams) SetAvgLap(arg time.Duration) {
+	p.AvgLap = arg
+}
+
+func (p *ExpertCalcParams) SetRaceDur(arg time.Duration) {
+	p.RaceDur = arg
+}
+
+func (p *ExpertCalcParams) SetPitTime(arg time.Duration) {
+	p.PitTime = arg
+}
+
+func (p *ExpertCalcParams) SetLps(arg int) {
+	p.Lps = arg
+}
+
 func NewEndOfLapData(opts ...EndOfLapDataOption) *EndOfLapData {
 	ret := &EndOfLapData{
 		CarInPit: false,
