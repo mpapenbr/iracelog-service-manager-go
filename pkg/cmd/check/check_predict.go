@@ -123,6 +123,7 @@ func (pd *predictData) debug() {
 func (pd *predictData) analyze() {
 }
 
+//nolint:funlen,govet,ineffassign // by design
 func predictRace(ctx context.Context, eventArg string) {
 	logger := log.GetFromContext(ctx).Named("check")
 	// wait for database
@@ -162,7 +163,7 @@ func predictRace(ctx context.Context, eventArg string) {
 	}
 	var calcType racestints.CalcType
 	var calc racestints.CalcStints
-	calcType, err = racestints.ParseCalcType(calcMode)
+	calcType, _ = racestints.ParseCalcType(calcMode)
 	var results *racestints.Result
 	switch calcType {
 	case racestints.CalcTypeSimple:
