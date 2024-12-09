@@ -2,13 +2,18 @@ package predict
 
 import (
 	"context"
+	"time"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/predict/v1/predictv1connect"
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
+	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	predictv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/predict/v1"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 func NewServer(opts ...Option) *predictServer {
@@ -29,8 +34,15 @@ func WithPool(p *pgxpool.Pool) Option {
 	}
 }
 
+func WithEventLookup(lookup *utils.EventLookup) Option {
+	return func(srv *predictServer) {
+		srv.lookup = lookup
+	}
+}
+
 type predictServer struct {
 	x.UnimplementedPredictServiceHandler
+	lookup *utils.EventLookup
 
 	pool *pgxpool.Pool
 	log  *log.Logger
@@ -42,7 +54,45 @@ func (s *predictServer) GetPredictParam(
 	req *connect.Request[predictv1.GetPredictParamRequest]) (
 	*connect.Response[predictv1.GetPredictParamResponse], error,
 ) {
-	return nil, nil
+	s.log.Debug("GetPredictParam called",
+		log.Any("arg", req.Msg),
+		log.Int32("id", req.Msg.EventSelector.GetId()))
+	var e *eventv1.Event
+	var err error
+	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	if err != nil {
+		s.log.Error("error resolving event",
+			log.Any("selector", req.Msg.EventSelector),
+			log.ErrorField(err))
+		return nil, err
+	}
+
+	if req.Msg.StartSelector == nil {
+		return nil, util.ErrInvalidStartSelector
+	}
+
+	var param *predictv1.PredictParam
+	switch req.Msg.StartSelector.Arg.(type) {
+	case *commonv1.StartSelector_RecordStamp:
+		return nil, util.ErrUnsupportedStartSelector
+	case *commonv1.StartSelector_SessionTime:
+		param, err = GetPredictParam(
+			ctx,
+			s.pool,
+			int(e.Id),
+			time.Duration(req.Msg.StartSelector.GetSessionTime()*float32(time.Second)),
+			req.Msg.CarNum,
+		)
+
+	default:
+		err = util.ErrUnsupportedStartSelector
+	}
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&predictv1.GetPredictParamResponse{
+		Param: param,
+	}), nil
 }
 
 //nolint:whitespace // by design
@@ -51,5 +101,23 @@ func (s *predictServer) GetLivePredictParam(
 	req *connect.Request[predictv1.GetLivePredictParamRequest]) (
 	*connect.Response[predictv1.GetLivePredictParamResponse], error,
 ) {
-	return nil, nil
+	// get the epd
+	var epd *utils.EventProcessingData
+	var param *predictv1.PredictParam
+	var err error
+	epd, err = s.lookup.GetEvent(req.Msg.EventSelector)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+
+	param, err = GetLivePredictParam(
+		epd,
+		req.Msg.CarNum,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&predictv1.GetLivePredictParamResponse{
+		Param: param,
+	}), nil
 }

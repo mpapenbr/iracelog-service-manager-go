@@ -24,6 +24,7 @@ import (
 	rsRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	trackRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 type (
@@ -98,10 +99,41 @@ func GetPredictParam(
 		track:    track,
 	}
 
+	//nolint:gocritic // false positive
+	if err = pd.init(); err != nil {
+		return nil, err
+	}
+	var ret *predictv1.PredictParam
+	if ret, err = pd.PredictParam(); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+//nolint:whitespace // readability
+func GetLivePredictParam(
+	epd *utils.EventProcessingData,
+	carNum string,
+) (*predictv1.PredictParam, error) {
+	pd := &predictData{
+		analyis:  epd.LastAnalysisData,
+		carInfo:  epd.LastDriverData,
+		curState: epd.LastRaceState,
+		carNum:   carNum,
+		l:        log.Default().Named("predict"),
+		event:    epd.Event,
+		track:    epd.Track,
+	}
+
 	if err := pd.init(); err != nil {
 		return nil, err
 	}
-	return nil, nil
+
+	if ret, err := pd.PredictParam(); err != nil {
+		return nil, err
+	} else {
+		return ret, nil
+	}
 }
 
 //nolint:lll,funlen,gocritic // readability,wip

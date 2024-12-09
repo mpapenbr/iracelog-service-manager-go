@@ -3,8 +3,8 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.23.0
 
 require (
-	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-00000000000000-5387f520969c.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.35.2-00000000000000-5387f520969c.1
+	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-00000000000000-ed6a0bf254c1.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.35.2-00000000000000-ed6a0bf254c1.1
 	connectrpc.com/connect v1.17.0
 	connectrpc.com/otelconnect v0.7.1
 	github.com/docker/go-connections v0.5.0

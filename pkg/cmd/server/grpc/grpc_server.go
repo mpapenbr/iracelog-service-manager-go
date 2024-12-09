@@ -404,6 +404,7 @@ func (s *grpcServer) registerTrackServer() {
 func (s *grpcServer) registerPredictServer() {
 	predictService := predict.NewServer(
 		predict.WithPool(s.pool),
+		predict.WithEventLookup(s.eventLookup),
 	)
 	path, handler := predictv1connect.NewPredictServiceHandler(
 		predictService,

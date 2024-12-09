@@ -15,8 +15,11 @@ import (
 )
 
 var (
-	ErrMissingEventSelector = errors.New("missing event selector")
-	ErrInvalidEventSelector = errors.New("invalid event selector")
+	ErrMissingEventSelector     = errors.New("missing event selector")
+	ErrInvalidEventSelector     = errors.New("invalid event selector")
+	ErrMissingStartSelector     = errors.New("missing start selector")
+	ErrInvalidStartSelector     = errors.New("invalid start selector")
+	ErrUnsupportedStartSelector = errors.New("unsupported start selector")
 )
 
 // returns the event for the given selector

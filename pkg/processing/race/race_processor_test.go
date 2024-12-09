@@ -1,4 +1,4 @@
-//nolint:thelper,whitespace,lll,funlen,gocritic,dupl // ok for tests
+//nolint:thelper,whitespace,lll,funlen,gocritic,dupl,errcheck // ok for tests
 package race
 
 import (

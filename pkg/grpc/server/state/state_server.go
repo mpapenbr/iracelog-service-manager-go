@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"errors"
 	"slices"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
@@ -67,8 +66,6 @@ func WithDebugWire(arg bool) Option {
 		srv.debugWire = arg
 	}
 }
-
-var ErrInvalidStartSelector = errors.New("invalid or missing start selector")
 
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
@@ -330,7 +327,7 @@ func (s *stateServer) GetStates(
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
 	if req.Msg.Start == nil {
-		return nil, ErrInvalidStartSelector
+		return nil, util.ErrMissingEventSelector
 	}
 	switch req.Msg.Start.Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
@@ -348,7 +345,7 @@ func (s *stateServer) GetStates(
 			float64(req.Msg.Start.GetSessionTime()),
 			int(req.Msg.Num))
 	default:
-		err = ErrInvalidStartSelector
+		err = util.ErrInvalidStartSelector
 
 	}
 	if err != nil {
@@ -377,7 +374,7 @@ func (s *stateServer) GetSpeedmaps(
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
 
 	if req.Msg.Start == nil {
-		return nil, ErrInvalidStartSelector
+		return nil, util.ErrMissingStartSelector
 	}
 	switch req.Msg.Start.Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
@@ -396,7 +393,7 @@ func (s *stateServer) GetSpeedmaps(
 			int(req.Msg.Num))
 
 	default:
-		err = ErrInvalidStartSelector
+		err = util.ErrInvalidStartSelector
 	}
 
 	if err != nil {

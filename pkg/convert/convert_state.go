@@ -126,7 +126,7 @@ func (p *StateConverter) convertMessage(messages []interface{}) *racestatev1.Mes
 	return ret
 }
 
-//nolint:whitespace // can't make both editor and linter happy
+//nolint:whitespace,errcheck // can't make both editor and linter happy
 func convertLaptime(
 	msg []interface{}, key string, extr func(arg []interface{}, key string) interface{},
 ) *racestatev1.TimeWithMarker {
