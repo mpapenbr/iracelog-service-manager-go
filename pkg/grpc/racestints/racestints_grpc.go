@@ -78,8 +78,7 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 				// curLap += remain
 				// curDur += time.Duration(remain) * avgLap
 				curDur = addStint(curDur, remain, curLap)
-				addPitstop(curDur, pitTime)
-				curDur += pitTime
+				curDur = addPitstop(curDur, pitTime)
 				curLap += remain
 			} else {
 				// calc remaining laps in remaining time and quit

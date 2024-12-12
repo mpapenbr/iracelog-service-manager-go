@@ -149,6 +149,7 @@ func (pd *predictData) PredictParam() (*predictv1.PredictParam, error) {
 	raceParam := predictv1.RaceParam{
 		Duration: toDur(pd.curState.Session.TimeRemain),
 		Lc:       pd.myData.stateData.Lc,
+		Session:  toDur(pd.curState.Session.SessionTime),
 	}
 	stintParam := predictv1.StintParam{
 		AvgLaptime: toDur(pd.myData.stints[len(pd.myData.stints)-2].rAvg),
@@ -168,6 +169,7 @@ func (pd *predictData) PredictParam() (*predictv1.PredictParam, error) {
 		CurrentTrackPos: pd.myData.stateData.TrackPos,
 		InPit:           pd.myData.stateData.State == racestatev1.CarState_CAR_STATE_PIT,
 		StintLap:        int32(pd.myData.stateData.StintLap),
+		RemainLapTime:   toDur((1 - pd.myData.stateData.TrackPos) * float32(stintParam.AvgLaptime.Seconds)),
 	}
 	return &predictv1.PredictParam{
 		Race:  &raceParam,

@@ -16,7 +16,6 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 	}
 	type fields struct {
 		param *ExpertCalcParams
-		parts []Part
 	}
 	tests := []struct {
 		name    string
@@ -66,7 +65,6 @@ func Test_expertStintCalc_Calc_singleStint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &expertStintCalc{
 				param: tt.fields.param,
-				parts: tt.fields.parts,
 			}
 			got, err := c.Calc()
 			if (err != nil) != tt.wantErr {
