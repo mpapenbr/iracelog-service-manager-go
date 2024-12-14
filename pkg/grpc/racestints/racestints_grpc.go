@@ -46,17 +46,24 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 		}
 		return ret
 	}
+	createPit := func(start time.Duration, pitTime time.Duration) *predictv1.Part {
+		ret := createPart(start, pitTime)
+		ret.PartType = &predictv1.Part_Pit{
+			Pit: &predictv1.PitPart{},
+		}
+		return ret
+	}
 	// returns duration in race after the pitstop
 	addStint := func(start time.Duration, laps, startLap int32) time.Duration {
 		p := createStint(start, laps, startLap)
 		parts = append(parts, p)
-		return p.End.AsDuration()
+		return p.End.AsDuration() - sessionOffset
 	}
 	// returns duration in race after the pitstop
 	addPitstop := func(start, pitTime time.Duration) time.Duration {
-		p := createPart(start, pitTime)
+		p := createPit(start, pitTime)
 		parts = append(parts, p)
-		return p.End.AsDuration()
+		return p.End.AsDuration() - sessionOffset
 	}
 
 	curDur := time.Duration(0) // just init
@@ -100,7 +107,7 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 			// special case: the race duration ends while the car is in the pit
 			// we need to add another lap
 			if curDur >= c.Race.Duration.AsDuration() {
-				addStint(curDur, 1, curLap+1)
+				addStint(curDur, 1, curLap)
 				return &predictv1.PredictResult{Parts: parts}, nil
 			}
 		}
@@ -114,9 +121,7 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 		if curDur+stintTime < c.Race.Duration.AsDuration() {
 			curDur = addStint(curDur, c.Stint.Lps, curLap)
 			curDur = addPitstop(curDur, pitTime)
-
 			curLap += c.Stint.Lps
-			curDur += stintTime
 
 			// after the pitstop the race is over.
 			// nevertheless we need another stint to finish the race

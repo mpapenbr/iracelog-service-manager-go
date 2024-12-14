@@ -15,6 +15,7 @@ type (
 	raceParamOption    func(p *predictv1.RaceParam)
 	carParamOption     func(p *predictv1.CarParam)
 	pitParamOption     func(p *predictv1.PitParam)
+	stintParamOption   func(p *predictv1.StintParam)
 	fuelParamOption    func(p *predictv1.FuelParam)
 
 	stintPartOption func(p *predictv1.StintPart)
@@ -49,6 +50,10 @@ func createPartStint(laps, startLap, endLap int32) *predictv1.Part_Stint {
 	return &predictv1.Part_Stint{Stint: &predictv1.StintPart{
 		Laps: laps, LapStart: startLap, LapEnd: endLap,
 	}}
+}
+
+func createPartPit() *predictv1.Part_Pit {
+	return &predictv1.Part_Pit{Pit: &predictv1.PitPart{}}
 }
 
 func withRaceDur(arg time.Duration) calcParamOption {
@@ -106,6 +111,12 @@ func WithPPCar(arg *predictv1.CarParam) predictParamOption {
 func WithPPPit(arg *predictv1.PitParam) predictParamOption {
 	return func(p *predictv1.PredictParam) {
 		p.Pit = arg
+	}
+}
+
+func WithPPStint(arg *predictv1.StintParam) predictParamOption {
+	return func(p *predictv1.PredictParam) {
+		p.Stint = arg
 	}
 }
 
@@ -190,6 +201,38 @@ func WithPPOverall(arg time.Duration) pitParamOption {
 func WithPPLane(arg time.Duration) pitParamOption {
 	return func(p *predictv1.PitParam) {
 		p.Lane = durationpb.New(arg)
+	}
+}
+
+func CopyStintParam(p *predictv1.StintParam, opts ...stintParamOption) *predictv1.StintParam {
+	ret := proto.Clone(p).(*predictv1.StintParam)
+	for _, opt := range opts {
+		opt(ret)
+	}
+	return ret
+}
+
+func WithSPLps(arg int32) stintParamOption {
+	return func(p *predictv1.StintParam) {
+		p.Lps = arg
+	}
+}
+
+func WithSPAvgLaptime(arg time.Duration) stintParamOption {
+	return func(p *predictv1.StintParam) {
+		p.AvgLaptime = durationpb.New(arg)
+	}
+}
+
+func WithSPInLaptime(arg time.Duration) stintParamOption {
+	return func(p *predictv1.StintParam) {
+		p.InLaptime = durationpb.New(arg)
+	}
+}
+
+func WithSPOutLaptime(arg time.Duration) stintParamOption {
+	return func(p *predictv1.StintParam) {
+		p.OutLaptime = durationpb.New(arg)
 	}
 }
 
