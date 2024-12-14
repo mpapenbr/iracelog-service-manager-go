@@ -11,29 +11,25 @@ import (
 )
 
 func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
-	toDurPb := func(d time.Duration) *durationpb.Duration {
-		return durationpb.New(d)
-	}
-
 	pp := &predictv1.PredictParam{
 		Race: &predictv1.RaceParam{
-			Duration: toDurPb(5 * time.Minute),
+			Duration: durationpb.New(conv("5m10s")),
 			Lc:       0,
-			Session:  toDurPb(0),
+			Session:  durationpb.New(0),
 		},
 		Stint: &predictv1.StintParam{
 			Lps:        8,
-			AvgLaptime: toDurPb(60 * time.Second),
+			AvgLaptime: durationpb.New(60 * time.Second),
 		},
 		// Pit not needed with these test
 		Car: &predictv1.CarParam{
 			CurrentTrackPos: 0,
 			InPit:           false,
 			StintLap:        0,
-			RemainLapTime:   toDurPb(0),
+			RemainLapTime:   durationpb.New(0),
 		},
 		Pit: &predictv1.PitParam{
-			Overall: toDurPb(10 * time.Second),
+			Overall: durationpb.New(10 * time.Second),
 		},
 	}
 	type fields struct {
@@ -46,17 +42,138 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"on first lap", fields{
-				param: CopyPredictParam(pp, WithPPCar(
-					CopyCarParam(pp.Car,
-						WithCPStintLap(1),
-						WithCPRemainLapTime(pp.Stint.AvgLaptime.AsDuration())))),
+			"first lap start", fields{
+				param: CopyPredictParam(pp,
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(1),
+							WithCPRemainLapTime(conv("60s"))))),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
-					CreateStintPart(60*time.Second, 4*60*time.Second,
-						&predictv1.Part_Stint{Stint: &predictv1.StintPart{Laps: 4, LapStart: 2, LapEnd: 5}}),
+					CreateStintPart(conv("60s"), conv("5m"),
+						createPartStint(5, 2, 6)),
 					// Note: result is based on end of current lap
-					// &stintPart{laps: 4, lapStart: 2, lapEnd: 5, stintTime: 4 * pp.AvgLap},
+
+				},
+			}, false,
+		},
+		{
+			"first lap middle", fields{
+				param: CopyPredictParam(pp,
+					WithPPRace(
+						CopyRaceParam(pp.Race, WithRPSession(conv("30s")))),
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(1),
+							WithCPRemainLapTime(conv("30s"))))),
+			}, &predictv1.PredictResult{
+				Parts: []*predictv1.Part{
+					CreateStintPart(conv("60s"), conv("5m"),
+						createPartStint(5, 2, 6)),
+					// Note: result is based on end of current lap
+
+				},
+			}, false,
+		},
+		{
+			"first lap end", fields{
+				param: CopyPredictParam(pp,
+					WithPPRace(
+						CopyRaceParam(pp.Race, WithRPSession(conv("60s")))),
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(1),
+							WithCPRemainLapTime(0)))),
+			}, &predictv1.PredictResult{
+				Parts: []*predictv1.Part{
+					CreateStintPart(conv("60s"), conv("5m"),
+						createPartStint(5, 2, 6)),
+					// Note: result is based on end of current lap
+
+				},
+			}, false,
+		},
+		{
+			// we calc spot on. we don't need to race a little bit longer than race duration
+			// that's why we only do additional 4 laps in the 5 minute race
+			"race duration is multiple of laptime", fields{
+				param: CopyPredictParam(pp,
+					WithPPRace(
+						CopyRaceParam(pp.Race,
+							WithRPDuration(conv("5m")), WithRPSession(conv("60s")))),
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(1),
+							WithCPRemainLapTime(0)))),
+			}, &predictv1.PredictResult{
+				Parts: []*predictv1.Part{
+					CreateStintPart(conv("60s"), conv("4m"),
+						createPartStint(4, 2, 5)),
+					// Note: result is based on end of current lap
+
+				},
+			}, false,
+		},
+		// Note: to check "near end of race" behavior the important part is the RaceParam
+		{
+			"second lap", fields{
+				param: CopyPredictParam(pp,
+					WithPPRace(
+						CopyRaceParam(pp.Race,
+							WithRPLc(1),
+							WithRPDuration(conv("4m10s")),
+							WithRPSession(conv("90s")))),
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(2),
+							WithCPRemainLapTime(conv("30s"))))),
+			}, &predictv1.PredictResult{
+				Parts: []*predictv1.Part{
+					CreateStintPart(conv("2m"), conv("4m"),
+						createPartStint(4, 3, 6)),
+
+					// Note: result is based on end of current lap
+
+				},
+			}, false,
+		},
+		{
+			"second to last lap", fields{
+				param: CopyPredictParam(pp,
+					WithPPRace(
+						CopyRaceParam(pp.Race,
+							WithRPLc(4),
+							WithRPDuration(conv("1m10s")),
+							WithRPSession(conv("4m30s")))),
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(2),
+							WithCPRemainLapTime(conv("30s"))))),
+			}, &predictv1.PredictResult{
+				Parts: []*predictv1.Part{
+					CreateStintPart(conv("5m"), conv("60s"),
+						createPartStint(1, 6, 6)),
+
+					// Note: result is based on end of current lap
+
+				},
+			}, false,
+		},
+		{
+			"last lap", fields{
+				param: CopyPredictParam(pp,
+					WithPPRace(
+						CopyRaceParam(pp.Race,
+							WithRPLc(5),
+							WithRPDuration(conv("10s")),
+							WithRPSession(conv("5m30s")))),
+					WithPPCar(
+						CopyCarParam(pp.Car,
+							WithCPStintLap(2),
+							WithCPRemainLapTime(conv("30s"))))),
+			}, &predictv1.PredictResult{
+				Parts: []*predictv1.Part{
+					// empty by design for last lap
 				},
 			}, false,
 		},

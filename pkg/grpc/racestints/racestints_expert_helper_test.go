@@ -39,6 +39,18 @@ func CreatePitPart(start, duration time.Duration, partPit *predictv1.Part_Pit) *
 	}
 }
 
+func conv(dur string) time.Duration {
+	//nolint:errcheck // we know the format is correct
+	d, _ := time.ParseDuration(dur)
+	return d
+}
+
+func createPartStint(laps, startLap, endLap int32) *predictv1.Part_Stint {
+	return &predictv1.Part_Stint{Stint: &predictv1.StintPart{
+		Laps: laps, LapStart: startLap, LapEnd: endLap,
+	}}
+}
+
 func withRaceDur(arg time.Duration) calcParamOption {
 	return func(p *ExpertCalcParams) {
 		p.RaceDur = arg

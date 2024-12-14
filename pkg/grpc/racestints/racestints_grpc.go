@@ -66,7 +66,11 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 		// curLap += eol.StintLap
 	} else {
 		if c.Car.RemainLapTime != nil {
-			curDur = c.Car.RemainLapTime.AsDuration()
+			curDur = c.Stint.AvgLaptime.AsDuration()
+
+			// correct offset since we start at the end of the current lap
+			// which is already included in curDur
+			sessionOffset += c.Car.RemainLapTime.AsDuration() - curDur
 		}
 		// check how many laps we can do in this stint
 		remain := c.Stint.Lps - c.Car.StintLap
