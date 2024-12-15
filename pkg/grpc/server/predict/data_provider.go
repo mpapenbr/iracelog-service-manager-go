@@ -159,7 +159,7 @@ func (pd *predictData) PredictParam() (*predictv1.PredictParam, error) {
 		if pd.track.PitInfo == nil {
 			return 0
 		}
-		return pd.event.PitSpeed / 3.6 * pd.track.PitInfo.LaneLength
+		return pd.track.PitInfo.LaneLength / (pd.event.PitSpeed / 3.6)
 	}
 	pitParam := predictv1.PitParam{
 		Overall: toDur(pd.myData.pits[len(pd.myData.pits)-1].timeUsed),
@@ -342,17 +342,15 @@ func createStintStats(lapFrom, lapTo int32, lapData []*analysisv1.Lap) *stintSta
 			if l.LapInfo != nil && l.LapInfo.Mode == commonv1.LapMode_LAP_MODE_OUTLAP {
 				sum += l.LapInfo.Time
 				calcLaps++
-			} else {
-				continue
 			}
+			continue
 		}
 		if i == len(laps)-1 {
 			if l.LapInfo != nil && l.LapInfo.Mode == commonv1.LapMode_LAP_MODE_INLAP {
 				sum += l.LapInfo.Time
 				calcLaps++
-			} else {
-				continue
 			}
+			continue
 		}
 		sum += l.LapTime
 		calcLaps++

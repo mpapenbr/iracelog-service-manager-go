@@ -1,4 +1,4 @@
-//nolint:whitespace,lll,funlen,unused,unparam // readability
+//nolint:whitespace,lll,funlen,unused,unparam,errcheck // readability
 package racestints
 
 import (

@@ -36,7 +36,7 @@ var (
 func NewPredictCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "predict eventId",
-		Short: "display laps (dev only)",
+		Short: "display race prediction (dev only)",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil

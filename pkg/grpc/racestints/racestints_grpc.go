@@ -18,11 +18,15 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 	pitTime := c.Pit.Overall.AsDuration()
 	parts := make([]*predictv1.Part, 0)
 	// curLap is the lap when the stint computation starts
-	// LC is the number of laps completed
-	// we add +2 because
-	// +1 for the current lap (this is our internal fast forward to the next reference point)
-	// +1 to have the lap number of the for the next lap
-	curLap := c.Race.Lc + 2
+	curLap := int32(1)
+	raceStarted := !(c.Race.Lc == 0 && c.Car.StintLap == 0)
+	if raceStarted {
+		// LC is the number of laps completed
+		// we add +2 because
+		// +1 for the current lap (this is our internal fast forward to the next reference point)
+		// +1 to have the lap number of the for the next lap
+		curLap = c.Race.Lc + 2
+	}
 	var sessionOffset time.Duration = 0
 	if c.Race.Session != nil {
 		sessionOffset = c.Race.Session.AsDuration()
@@ -46,7 +50,7 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 		}
 		return ret
 	}
-	createPit := func(start time.Duration, pitTime time.Duration) *predictv1.Part {
+	createPit := func(start, pitTime time.Duration) *predictv1.Part {
 		ret := createPart(start, pitTime)
 		ret.PartType = &predictv1.Part_Pit{
 			Pit: &predictv1.PitPart{},
@@ -72,7 +76,8 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 		// we need to calc the situation at the end of the current lap
 		// curLap += eol.StintLap
 	} else {
-		if c.Car.RemainLapTime != nil {
+		// adjust to next reference point only if we compute in a running race
+		if c.Car.RemainLapTime != nil && raceStarted {
 			curDur = c.Stint.AvgLaptime.AsDuration()
 
 			// correct offset since we start at the end of the current lap

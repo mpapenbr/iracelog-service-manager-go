@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/racestints"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -119,5 +120,19 @@ func (s *predictServer) GetLivePredictParam(
 	}
 	return connect.NewResponse(&predictv1.GetLivePredictParamResponse{
 		Param: param,
+	}), nil
+}
+
+func (s *predictServer) PredictRace(ctx context.Context,
+	req *connect.Request[predictv1.PredictRaceRequest]) (
+	*connect.Response[predictv1.PredictRaceResponse], error,
+) {
+	// TODO: validate vital parameters
+	result, err := racestints.Calc(req.Msg.Param)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&predictv1.PredictRaceResponse{
+		Result: result,
 	}), nil
 }
