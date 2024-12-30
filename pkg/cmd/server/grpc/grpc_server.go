@@ -16,6 +16,7 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/analysis/v1/analysisv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/predict/v1/predictv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
@@ -37,6 +38,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/analysis"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/livedata"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/predict"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/track"
@@ -220,6 +222,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerLiveDataServer()
 	s.registerStateServer()
 	s.registerTrackServer()
+	s.registerPredictServer()
 }
 
 //nolint:funlen // by design
@@ -391,6 +394,20 @@ func (s *grpcServer) registerTrackServer() {
 		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := trackv1connect.NewTrackServiceHandler(
 		trackService,
+		connect.WithInterceptors(s.otel,
+			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
+				auth.WithProviderToken(config.ProviderToken))),
+	)
+	s.mux.Handle(path, handler)
+}
+
+func (s *grpcServer) registerPredictServer() {
+	predictService := predict.NewServer(
+		predict.WithPool(s.pool),
+		predict.WithEventLookup(s.eventLookup),
+	)
+	path, handler := predictv1connect.NewPredictServiceHandler(
+		predictService,
 		connect.WithInterceptors(s.otel,
 			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
 				auth.WithProviderToken(config.ProviderToken))),

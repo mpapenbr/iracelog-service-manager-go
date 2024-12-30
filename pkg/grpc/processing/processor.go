@@ -107,6 +107,7 @@ func (p *Processor) ProcessSpeedmap(payload *racestatev1.PublishSpeedmapRequest)
 				carClassLaptimes[k] = car.Laptime
 			}
 			p.snapshotChan <- &analysisv1.SnapshotData{
+				//nolint:errcheck // ignore error
 				RecordStamp:      proto.Clone(payload.Timestamp).(*timestamppb.Timestamp),
 				SessionTime:      p.lastSessionData.SessionTime,
 				TimeOfDay:        p.lastSessionData.TimeOfDay,
@@ -121,6 +122,7 @@ func (p *Processor) ProcessSpeedmap(payload *racestatev1.PublishSpeedmapRequest)
 	}
 }
 
+//nolint:errcheck // ignore error
 func (p *Processor) composeReplayInfo() *eventv1.ReplayInfo {
 	ret := proto.Clone(p.raceProcessor.ReplayInfo.ProtoReflect().Interface())
 	return ret.(*eventv1.ReplayInfo)

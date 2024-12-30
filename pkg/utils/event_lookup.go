@@ -67,6 +67,7 @@ type EventProcessingData struct {
 	SnapshotBroadcast   broadcast.BroadcastServer[*analysisv1.SnapshotData]
 	Mutex               sync.Mutex
 	LastDriverData      *racestatev1.PublishDriverDataRequest
+	LastRaceState       *racestatev1.PublishStateRequest
 	LastAnalysisData    *analysisv1.Analysis
 	LastReplayInfo      *eventv1.ReplayInfo
 	RecordingMode       providerev1.RecordingMode
@@ -157,6 +158,13 @@ func collectRaceSessions(e *eventv1.Event) []uint32 {
 }
 
 func (epd *EventProcessingData) setupOwnListeners() {
+	go func() {
+		ch := epd.RacestateBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.LastRaceState = proto.Clone(data).(*racestatev1.PublishStateRequest)
+		}
+	}()
 	go func() {
 		ch := epd.DriverDataBroadcast.Subscribe()
 		for data := range ch {

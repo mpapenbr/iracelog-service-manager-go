@@ -91,7 +91,7 @@ func (s *liveDataServer) LiveRaceState(
 	return nil
 }
 
-//nolint:whitespace,dupl // can't make both editor and linter happy
+//nolint:whitespace,dupl,errcheck // can't make both editor and linter happy
 func (s *liveDataServer) LiveAnalysis(
 	ctx context.Context,
 	req *connect.Request[livedatav1.LiveAnalysisRequest],
@@ -123,7 +123,7 @@ func (s *liveDataServer) LiveAnalysis(
 	return nil
 }
 
-//nolint:whitespace,dupl // can't make both editor and linter happy
+//nolint:whitespace,dupl,errcheck // can't make both editor and linter happy
 func (s *liveDataServer) LiveSpeedmap(
 	ctx context.Context,
 	req *connect.Request[livedatav1.LiveSpeedmapRequest],
@@ -158,7 +158,7 @@ func (s *liveDataServer) LiveSpeedmap(
 	return nil
 }
 
-//nolint:whitespace,dupl,funlen // can't make both editor and linter happy
+//nolint:whitespace,dupl,funlen,errcheck // can't make both editor and linter happy
 func (s *liveDataServer) LiveSnapshotData(
 	ctx context.Context,
 	req *connect.Request[livedatav1.LiveSnapshotDataRequest],
@@ -296,7 +296,7 @@ func (s *liveDataServer) LiveCarOccupancies(
 	return nil
 }
 
-//nolint:whitespace,dupl,funlen,gocritic // can't make both editor and linter happy
+//nolint:whitespace,dupl,funlen,gocritic,errcheck // by design
 func (s *liveDataServer) LiveAnalysisSel(
 	ctx context.Context,
 	req *connect.Request[livedatav1.LiveAnalysisSelRequest],
