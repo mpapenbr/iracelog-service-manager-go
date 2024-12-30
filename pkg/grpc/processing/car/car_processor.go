@@ -284,10 +284,12 @@ func (p *CarProcessor) handleComputeStateRun(
 	p.markSeatTime(carComputeState.CarNum, sessionTime)
 	switch curCarState {
 	case racestatev1.CarState_CAR_STATE_RUN:
-
 		carComputeState.OutEncountered = 0.0
-	case racestatev1.CarState_CAR_STATE_OUT:
 
+	case racestatev1.CarState_CAR_STATE_FIN:
+		carComputeState.CarState = racestatev1.CarState_CAR_STATE_FIN
+
+	case racestatev1.CarState_CAR_STATE_OUT:
 		if carComputeState.OutEncountered == 0.0 {
 			carComputeState.OutEncountered = sessionTime
 		} else if sessionTime-carComputeState.OutEncountered > OUT_THRESHOLD {
@@ -299,7 +301,6 @@ func (p *CarProcessor) handleComputeStateRun(
 		}
 
 	case racestatev1.CarState_CAR_STATE_PIT:
-
 		carComputeState.OutEncountered = 0.0
 		carComputeState.CarState = racestatev1.CarState_CAR_STATE_PIT
 		stint.Current.IsCurrentStint = false
