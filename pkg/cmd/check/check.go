@@ -18,7 +18,7 @@ func NewCheckCmd() *cobra.Command {
 	cmd.AddCommand(NewCheckSnapshotsCmd())
 	cmd.AddCommand(NewCheckStateInoutlapCmd())
 	cmd.AddCommand(NewDisplayLapsCmd())
-	cmd.AddCommand(NewPredictCmd())
+
 	return cmd
 }
 
