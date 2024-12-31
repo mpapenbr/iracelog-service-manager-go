@@ -1,3 +1,12 @@
-realm: racelog
-url: ws://localhost:8091/ws
-db: postgresql://postgres:secret@db:5432/iracelog
+
+db: postgresql://DBUSER:DBPASSWORD@localhost:5432/iracelog
+
+log-config: logger.yml
+log-format: text
+log-level: debug
+
+# migrationSourceUrl: file:///workspaces/iracelog-service-manager-go/pkg/db/migrate/migrations
+# enable-telemetry: true
+# telemetry-endpoint: localhost:4317
+grpc-server-addr: localhost:8084
+max-concurrent-streams: 1000

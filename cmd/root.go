@@ -16,13 +16,9 @@ import (
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	checkCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/check"
-	clientCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/client"
 	migrateCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/migrate"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/repair"
-	replayCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay"
 	grpcServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/grpc"
-	wampServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/server/wamp"
-	transferCmd "github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/transfer"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
@@ -83,12 +79,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.DB, "db",
 		"postgresql://DB_USERNAME:DB_USER_PASSWORD@DB_HOST:5432/iracelog",
 		"Connection string for the database")
-	rootCmd.PersistentFlags().StringVar(&config.URL, "url",
-		"ws://localhost:8080/ws",
-		"URL to connect the WAMP server")
-	rootCmd.PersistentFlags().StringVar(&config.Realm, "realm",
-		"racelog",
-		"Realm to use for WAMP server")
+
 	rootCmd.PersistentFlags().StringVar(&config.WaitForServices,
 		"wait-for-services",
 		"15s",
@@ -104,12 +95,8 @@ func init() {
 
 	// add commands here
 	rootCmd.AddCommand(migrateCmd.NewMigrateCmd())
-	rootCmd.AddCommand(wampServer.NewServerCmd())
 	rootCmd.AddCommand(grpcServer.NewServerCmd())
-	rootCmd.AddCommand(replayCmd.NewReplayCmd())
 	rootCmd.AddCommand(checkCmd.NewCheckCmd())
-	rootCmd.AddCommand(clientCmd.NewLiveStateCmd())
-	rootCmd.AddCommand(transferCmd.NewTransferCmd())
 	rootCmd.AddCommand(repair.NewRepairCmd())
 }
 

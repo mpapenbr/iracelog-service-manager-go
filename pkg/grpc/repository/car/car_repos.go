@@ -9,7 +9,7 @@ import (
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 )
 
 type persister struct {

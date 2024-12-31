@@ -12,8 +12,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
 // stores the racestate info and the protobuf message in the database

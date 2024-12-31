@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 )
 
 var selector = `select id, event_key, name, description, event_time,

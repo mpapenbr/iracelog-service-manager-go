@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 )
 
 func Create(

@@ -12,7 +12,6 @@ func NewCheckCmd() *cobra.Command {
 		Short: "commands to check",
 	}
 
-	cmd.AddCommand(NewCheckConvertCmd())
 	cmd.AddCommand(NewCheckDataFetcherCmd())
 	cmd.AddCommand(NewCheckCarStatesCmd())
 	cmd.AddCommand(NewCheckSnapshotsCmd())
