@@ -5,7 +5,6 @@ import (
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay/grpc"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay/util"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay/wamp"
 )
 
 func NewReplayCmd() *cobra.Command {
@@ -32,6 +31,6 @@ func NewReplayCmd() *cobra.Command {
 		"",
 		"replay this duration with max speed")
 	cmd.AddCommand(grpc.NewReplayGrpcCmd())
-	cmd.AddCommand(wamp.NewReplayWampCmd())
+
 	return cmd
 }

@@ -65,25 +65,7 @@
         "postgresql://docker:docker@localhost:5432/iracelog_aer"
       ]
     },
-    {
-      "name": "check convert",
-      "type": "go",
-      "request": "launch",
-      "mode": "auto",
-      "program": "${workspaceFolder}/main.go",
-      "envFile": "${workspaceFolder}/.env",
-      "args": [
-        "check",
-        "convert",
-        "320",
-        "--log-level",
-        "debug",
-        "--start",
-        "1711241308",
-        "--db",
-        "postgresql://docker:docker@localhost:5432/iracelog_try"
-      ]
-    },
+
     {
       "name": "check datafetcher",
       "type": "go",
@@ -118,21 +100,7 @@
         "postgresql://docker:docker@localhost:5432/iracelog_grpc"
       ]
     },
-    {
-      "name": "Wamp-Server",
-      "type": "go",
-      "request": "launch",
-      "mode": "auto",
-      "program": "${workspaceFolder}/main.go",
-      "args": [
-        "wamp",
-        "--log-format",
-        "text",
-        "--log-level",
-        "debug",
-        "--enable-telemetry"
-      ]
-    },
+
     {
       "name": "Migrate",
       "type": "go",

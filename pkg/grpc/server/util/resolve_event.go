@@ -9,8 +9,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 

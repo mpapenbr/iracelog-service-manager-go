@@ -8,7 +8,7 @@ import (
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 )
 
 func Upsert(

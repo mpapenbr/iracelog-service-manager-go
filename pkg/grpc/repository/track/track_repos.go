@@ -9,7 +9,7 @@ import (
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/repository"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 )
 
 var selector = `select id, name, short_name, config, track_length,
