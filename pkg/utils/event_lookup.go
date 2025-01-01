@@ -36,6 +36,12 @@ func WithStaleDuration(d time.Duration) Option {
 	}
 }
 
+func WithDeleteEventCB(cb func(eventKey string)) Option {
+	return func(el *EventLookup) {
+		el.deleteEventCB = cb
+	}
+}
+
 func NewEventLookup(opts ...Option) *EventLookup {
 	ret := &EventLookup{
 		lookup: make(map[string]*EventProcessingData),
@@ -82,6 +88,7 @@ type EventLookup struct {
 	staleDuration time.Duration
 	mutex         sync.Mutex
 	log           *log.Logger
+	deleteEventCB func(eventKey string)
 }
 
 //nolint:whitespace,funlen // can't make both editor and linter happy
@@ -289,6 +296,9 @@ func (e *EventLookup) setupWatchdog() {
 				}
 				for _, epd := range toRemove {
 					delete(e.lookup, epd.Event.Key)
+					if e.deleteEventCB != nil {
+						e.deleteEventCB(epd.Event.Key)
+					}
 				}
 			}
 		}

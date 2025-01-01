@@ -25,6 +25,8 @@ var (
 	AdminToken           string // token for admin access
 	StaleDuration        string // duration after which an event is considered stale
 	MaxConcurrentStreams int    // max number of concurrent streams per connection
+	NatsUrl              string // nats server url
+	EnabledNats          bool   // enable nats
 
 )
 
