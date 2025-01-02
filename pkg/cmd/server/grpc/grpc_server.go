@@ -410,7 +410,8 @@ func (s *grpcServer) registerProviderServer() {
 func (s *grpcServer) registerStateServer() {
 	stateService := state.NewServer(
 		state.WithPool(s.pool),
-		state.WithEventLookup(s.eventLookup),
+		state.WithEventLookup(s.eventLookup), // to be removed?
+		state.WithPubSubData(s.pubsubData),
 		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := racestatev1connect.NewRaceStateServiceHandler(
 		stateService,
@@ -423,7 +424,9 @@ func (s *grpcServer) registerStateServer() {
 
 func (s *grpcServer) registerLiveDataServer() {
 	liveDataService := livedata.NewServer(
-		livedata.WithEventLookup(s.eventLookup))
+		livedata.WithEventLookup(s.eventLookup), // to be removed?
+		livedata.WithPubSubData(s.pubsubData),
+	)
 	path, handler := livedatav1connect.NewLiveDataServiceHandler(
 		liveDataService,
 		connect.WithInterceptors(s.otel),
@@ -447,7 +450,7 @@ func (s *grpcServer) registerTrackServer() {
 func (s *grpcServer) registerPredictServer() {
 	predictService := predict.NewServer(
 		predict.WithPool(s.pool),
-		predict.WithEventLookup(s.eventLookup),
+		predict.WithEventLookup(s.eventLookup), // to be removed?
 	)
 	path, handler := predictv1connect.NewPredictServiceHandler(
 		predictService,

@@ -25,6 +25,7 @@ import (
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/pubsub"
 	mainUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -67,14 +68,21 @@ func WithDebugWire(arg bool) Option {
 	}
 }
 
+func WithPubSubData(pd pubsub.PubSubData) Option {
+	return func(srv *stateServer) {
+		srv.pubsubData = pd
+	}
+}
+
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
-	pool      *pgxpool.Pool
-	pe        permission.PermissionEvaluator
-	lookup    *utils.EventLookup
-	log       *log.Logger
-	wireLog   *log.Logger
-	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
+	pool       *pgxpool.Pool
+	pe         permission.PermissionEvaluator
+	pubsubData pubsub.PubSubData
+	lookup     *utils.EventLookup
+	log        *log.Logger
+	wireLog    *log.Logger
+	debugWire  bool // if true, debug events affecting "wire" actions (send/receive)
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -87,7 +95,7 @@ func (s *stateServer) PublishState(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	// get the epd
+	// get the epd. This can only be found in the "local" lookup.
 	epd, err := s.lookup.GetEvent(req.Msg.Event)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
@@ -97,7 +105,9 @@ func (s *stateServer) PublishState(
 			log.String("event", epd.Event.Key),
 			log.Int("car entries", len(req.Msg.Cars)))
 	}
-
+	if err := s.pubsubData.PublishRaceStateData(req.Msg); err != nil {
+		s.log.Error("error publishing state", log.ErrorField(err))
+	}
 	if s.isRaceSession(epd, req.Msg) {
 		if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 			id, err := racestaterepos.CreateRaceState(ctx, tx, int(epd.Event.Id), req.Msg)

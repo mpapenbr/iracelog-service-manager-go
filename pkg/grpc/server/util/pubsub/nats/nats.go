@@ -2,10 +2,12 @@ package nats
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
+	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/pubsub"
 	"github.com/nats-io/nats.go"
@@ -17,21 +19,25 @@ type (
 		pubsub.EmptyPubSubData
 		ctx            context.Context
 		conn           *nats.Conn
-		events         map[string]*pubsub.EventData // holds events over all cluster members
+		events         map[string]*eventContainer // holds events over all cluster members
 		l              *log.Logger
 		mutex          sync.Mutex
 		onUnregisterCB func(sel *commonv1.EventSelector)
 		subRegister    *nats.Subscription
 		subUnregister  *nats.Subscription
 	}
-	Option func(*NatsPubSub)
+	Option         func(*NatsPubSub)
+	eventContainer struct {
+		eventData    *pubsub.EventData
+		subRacestate *nats.Subscription
+	}
 )
 
 func NewNatsPubSub(conn *nats.Conn, opts ...Option) (*NatsPubSub, error) {
 	ret := &NatsPubSub{
 		conn:   conn,
 		ctx:    context.Background(),
-		events: make(map[string]*pubsub.EventData),
+		events: make(map[string]*eventContainer),
 		l:      log.Default().Named("nats"),
 		mutex:  sync.Mutex{},
 	}
@@ -71,21 +77,23 @@ func (n *NatsPubSub) DeleteEventCallback(eventKey string) {
 	n.PublishEventUnregistered(eventKey)
 }
 
-func (n *NatsPubSub) PublishEventRegistered(ed *pubsub.EventData) {
+func (n *NatsPubSub) PublishEventRegistered(ed *pubsub.EventData) error {
 	builder := providerv1.RegisterEventResponse_builder{
 		Event: ed.Event,
 		Track: ed.Track,
 	}
 	msg := builder.Build()
 	data, _ := proto.Marshal(msg)
-	n.conn.Publish("event.registered", data)
+	return n.conn.Publish("event.registered", data)
 }
 
-func (n *NatsPubSub) PublishEventUnregistered(eventKey string) {
-	// n.mutex.Lock()
-	// defer n.mutex.Unlock()
-	// delete(n.events, eventKey)
-	n.conn.Publish("event.unregistered", []byte(eventKey))
+func (n *NatsPubSub) PublishEventUnregistered(eventKey string) error {
+	return n.conn.Publish("event.unregistered", []byte(eventKey))
+}
+
+func (n *NatsPubSub) PublishRaceStateData(req *racestatev1.PublishStateRequest) error {
+	data, _ := proto.Marshal(req)
+	return n.conn.Publish(fmt.Sprintf("racestate.%s", req.Event.GetKey()), data)
 }
 
 func (n *NatsPubSub) LiveEvents() []*pubsub.EventData {
@@ -93,7 +101,7 @@ func (n *NatsPubSub) LiveEvents() []*pubsub.EventData {
 	defer n.mutex.Unlock()
 	events := make([]*pubsub.EventData, 0, len(n.events))
 	for _, event := range n.events {
-		events = append(events, event)
+		events = append(events, event.eventData)
 	}
 	return events
 }
@@ -102,12 +110,73 @@ func (n *NatsPubSub) LiveEvents() []*pubsub.EventData {
 func (n *NatsPubSub) GetEvent(selector *commonv1.EventSelector) (
 	*pubsub.EventData, error,
 ) {
+	if event, err := n.getEvent(selector); err != nil {
+		return nil, err
+	} else {
+		return event.eventData, nil
+	}
+}
+
+//nolint:whitespace // false positive
+func (n *NatsPubSub) SubscribeRaceStateData(sel *commonv1.EventSelector) (
+	<-chan *racestatev1.PublishStateRequest, error,
+) {
+	if event, err := n.getEvent(sel); err != nil {
+		return nil, err
+	} else {
+		subj := fmt.Sprintf("racestate.%s", event.eventData.Event.Key)
+		dataChan := make(chan *racestatev1.PublishStateRequest)
+		sub, err := n.conn.Subscribe(subj, func(msg *nats.Msg) {
+			var req racestatev1.PublishStateRequest
+			if uErr := proto.Unmarshal(msg.Data, &req); uErr != nil {
+				n.l.Error("error unmarshalling racestate data", log.ErrorField(uErr))
+				return
+			}
+			n.l.Debug("received racestate data", log.String("eventKey", req.Event.GetKey()))
+			dataChan <- &req
+		})
+		if err != nil {
+			return nil, err
+		}
+		event.subRacestate = sub
+		return dataChan, nil
+	}
+}
+
+//nolint:whitespace // false positive
+func (n *NatsPubSub) UnsubscribeRaceStateData(
+	sel *commonv1.EventSelector,
+	dataChan <-chan *racestatev1.PublishStateRequest,
+) {
+	if event, err := n.getEvent(sel); err == nil {
+		n.unsubscribe(event.subRacestate)
+	}
+}
+
+func (n *NatsPubSub) unsubscribe(sub *nats.Subscription) {
+	if sub != nil {
+		if err := sub.Unsubscribe(); err != nil {
+			n.l.Debug("error unsubscribing",
+				log.String("sub", sub.Subject),
+				log.ErrorField(err))
+		} else {
+			n.l.Debug("unsubscribed",
+				log.String("sub", sub.Subject),
+			)
+		}
+	}
+}
+
+//nolint:whitespace // false positive
+func (n *NatsPubSub) getEvent(selector *commonv1.EventSelector) (
+	*eventContainer, error,
+) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 	switch selector.Arg.(type) {
 	case *commonv1.EventSelector_Id:
 		for _, v := range n.events {
-			if v.Event.Id == uint32(selector.GetId()) {
+			if v.eventData.Event.Id == uint32(selector.GetId()) {
 				return v, nil
 			}
 		}
@@ -131,9 +200,11 @@ func (n *NatsPubSub) setupSubscriptions() error {
 		n.l.Debug("received event registered", log.String("eventKey", regData.Event.Key))
 		n.mutex.Lock()
 		defer n.mutex.Unlock()
-		n.events[regData.Event.Key] = &pubsub.EventData{
-			Event: regData.Event,
-			Track: regData.Track,
+		n.events[regData.Event.Key] = &eventContainer{
+			eventData: &pubsub.EventData{
+				Event: regData.Event,
+				Track: regData.Track,
+			},
 		}
 	}); err != nil {
 		return err

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/pubsub"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -37,6 +38,12 @@ func WithEventLookup(lookup *utils.EventLookup) Option {
 	}
 }
 
+func WithPubSubData(pubsubData pubsub.PubSubData) Option {
+	return func(srv *liveDataServer) {
+		srv.pubsubData = pubsubData
+	}
+}
+
 func WithDebugWire(arg bool) Option {
 	return func(srv *liveDataServer) {
 		srv.debugWire = arg
@@ -46,10 +53,11 @@ func WithDebugWire(arg bool) Option {
 type liveDataServer struct {
 	livedatav1connect.UnimplementedLiveDataServiceHandler
 
-	lookup    *utils.EventLookup
-	log       *log.Logger
-	wireLog   *log.Logger
-	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
+	lookup     *utils.EventLookup
+	pubsubData pubsub.PubSubData
+	log        *log.Logger
+	wireLog    *log.Logger
+	debugWire  bool // if true, debug events affecting "wire" actions (send/receive)
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -59,19 +67,25 @@ func (s *liveDataServer) LiveRaceState(
 	stream *connect.ServerStream[livedatav1.LiveRaceStateResponse],
 ) error {
 	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// epd, err := s.pubsubData.GetEvent(req.Msg.Event)
+	// if err != nil {
+	// 	return connect.NewError(connect.CodeNotFound, err)
+	// }
+	// dataChan := epd.RacestateBroadcast.Subscribe()
+	dataChan, err := s.pubsubData.SubscribeRaceStateData(req.Msg.Event)
 	if err != nil {
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeInternal, err)
 	}
+	eventKey := req.Msg.Event.GetKey()
 	s.log.Debug("Sending live race states",
-		log.String("event", epd.Event.Key),
+		log.String("event", eventKey),
 	)
-	dataChan := epd.RacestateBroadcast.Subscribe()
 
 	for d := range dataChan {
 		if s.debugWire {
 			s.wireLog.Debug("Send racestate data",
-				log.String("event", epd.Event.Key))
+				log.String("event", eventKey))
 		}
 		if err := stream.Send(&livedatav1.LiveRaceStateResponse{
 			Timestamp: d.Timestamp,
@@ -79,15 +93,14 @@ func (s *liveDataServer) LiveRaceState(
 			Cars:      d.Cars,
 			Messages:  d.Messages,
 		}); err != nil {
-			epd.Mutex.Lock()
-			//nolint:gocritic // by design
-			defer epd.Mutex.Unlock()
-			epd.RacestateBroadcast.CancelSubscription(dataChan)
+			s.log.Debug("LiveRaceState stream closed", log.String("event", eventKey))
+			s.pubsubData.UnsubscribeRaceStateData(req.Msg.Event, dataChan)
 			return err
 		}
 
 	}
-	s.log.Debug("LiveRaceState stream closed")
+	s.pubsubData.UnsubscribeRaceStateData(req.Msg.Event, dataChan)
+	s.log.Debug("LiveRaceState stream closed", log.String("event", eventKey))
 	return nil
 }
 
