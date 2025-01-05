@@ -19,6 +19,7 @@ import (
 	aProtoRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
 	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
@@ -46,6 +47,12 @@ func WithEventLookup(lookup *utils.EventLookup) Option {
 	}
 }
 
+func WithDataProxy(arg proxy.DataProxy) Option {
+	return func(srv *providerServer) {
+		srv.dataProxy = arg
+	}
+}
+
 func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	return func(srv *providerServer) {
 		srv.pe = pe
@@ -56,10 +63,11 @@ var ErrEventAlreadyRegistered = errors.New("event already registered")
 
 type providerServer struct {
 	x.UnimplementedProviderServiceHandler
-	pool   *pgxpool.Pool
-	pe     permission.PermissionEvaluator
-	lookup *utils.EventLookup
-	log    *log.Logger
+	dataProxy proxy.DataProxy
+	pool      *pgxpool.Pool
+	pe        permission.PermissionEvaluator
+	lookup    *utils.EventLookup
+	log       *log.Logger
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -69,7 +77,7 @@ func (s *providerServer) ListLiveEvents(
 ) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
 	s.log.Debug("ListLiveEvents called")
 	ec := []*providerv1.LiveEventContainer{}
-	for _, v := range s.lookup.GetEvents() {
+	for _, v := range s.dataProxy.LiveEvents() {
 		ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 	}
 	return connect.NewResponse(&providerv1.ListLiveEventsResponse{Events: ec}), nil
@@ -95,9 +103,10 @@ func (s *providerServer) RegisterEvent(
 			Key: req.Msg.Key,
 		},
 	}
-	if e, _ := s.lookup.GetEvent(selector); e != nil {
+	if ed, _ := s.dataProxy.GetEvent(selector); ed != nil {
 		return nil, connect.NewError(connect.CodeAlreadyExists, ErrEventAlreadyRegistered)
 	}
+
 	if err := s.storeData(
 		ctx,
 		req.Msg.RecordingMode,
@@ -119,6 +128,9 @@ func (s *providerServer) RegisterEvent(
 	epd := s.lookup.AddEvent(req.Msg.Event, dbTrack, req.Msg.RecordingMode)
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
+	if err = s.dataProxy.PublishEventRegistered(epd); err != nil {
+		s.log.Error("error publishing registered event", log.ErrorField(err))
+	}
 	s.log.Debug("event registered")
 	return connect.NewResponse(&providerv1.RegisterEventResponse{
 			Event: req.Msg.Event,
@@ -138,14 +150,23 @@ func (s *providerServer) UnregisterEvent(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-
-	epd, err := s.lookup.GetEvent(req.Msg.EventSelector)
-	if err != nil {
+	var ed *proxy.EventData
+	var err error
+	if ed, err = s.dataProxy.GetEvent(req.Msg.EventSelector); err != nil {
+		s.log.Warn("event not found in pubsub", log.ErrorField(err))
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	s.storeAnalysisData(epd)
-	s.storeReplayInfo(epd)
-	s.lookup.RemoveEvent(req.Msg.EventSelector)
+	epd, _ := s.lookup.GetEvent(req.Msg.EventSelector)
+	if epd != nil {
+		s.log.Debug("I was processing this event", log.String("key", epd.Event.Key))
+
+		s.storeAnalysisData(epd)
+		s.storeReplayInfo(epd)
+		s.lookup.RemoveEvent(req.Msg.EventSelector)
+	}
+	if err := s.dataProxy.PublishEventUnregistered(ed.Event.Key); err != nil {
+		s.log.Error("error publishing unregistered event", log.ErrorField(err))
+	}
 	s.log.Debug("Event unregistered",
 		log.Any("event", req.Msg.EventSelector))
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
@@ -160,7 +181,7 @@ func (s *providerServer) UnregisterAll(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-
+	// TODO: data has to retrieved by pubsubData
 	ec := []*providerv1.LiveEventContainer{}
 	for _, v := range s.lookup.GetEvents() {
 		s.storeAnalysisData(v)
