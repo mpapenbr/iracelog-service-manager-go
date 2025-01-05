@@ -23,6 +23,7 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nats-io/nats.go"
 	"github.com/pgx-contrib/pgxtrace"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
@@ -42,6 +43,9 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/local"
+	ownNats "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/nats"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
@@ -123,6 +127,14 @@ func NewServerCmd() *cobra.Command {
 		"max-concurrent-streams",
 		100,
 		"max number of concurrent streams per connection")
+	cmd.Flags().BoolVar(&config.EnabledNats,
+		"enable-nats",
+		false,
+		"use NATS as middleware for live data")
+	cmd.Flags().StringVar(&config.NatsUrl,
+		"nats-url",
+		"nats://localhost:4222",
+		"url of the NATS server")
 	return cmd
 }
 
@@ -135,6 +147,7 @@ type grpcServer struct {
 	otel        *otelconnect.Interceptor
 	eventLookup *utils.EventLookup
 	tlsConfig   *tls.Config
+	dataProxy   proxy.DataProxy
 }
 
 //nolint:funlen,cyclop // by design
@@ -215,7 +228,33 @@ func (s *grpcServer) SetupGrpcServices() {
 		staleDuration = 1 * time.Minute
 	}
 	s.log.Debug("init with stale duration", log.Duration("duration", staleDuration))
+
+	// default: use local pubsub
 	s.eventLookup = utils.NewEventLookup(utils.WithStaleDuration(staleDuration))
+	localInst := local.NewLocalProxy(s.eventLookup)
+	s.dataProxy = localInst
+	s.eventLookup.SetDeleteEventCB(localInst.DeleteEventCallback)
+	// TODO: rename to cluster?
+	if config.EnabledNats {
+		s.log.Debug("Using NATS as middleware for live data")
+		nc, err := nats.Connect(config.NatsUrl)
+		if err != nil {
+			s.log.Error("Could not connect to NATS", log.ErrorField(err))
+		}
+		if inst, err := ownNats.NewNatsProxy(nc,
+			ownNats.WithContext(s.ctx),
+			ownNats.WithLogger(log.GetFromContext(s.ctx).Named("nats")),
+		); err == nil {
+			s.dataProxy = inst
+			s.eventLookup = utils.NewEventLookup(
+				utils.WithStaleDuration(staleDuration),
+				utils.WithDeleteEventCB(inst.DeleteEventCallback))
+			inst.SetOnUnregisterCB(s.eventLookup.RemoveEvent)
+		} else {
+			s.log.Warn("Could not setup NATS proxy. Continue with standard mode",
+				log.ErrorField(err))
+		}
+	}
 	s.registerEventServer()
 	s.registerAnalysisServer()
 	s.registerProviderServer()
@@ -294,6 +333,8 @@ func (s *grpcServer) Start() error {
 	if s.telemetry != nil {
 		s.telemetry.Shutdown()
 	}
+	s.log.Debug("Shutting down pubsub")
+	s.dataProxy.Close()
 
 	s.log.Info("Server terminated")
 	return nil
@@ -318,6 +359,9 @@ func (s *grpcServer) waitForRequiredServices() {
 		wg.Add(1)
 		go checkTcp(postgresAddr)
 	}
+
+	// TODO: check for NATS if enabled
+
 	s.log.Debug("Waiting for connection checks to return")
 	wg.Wait()
 	s.log.Debug("Required services are available")
@@ -354,6 +398,7 @@ func (s *grpcServer) registerProviderServer() {
 	providerService := provider.NewServer(
 		provider.WithPersistence(s.pool),
 		provider.WithEventLookup(s.eventLookup),
+		provider.WithDataProxy(s.dataProxy),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
@@ -367,7 +412,8 @@ func (s *grpcServer) registerProviderServer() {
 func (s *grpcServer) registerStateServer() {
 	stateService := state.NewServer(
 		state.WithPool(s.pool),
-		state.WithEventLookup(s.eventLookup),
+		state.WithEventLookup(s.eventLookup), // to be removed?
+		state.WithDataProxy(s.dataProxy),
 		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := racestatev1connect.NewRaceStateServiceHandler(
 		stateService,
@@ -380,7 +426,9 @@ func (s *grpcServer) registerStateServer() {
 
 func (s *grpcServer) registerLiveDataServer() {
 	liveDataService := livedata.NewServer(
-		livedata.WithEventLookup(s.eventLookup))
+		livedata.WithEventLookup(s.eventLookup), // to be removed?
+		livedata.WithDataProxy(s.dataProxy),
+	)
 	path, handler := livedatav1connect.NewLiveDataServiceHandler(
 		liveDataService,
 		connect.WithInterceptors(s.otel),
@@ -404,7 +452,7 @@ func (s *grpcServer) registerTrackServer() {
 func (s *grpcServer) registerPredictServer() {
 	predictService := predict.NewServer(
 		predict.WithPool(s.pool),
-		predict.WithEventLookup(s.eventLookup),
+		predict.WithEventLookup(s.eventLookup), // to be removed?
 	)
 	path, handler := predictv1connect.NewPredictServiceHandler(
 		predictService,

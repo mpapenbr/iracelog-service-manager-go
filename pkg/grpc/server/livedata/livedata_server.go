@@ -8,13 +8,13 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	livedatav1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/livedata/v1"
-	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	speedmapv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/speedmap/v1"
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -37,6 +37,12 @@ func WithEventLookup(lookup *utils.EventLookup) Option {
 	}
 }
 
+func WithDataProxy(dataProxy proxy.DataProxy) Option {
+	return func(srv *liveDataServer) {
+		srv.dataProxy = dataProxy
+	}
+}
+
 func WithDebugWire(arg bool) Option {
 	return func(srv *liveDataServer) {
 		srv.debugWire = arg
@@ -47,6 +53,7 @@ type liveDataServer struct {
 	livedatav1connect.UnimplementedLiveDataServiceHandler
 
 	lookup    *utils.EventLookup
+	dataProxy proxy.DataProxy
 	log       *log.Logger
 	wireLog   *log.Logger
 	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
@@ -58,20 +65,25 @@ func (s *liveDataServer) LiveRaceState(
 	req *connect.Request[livedatav1.LiveRaceStateRequest],
 	stream *connect.ServerStream[livedatav1.LiveRaceStateResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// get channels
+	dataChan, quitChan, err := s.dataProxy.SubscribeRaceStateData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
+	eventKey := req.Msg.Event.GetKey()
 	s.log.Debug("Sending live race states",
-		log.String("event", epd.Event.Key),
+		log.String("event", eventKey),
 	)
-	dataChan := epd.RacestateBroadcast.Subscribe()
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveRaceState stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
 
 	for d := range dataChan {
 		if s.debugWire {
 			s.wireLog.Debug("Send racestate data",
-				log.String("event", epd.Event.Key))
+				log.String("event", eventKey))
 		}
 		if err := stream.Send(&livedatav1.LiveRaceStateResponse{
 			Timestamp: d.Timestamp,
@@ -79,15 +91,13 @@ func (s *liveDataServer) LiveRaceState(
 			Cars:      d.Cars,
 			Messages:  d.Messages,
 		}); err != nil {
-			epd.Mutex.Lock()
-			//nolint:gocritic // by design
-			defer epd.Mutex.Unlock()
-			epd.RacestateBroadcast.CancelSubscription(dataChan)
+			s.log.Debug("Error sending LiveRaceState stream", log.String("event", eventKey))
 			return err
 		}
 
 	}
-	s.log.Debug("LiveRaceState stream closed")
+	s.log.Debug("LiveRaceState source channel closed", log.String("event", eventKey))
+
 	return nil
 }
 
@@ -97,29 +107,35 @@ func (s *liveDataServer) LiveAnalysis(
 	req *connect.Request[livedatav1.LiveAnalysisRequest],
 	stream *connect.ServerStream[livedatav1.LiveAnalysisResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	s.log.Debug("Sending live race states",
-		log.String("event", epd.Event.Key),
+	eventKey := req.Msg.Event.GetKey()
+	s.log.Debug("Sending live analysis data",
+		log.String("event", eventKey),
 	)
-	dataChan := epd.AnalysisBroadcast.Subscribe()
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveAnalysis stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
+
 	for a := range dataChan {
 		if s.debugWire {
-			s.wireLog.Debug("Received racestate data",
-				log.String("event", epd.Event.Key))
+			s.wireLog.Debug("Received analysis data",
+				log.String("event", eventKey))
 		}
 		if err := stream.Send(&livedatav1.LiveAnalysisResponse{
 			Timestamp: timestamppb.Now(),
 			Analysis:  proto.Clone(a).(*analysisv1.Analysis),
 		}); err != nil {
-			s.cancelSubscription(epd, dataChan)
+			s.log.Debug("Error sending AnalysisData stream", log.String("event", eventKey))
 			return err
 		}
 	}
-	s.log.Debug("LiveAnalysis stream closed")
+	s.log.Debug("AnalysisData source channel closed", log.String("event", eventKey))
+
 	return nil
 }
 
@@ -129,32 +145,34 @@ func (s *liveDataServer) LiveSpeedmap(
 	req *connect.Request[livedatav1.LiveSpeedmapRequest],
 	stream *connect.ServerStream[livedatav1.LiveSpeedmapResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeSpeedmapData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
+	eventKey := req.Msg.Event.GetKey()
 	s.log.Debug("Sending live speedmap data",
-		log.String("event", epd.Event.Key),
+		log.String("event", eventKey),
 	)
-	dataChan := epd.SpeedmapBroadcast.Subscribe()
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveSpeedmap stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
 	for a := range dataChan {
 		if s.debugWire {
 			s.wireLog.Debug("Sending speedmap data",
-				log.String("event", epd.Event.Key))
+				log.String("event", eventKey))
 		}
 		if err := stream.Send(&livedatav1.LiveSpeedmapResponse{
 			Timestamp: a.Timestamp,
 			Speedmap:  proto.Clone(a.Speedmap).(*speedmapv1.Speedmap),
 		}); err != nil {
-			epd.Mutex.Lock()
-			//nolint:gocritic // by design
-			defer epd.Mutex.Unlock()
-			epd.SpeedmapBroadcast.CancelSubscription(dataChan)
+			s.log.Debug("Error sending LiveSpeedmap stream", log.String("event", eventKey))
 			return err
 		}
 	}
-	s.log.Debug("LiveSpeedmap stream closed")
+	s.log.Debug("LiveSpeedmap source channel closed", log.String("event", eventKey))
+
 	return nil
 }
 
@@ -164,21 +182,29 @@ func (s *liveDataServer) LiveSnapshotData(
 	req *connect.Request[livedatav1.LiveSnapshotDataRequest],
 	stream *connect.ServerStream[livedatav1.LiveSnapshotDataResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// get channels
+	dataChan, quitChan, err := s.dataProxy.SubscribeSnapshotData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
+	eventKey := req.Msg.Event.GetKey()
 	s.log.Debug("Sending live snapshot data",
-		log.String("event", epd.Event.Key),
+		log.String("event", eventKey),
 	)
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveSnapshot stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
+
 	if req.Msg.StartFrom == livedatav1.SnapshotStartMode_SNAPSHOT_START_MODE_BEGIN {
+		historyData := s.dataProxy.HistorySnapshotData(req.Msg.Event)
 		s.log.Debug("sending snapshots from beginning",
-			log.Int("snapshots", len(epd.SnapshotData)))
-		for _, a := range epd.SnapshotData {
+			log.Int("snapshots", len(historyData)))
+		for _, a := range historyData {
 			if s.debugWire {
 				s.wireLog.Debug("Sending snapshot data",
-					log.String("event", epd.Event.Key))
+					log.String("event", eventKey))
 			}
 			if err := stream.Send(&livedatav1.LiveSnapshotDataResponse{
 				Timestamp:    timestamppb.Now(),
@@ -190,20 +216,16 @@ func (s *liveDataServer) LiveSnapshotData(
 		}
 	}
 
-	dataChan := epd.SnapshotBroadcast.Subscribe()
 	for a := range dataChan {
 		if s.debugWire {
 			s.wireLog.Debug("Sending snapshot data",
-				log.String("event", epd.Event.Key))
+				log.String("event", eventKey))
 		}
 		if err := stream.Send(&livedatav1.LiveSnapshotDataResponse{
 			Timestamp:    timestamppb.Now(),
 			SnapshotData: proto.Clone(a).(*analysisv1.SnapshotData),
 		}); err != nil {
-			epd.Mutex.Lock()
-			//nolint:gocritic // by design
-			defer epd.Mutex.Unlock()
-			epd.SnapshotBroadcast.CancelSubscription(dataChan)
+			s.log.Debug("Error sending LiveSnapshot stream", log.String("event", eventKey))
 			return err
 		}
 	}
@@ -217,49 +239,35 @@ func (s *liveDataServer) LiveDriverData(
 	req *connect.Request[livedatav1.LiveDriverDataRequest],
 	stream *connect.ServerStream[livedatav1.LiveDriverDataResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeDriverData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
+	eventKey := req.Msg.Event.GetKey()
 	s.log.Debug("Sending live driver data",
-		log.String("event", epd.Event.Key),
+		log.String("event", eventKey),
 	)
 
-	//nolint:lll // readability
-	composeResp := func(a *racestatev1.PublishDriverDataRequest) *livedatav1.LiveDriverDataResponse {
-		return &livedatav1.LiveDriverDataResponse{
-			Timestamp:      a.Timestamp,
-			Entries:        a.Entries,
-			Cars:           a.Cars,
-			CarClasses:     a.CarClasses,
-			SessionTime:    a.SessionTime,
-			CurrentDrivers: a.CurrentDrivers,
-		}
-	}
-	if epd.LastDriverData != nil {
-		if err := stream.Send(composeResp(epd.LastDriverData)); err != nil {
-			s.log.Warn("Error sending live driver (first)", log.ErrorField(err))
-			return err
-		}
-	}
-	dataChan := epd.DriverDataBroadcast.Subscribe()
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveDriverData stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
+
 	for a := range dataChan {
 		if s.debugWire {
 			s.wireLog.Debug("Sending driver data",
-				log.String("event", epd.Event.Key))
+				log.String("event", eventKey))
 		}
 		//nolint:errcheck // by design
-		work := proto.Clone(a).(*racestatev1.PublishDriverDataRequest)
-		if err := stream.Send(composeResp(work)); err != nil {
-			epd.Mutex.Lock()
-			//nolint:gocritic // by design
-			defer epd.Mutex.Unlock()
-			epd.DriverDataBroadcast.CancelSubscription(dataChan)
+		work := proto.Clone(a).(*livedatav1.LiveDriverDataResponse)
+		if err := stream.Send(work); err != nil {
+			s.log.Debug("Error sending LiveDriverData stream", log.String("event", eventKey))
+			close(quitChan)
 			return err
 		}
 	}
-	s.log.Debug("LiveDriverData stream closed")
+	s.log.Debug("LiveDriverData source stream closed", log.String("event", eventKey))
 	return nil
 }
 
@@ -269,30 +277,35 @@ func (s *liveDataServer) LiveCarOccupancies(
 	req *connect.Request[livedatav1.LiveCarOccupanciesRequest],
 	stream *connect.ServerStream[livedatav1.LiveCarOccupanciesResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// get channels
+	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	s.log.Debug("Sending live carinfo data",
-		log.String("event", epd.Event.Key),
+	eventKey := req.Msg.Event.GetKey()
+	s.log.Debug("Sending car occupancy data",
+		log.String("event", eventKey),
 	)
-	dataChan := epd.AnalysisBroadcast.Subscribe()
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveCarOccupancy stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
 	for a := range dataChan {
 		if s.debugWire {
-			s.wireLog.Debug("Sending carinfo data",
-				log.String("event", epd.Event.Key))
+			s.wireLog.Debug("Sending carOccupancy data",
+				log.String("event", eventKey))
 		}
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*analysisv1.Analysis)
 		if err := stream.Send(&livedatav1.LiveCarOccupanciesResponse{
 			CarOccupancies: work.CarOccupancies,
 		}); err != nil {
-			s.cancelSubscription(epd, dataChan)
+			s.log.Warn("Error sending carOccupancy data", log.ErrorField(err))
 			return err
 		}
 	}
-	s.log.Debug("LiveCarInfo stream closed")
+	s.log.Debug("LiveCarOccupancy stream closed")
 	return nil
 }
 
@@ -302,24 +315,32 @@ func (s *liveDataServer) LiveAnalysisSel(
 	req *connect.Request[livedatav1.LiveAnalysisSelRequest],
 	stream *connect.ServerStream[livedatav1.LiveAnalysisSelResponse],
 ) error {
-	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// get channels
+	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Msg.Event)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	s.log.Debug("Sending live analysis data by selector",
-		log.String("event", epd.Event.Key),
+	eventKey := req.Msg.Event.GetKey()
+	s.log.Debug("Sending selected live analysis data",
+		log.String("event", eventKey),
 	)
+	go func() {
+		<-ctx.Done()
+		s.log.Debug("LiveAnalysisSel stream canceled", log.String("event", eventKey))
+		close(quitChan)
+	}()
+
 	var snapshotsCopy []*analysisv1.SnapshotData
-	for _, snapshot := range epd.SnapshotData {
+
+	for _, snapshot := range s.dataProxy.HistorySnapshotData(req.Msg.Event) {
 		snapshotsCopy = append(snapshotsCopy,
 			proto.Clone(snapshot).(*analysisv1.SnapshotData))
 	}
-	dataChan := epd.AnalysisBroadcast.Subscribe()
+
 	//nolint:errcheck // by design
 	first := proto.Clone(<-dataChan).(*analysisv1.Analysis)
 	if first == nil {
-		s.cancelSubscription(epd, dataChan)
+		close(quitChan)
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("no analysis data"))
 
@@ -339,35 +360,25 @@ func (s *liveDataServer) LiveAnalysisSel(
 	if err := stream.Send(firstResp); err != nil {
 		s.log.Warn("Error sending live analysis data by selector (first)",
 			log.ErrorField(err))
-		s.cancelSubscription(epd, dataChan)
+		close(quitChan)
 		return err
 	}
 	for a := range dataChan {
 		if s.debugWire {
 			s.wireLog.Debug("Sending carinfo data",
-				log.String("event", epd.Event.Key))
+				log.String("event", eventKey))
 		}
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*analysisv1.Analysis)
 		if err := stream.Send(
 			s.composeAnalysisResponse(work, req.Msg.Selector)); err != nil {
 			s.log.Warn("Error sending live analysis data by selector", log.ErrorField(err))
-			s.cancelSubscription(epd, dataChan)
+			close(quitChan)
 			return err
 		}
 	}
 	s.log.Debug("LiveAnalysisSel stream closed")
 	return nil
-}
-
-//nolint:whitespace // can't make both editor and linter happy
-func (s *liveDataServer) cancelSubscription(
-	epd *utils.EventProcessingData,
-	dataChan <-chan *analysisv1.Analysis,
-) {
-	epd.Mutex.Lock()
-	defer epd.Mutex.Unlock()
-	epd.AnalysisBroadcast.CancelSubscription(dataChan)
 }
 
 //nolint:whitespace // can't make both editor and linter happy

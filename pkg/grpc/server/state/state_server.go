@@ -25,6 +25,7 @@ import (
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	mainUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -67,10 +68,17 @@ func WithDebugWire(arg bool) Option {
 	}
 }
 
+func WithDataProxy(pd proxy.DataProxy) Option {
+	return func(srv *stateServer) {
+		srv.dataProxy = pd
+	}
+}
+
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
 	pool      *pgxpool.Pool
 	pe        permission.PermissionEvaluator
+	dataProxy proxy.DataProxy
 	lookup    *utils.EventLookup
 	log       *log.Logger
 	wireLog   *log.Logger
@@ -87,7 +95,7 @@ func (s *stateServer) PublishState(
 	if !s.pe.HasRole(a, auth.RoleProvider) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	// get the epd
+	// get the epd. This can only be found in the "local" lookup.
 	epd, err := s.lookup.GetEvent(req.Msg.Event)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
@@ -97,7 +105,9 @@ func (s *stateServer) PublishState(
 			log.String("event", epd.Event.Key),
 			log.Int("car entries", len(req.Msg.Cars)))
 	}
-
+	if err := s.dataProxy.PublishRaceStateData(req.Msg); err != nil {
+		s.log.Error("error publishing state", log.ErrorField(err))
+	}
 	if s.isRaceSession(epd, req.Msg) {
 		if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 			id, err := racestaterepos.CreateRaceState(ctx, tx, int(epd.Event.Id), req.Msg)
@@ -153,6 +163,9 @@ func (s *stateServer) PublishSpeedmap(
 			log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
 	}
 
+	if err := s.dataProxy.PublishSpeedmapData(req.Msg); err != nil {
+		s.log.Error("error publishing speedmap", log.ErrorField(err))
+	}
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 		return speedmapprotorepos.Create(ctx, tx, epd.LastRsInfoId, req.Msg)
 	}); err != nil {
@@ -183,6 +196,9 @@ func (s *stateServer) PublishDriverData(
 		s.wireLog.Debug("PublishDriverData called", log.String("event", epd.Event.Key))
 	}
 
+	if err := s.dataProxy.PublishDriverData(req.Msg); err != nil {
+		s.log.Error("error publishing state", log.ErrorField(err))
+	}
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 		// Note: carrepos uses eventId, carprotorepos rsInfoId
 		if err := carrepos.Create(ctx, tx, int(epd.Event.Id), req.Msg); err != nil {

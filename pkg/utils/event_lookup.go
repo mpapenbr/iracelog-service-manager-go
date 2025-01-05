@@ -36,19 +36,30 @@ func WithStaleDuration(d time.Duration) Option {
 	}
 }
 
+func WithDeleteEventCB(cb func(eventKey string)) Option {
+	return func(el *EventLookup) {
+		el.deleteEventCB = cb
+	}
+}
+
+var idCounter int = 1
+
 func NewEventLookup(opts ...Option) *EventLookup {
 	ret := &EventLookup{
 		lookup: make(map[string]*EventProcessingData),
 		ctx:    context.Background(),
 		mutex:  sync.Mutex{},
 		log:    log.Default().Named("grpc.eventmgr"),
+		id:     idCounter,
 	}
+	idCounter++
 	for _, opt := range opts {
 		opt(ret)
 	}
 	if ret.staleDuration > 0 {
 		ret.setupWatchdog()
 	}
+
 	return ret
 }
 
@@ -82,6 +93,8 @@ type EventLookup struct {
 	staleDuration time.Duration
 	mutex         sync.Mutex
 	log           *log.Logger
+	deleteEventCB func(eventKey string)
+	id            int
 }
 
 //nolint:whitespace,funlen // can't make both editor and linter happy
@@ -143,57 +156,8 @@ func (e *EventLookup) AddEvent(
 	return epd
 }
 
-func (epd *EventProcessingData) MarkDataEvent() {
-	epd.LastDataEvent = time.Now()
-}
-
-func collectRaceSessions(e *eventv1.Event) []uint32 {
-	ret := make([]uint32, 0)
-	for _, s := range e.Sessions {
-		if s.Type == commonv1.SessionType_SESSION_TYPE_RACE {
-			ret = append(ret, s.Num)
-		}
-	}
-	return ret
-}
-
-func (epd *EventProcessingData) setupOwnListeners() {
-	go func() {
-		ch := epd.RacestateBroadcast.Subscribe()
-		for data := range ch {
-			//nolint:errcheck // by design
-			epd.LastRaceState = proto.Clone(data).(*racestatev1.PublishStateRequest)
-		}
-	}()
-	go func() {
-		ch := epd.DriverDataBroadcast.Subscribe()
-		for data := range ch {
-			//nolint:errcheck // by design
-			epd.LastDriverData = proto.Clone(data).(*racestatev1.PublishDriverDataRequest)
-		}
-	}()
-	go func() {
-		ch := epd.AnalysisBroadcast.Subscribe()
-		for data := range ch {
-			//nolint:errcheck // by design
-			epd.LastAnalysisData = proto.Clone(data).(*analysisv1.Analysis)
-		}
-	}()
-	go func() {
-		ch := epd.ReplayInfoBroadcast.Subscribe()
-		for data := range ch {
-			//nolint:errcheck // by design
-			epd.LastReplayInfo = proto.Clone(data).(*eventv1.ReplayInfo)
-		}
-	}()
-	go func() {
-		ch := epd.SnapshotBroadcast.Subscribe()
-		for data := range ch {
-			//nolint:errcheck // by design
-			epd.SnapshotData = append(epd.SnapshotData,
-				proto.Clone(data).(*analysisv1.SnapshotData))
-		}
-	}()
+func (e *EventLookup) SetDeleteEventCB(cb func(eventKey string)) {
+	e.deleteEventCB = cb
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -230,12 +194,7 @@ func (e *EventLookup) RemoveEvent(selector *commonv1.EventSelector) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	if epd, err := e.getEvent(selector); err == nil {
-		epd.AnalysisBroadcast.Close()
-		epd.RacestateBroadcast.Close()
-		epd.DriverDataBroadcast.Close()
-		epd.SpeedmapBroadcast.Close()
-		epd.ReplayInfoBroadcast.Close()
-		epd.SnapshotBroadcast.Close()
+		epd.Close()
 		delete(e.lookup, epd.Event.Key)
 	}
 }
@@ -288,9 +247,75 @@ func (e *EventLookup) setupWatchdog() {
 					}
 				}
 				for _, epd := range toRemove {
+					epd.Close()
 					delete(e.lookup, epd.Event.Key)
+					if e.deleteEventCB != nil {
+						e.deleteEventCB(epd.Event.Key)
+					}
 				}
 			}
 		}
 	}()
+}
+
+func (epd *EventProcessingData) MarkDataEvent() {
+	epd.LastDataEvent = time.Now()
+}
+
+func (epd *EventProcessingData) Close() {
+	epd.AnalysisBroadcast.Close()
+	epd.RacestateBroadcast.Close()
+	epd.DriverDataBroadcast.Close()
+	epd.SpeedmapBroadcast.Close()
+	epd.ReplayInfoBroadcast.Close()
+	epd.SnapshotBroadcast.Close()
+}
+
+func (epd *EventProcessingData) setupOwnListeners() {
+	go func() {
+		ch := epd.RacestateBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.LastRaceState = proto.Clone(data).(*racestatev1.PublishStateRequest)
+		}
+	}()
+	go func() {
+		ch := epd.DriverDataBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.LastDriverData = proto.Clone(data).(*racestatev1.PublishDriverDataRequest)
+		}
+	}()
+	go func() {
+		ch := epd.AnalysisBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.LastAnalysisData = proto.Clone(data).(*analysisv1.Analysis)
+		}
+	}()
+	go func() {
+		ch := epd.ReplayInfoBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.LastReplayInfo = proto.Clone(data).(*eventv1.ReplayInfo)
+		}
+	}()
+	go func() {
+		ch := epd.SnapshotBroadcast.Subscribe()
+		for data := range ch {
+			//nolint:errcheck // by design
+			epd.SnapshotData = append(epd.SnapshotData,
+				proto.Clone(data).(*analysisv1.SnapshotData))
+		}
+	}()
+}
+
+func collectRaceSessions(e *eventv1.Event) []uint32 {
+	ret := make([]uint32, 0)
+	for _, s := range e.Sessions {
+		if s.Type == commonv1.SessionType_SESSION_TYPE_RACE {
+			ret = append(ret, s.Num)
+		}
+	}
+	return ret
 }
