@@ -3,9 +3,9 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.23.0
 
 require (
-	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.17.0-20241230163410-ef433322b2ac.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.1-20241230163410-ef433322b2ac.1
-	connectrpc.com/connect v1.17.0
+	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20241230163410-ef433322b2ac.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.2-20241230163410-ef433322b2ac.1
+	connectrpc.com/connect v1.18.1
 	connectrpc.com/otelconnect v0.7.1
 	github.com/docker/go-connections v0.5.0
 	github.com/exaring/otelpgx v0.7.0
@@ -14,14 +14,14 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/nats-io/nats.go v1.38.0
-	github.com/ohler55/ojg v1.26.0
+	github.com/ohler55/ojg v1.26.1
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.47.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
-	github.com/testcontainers/testcontainers-go v0.34.0
+	github.com/testcontainers/testcontainers-go v0.35.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.58.0
 	go.opentelemetry.io/otel v1.33.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.33.0
@@ -32,8 +32,8 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.33.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.22.0
-	golang.org/x/net v0.33.0
-	google.golang.org/protobuf v1.36.1
+	golang.org/x/net v0.34.0
+	google.golang.org/protobuf v1.36.2
 	gotest.tools/v3 v3.5.1
 	moul.io/zapfilter v1.7.0
 )
@@ -125,8 +125,8 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
