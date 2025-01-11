@@ -91,7 +91,7 @@ func (s *liveDataServer) LiveRaceState(
 			Cars:      d.Cars,
 			Messages:  d.Messages,
 		}); err != nil {
-			s.log.Debug("Error sending LiveRaceState stream", log.String("event", eventKey))
+			s.log.Warn("Error sending LiveRaceState stream", log.String("event", eventKey))
 			return err
 		}
 
@@ -130,7 +130,7 @@ func (s *liveDataServer) LiveAnalysis(
 			Timestamp: timestamppb.Now(),
 			Analysis:  proto.Clone(a).(*analysisv1.Analysis),
 		}); err != nil {
-			s.log.Debug("Error sending AnalysisData stream", log.String("event", eventKey))
+			s.log.Warn("Error sending AnalysisData stream", log.String("event", eventKey))
 			return err
 		}
 	}
@@ -167,7 +167,7 @@ func (s *liveDataServer) LiveSpeedmap(
 			Timestamp: a.Timestamp,
 			Speedmap:  proto.Clone(a.Speedmap).(*speedmapv1.Speedmap),
 		}); err != nil {
-			s.log.Debug("Error sending LiveSpeedmap stream", log.String("event", eventKey))
+			s.log.Warn("Error sending LiveSpeedmap stream", log.String("event", eventKey))
 			return err
 		}
 	}
@@ -225,7 +225,7 @@ func (s *liveDataServer) LiveSnapshotData(
 			Timestamp:    timestamppb.Now(),
 			SnapshotData: proto.Clone(a).(*analysisv1.SnapshotData),
 		}); err != nil {
-			s.log.Debug("Error sending LiveSnapshot stream", log.String("event", eventKey))
+			s.log.Warn("Error sending LiveSnapshot stream", log.String("event", eventKey))
 			return err
 		}
 	}
@@ -262,8 +262,7 @@ func (s *liveDataServer) LiveDriverData(
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*livedatav1.LiveDriverDataResponse)
 		if err := stream.Send(work); err != nil {
-			s.log.Debug("Error sending LiveDriverData stream", log.String("event", eventKey))
-			close(quitChan)
+			s.log.Warn("Error sending LiveDriverData stream", log.String("event", eventKey))
 			return err
 		}
 	}
@@ -373,7 +372,6 @@ func (s *liveDataServer) LiveAnalysisSel(
 		if err := stream.Send(
 			s.composeAnalysisResponse(work, req.Msg.Selector)); err != nil {
 			s.log.Warn("Error sending live analysis data by selector", log.ErrorField(err))
-			close(quitChan)
 			return err
 		}
 	}

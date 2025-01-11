@@ -2,8 +2,13 @@ package broadcast
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 )
@@ -28,6 +33,15 @@ type broadcastServer[T any] struct {
 	numRcv         int
 	numSnd         int
 	numSkip        int
+	eventKey       string
+}
+
+type Option[T any] func(*broadcastServer[T])
+
+func WithTelemetry[T any](eventKey string) Option[T] {
+	return func(b *broadcastServer[T]) {
+		b.eventKey = eventKey
+	}
 }
 
 func (b *broadcastServer[T]) Subscribe() <-chan T {
@@ -47,9 +61,14 @@ func (b *broadcastServer[T]) Close() {
 	b.cancel()
 }
 
-func NewBroadcastServer[T any](name string, source <-chan T) BroadcastServer[T] {
+//nolint:whitespace // false positive
+func NewBroadcastServer[T any](
+	eventKey, name string,
+	source <-chan T,
+) BroadcastServer[T] {
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &broadcastServer[T]{
+		eventKey:       eventKey,
 		name:           name,
 		source:         source,
 		addListener:    make(chan chan T),
@@ -57,9 +76,65 @@ func NewBroadcastServer[T any](name string, source <-chan T) BroadcastServer[T] 
 		ctx:            ctx,
 		cancel:         cancel,
 	}
-
+	b.setupMetrics()
 	go b.serve()
 	return b
+}
+
+//nolint:lll,funlen // readability
+func (b *broadcastServer[T]) setupMetrics() {
+	// Implement the setupMetrics method here
+	// For example, initialize metrics or logging
+	log.Info("Setting up metrics",
+		log.String("eventKey", b.eventKey),
+		log.String("name", b.name))
+	meter := otel.GetMeterProvider().Meter(fmt.Sprintf("ism.broadcast.%s", b.name))
+	register := func(metricName, desc, unit string, valueProvider func() int64) {
+		if _, err := meter.Int64ObservableGauge(
+			metricName,
+			metric.WithDescription(desc),
+			metric.WithUnit(unit),
+
+			metric.WithInt64Callback(func(_ context.Context, o metric.Int64Observer) error {
+				o.Observe(valueProvider(),
+					metric.WithAttributes(
+						attribute.String("name", b.name),
+						attribute.String("event", b.eventKey),
+					),
+				)
+				return nil
+			})); err != nil {
+			log.Error("failed to register metric",
+				log.String("metric", metricName),
+				log.ErrorField(err))
+		}
+	}
+	type data struct {
+		name  string
+		desc  string
+		unit  string
+		value func() int64
+	}
+	for _, d := range []*data{
+		{
+			"ism.broadcast.rcv", "Number of received messages", "{count}",
+			func() int64 { return int64(b.numRcv) },
+		},
+		{
+			"ism.broadcast.snd", "Number of sent messages", "{count}",
+			func() int64 { return int64(b.numSnd) },
+		},
+		{
+			"ism.broadcast.skip", "Number of skipped messages", "{count}",
+			func() int64 { return int64(b.numSkip) },
+		},
+		{
+			"ism.broadcast.listener", "Number of listeners", "{count}",
+			func() int64 { return int64(len(b.listeners)) },
+		},
+	} {
+		register(d.name, d.desc, d.unit, d.value)
+	}
 }
 
 //nolint:funlen,cyclop,gocognit // by design

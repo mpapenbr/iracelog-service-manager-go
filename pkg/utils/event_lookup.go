@@ -97,7 +97,7 @@ type EventLookup struct {
 	id            int
 }
 
-//nolint:whitespace,funlen // can't make both editor and linter happy
+//nolint:whitespace,funlen,lll // can't make both editor and linter happy, readability
 func (e *EventLookup) AddEvent(
 	event *eventv1.Event,
 	track *trackv1.Track,
@@ -140,12 +140,13 @@ func (e *EventLookup) AddEvent(
 				snapshotSource,
 			),
 		),
-		AnalysisBroadcast:   broadcast.NewBroadcastServer("analysis", analysisSource),
-		RacestateBroadcast:  broadcast.NewBroadcastServer("racestate", racestateSource),
-		DriverDataBroadcast: broadcast.NewBroadcastServer("driverdata", driverDataSource),
-		SpeedmapBroadcast:   broadcast.NewBroadcastServer("speedmap", speedmapSource),
-		ReplayInfoBroadcast: broadcast.NewBroadcastServer("replayInfo", replayInfoSource),
-		SnapshotBroadcast:   broadcast.NewBroadcastServer("snapshot", snapshotSource),
+
+		AnalysisBroadcast:   broadcast.NewBroadcastServer(event.Key, "analysis", analysisSource),
+		RacestateBroadcast:  broadcast.NewBroadcastServer(event.Key, "racestate", racestateSource),
+		DriverDataBroadcast: broadcast.NewBroadcastServer(event.Key, "driverdata", driverDataSource),
+		SpeedmapBroadcast:   broadcast.NewBroadcastServer(event.Key, "speedmap", speedmapSource),
+		ReplayInfoBroadcast: broadcast.NewBroadcastServer(event.Key, "replayInfo", replayInfoSource),
+		SnapshotBroadcast:   broadcast.NewBroadcastServer(event.Key, "snapshot", snapshotSource),
 		Mutex:               sync.Mutex{},
 		LastDataEvent:       time.Now(),
 		SnapshotData:        make([]*analysisv1.SnapshotData, 0),
