@@ -503,7 +503,7 @@ func createEventBroadcaster[T any](
 ) *broadcastData[*T] {
 	dataChan := make(chan *T)
 	quitChan := make(chan struct{})
-	bs := broadcast.NewBroadcastServer(name, dataChan)
+	bs := broadcast.NewBroadcastServer(eventKey, fmt.Sprintf("nats.%s", name), dataChan)
 	var err error
 	var sub *nats.Subscription
 	subj := fmt.Sprintf("%s.%s", name, eventKey)
