@@ -47,11 +47,13 @@ dockers:
       - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
       - "--label=org.opencontainers.image.description=Backend for iRacelog"
       - "--label=org.opencontainers.image.licenses=MIT license"
+      - "--build-arg=ARCH=amd64"
       - "--platform=linux/amd64"
 
     extra_files:
       - pkg/db/migrate/migrations
       - samples
+      - ext/healthcheck/grpc_health_probe.amd64
     use: buildx
     goarch: amd64
 
@@ -69,11 +71,13 @@ dockers:
       - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
       - "--label=org.opencontainers.image.description=Backend for iRacelog"
       - "--label=org.opencontainers.image.licenses=MIT license"
+      - "--build-arg=ARCH=arm64"
       - "--platform=linux/arm64"
 
     extra_files:
       - pkg/db/migrate/migrations
       - samples
+      - ext/healthcheck/grpc_health_probe.arm64
     use: buildx
     goarch: arm64
 

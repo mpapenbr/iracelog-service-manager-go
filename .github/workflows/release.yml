@@ -5,13 +5,49 @@ on:
     tags:
       - v*.*.*
 jobs:
+  collect-grpc-health:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - amd64
+          - arm64
+    steps:
+      - name: get grpc health check
+        run: |
+          curl -L https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.36/grpc_health_probe-linux-${{matrix.config}} -o ${{ runner.temp }}/grpc_health_probe.${{matrix.config}}
+      - name: Upload health check artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: grpc-${{matrix.config}}
+          path: ${{ runner.temp }}/grpc_health_probe.${{matrix.config}}
+
   goreleaser:
+    needs:
+      - collect-grpc-health
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Unshallow Fetch
         run: git fetch --prune --unshallow
+
+      - name: Download grpc health check artifacts (amd64)
+        uses: actions/download-artifact@v4
+        with:
+          name: grpc-amd64
+          path: ext/healthcheck
+      - name: Download grpc health check artifacts (arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: grpc-arm64
+          path: ext/healthcheck
+
+      - name: add execute permissions
+        run: chmod +x ext/healthcheck/*
+
+      - name: show ext/healthcheck
+        run: ls -la ext/healthcheck
 
       - uses: actions/setup-go@v5
         with:

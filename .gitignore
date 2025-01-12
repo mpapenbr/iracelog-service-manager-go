@@ -8,6 +8,7 @@ bin/**
 coverage/**
 dist/**
 __debug_bin*
+ext/**
 
 # Directories require atleast one file to be tracked by git.
 !tmp/.gitkeep
