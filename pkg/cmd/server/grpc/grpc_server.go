@@ -370,7 +370,7 @@ func (s *grpcServer) waitForRequiredServices() {
 }
 
 func (s *grpcServer) registerHealthServer() {
-	checker := grpchealth.NewStaticChecker("a", "b", "iracelog.provider.v1.ProviderService")
+	checker := grpchealth.NewStaticChecker()
 	s.mux.Handle(grpchealth.NewHandler(checker))
 }
 
