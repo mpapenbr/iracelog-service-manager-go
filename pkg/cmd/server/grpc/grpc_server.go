@@ -21,6 +21,7 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
 	"connectrpc.com/connect"
+	"connectrpc.com/grpchealth"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -262,6 +263,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerStateServer()
 	s.registerTrackServer()
 	s.registerPredictServer()
+	s.registerHealthServer()
 }
 
 //nolint:funlen // by design
@@ -365,6 +367,11 @@ func (s *grpcServer) waitForRequiredServices() {
 	s.log.Debug("Waiting for connection checks to return")
 	wg.Wait()
 	s.log.Debug("Required services are available")
+}
+
+func (s *grpcServer) registerHealthServer() {
+	checker := grpchealth.NewStaticChecker("a", "b", "iracelog.provider.v1.ProviderService")
+	s.mux.Handle(grpchealth.NewHandler(checker))
 }
 
 func (s *grpcServer) registerEventServer() {
