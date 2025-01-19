@@ -7,6 +7,8 @@ import (
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 )
 
 type snapHist struct{}
@@ -51,6 +53,79 @@ func (s snapHist) FromBinary(data []byte) ([]*analysisv1.SnapshotData, error) {
 			return nil, fmt.Errorf("error unmarshalling snapshot data: %w", err)
 		}
 		result = append(result, snap)
+	}
+	return result, nil
+}
+
+type eventLookupTransfer struct{}
+
+//nolint:whitespace // editor/linter issue
+func (s eventLookupTransfer) ToBinary(input map[string]*proxy.EventData) (
+	ret []byte, err error,
+) {
+	var result bytes.Buffer
+	for k, v := range input {
+		if err = binary.Write(&result, binary.LittleEndian, uint32(len(k))); err != nil {
+			return nil, fmt.Errorf("error writing event key length: %w", err)
+		}
+		_, err = result.Write([]byte(k))
+		if err != nil {
+			return nil, fmt.Errorf("error writing key: %w", err)
+		}
+
+		data, err := v.ToBinary()
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling EventData: %w", err)
+		}
+
+		if err = binary.Write(
+			&result,
+			binary.LittleEndian,
+			uint32(len(data))); err != nil {
+			return nil, fmt.Errorf("error writing EventData  length: %w", err)
+		}
+
+		_, err = result.Write(data)
+		if err != nil {
+			return nil, fmt.Errorf("error writing EventData: %w", err)
+		}
+	}
+	return result.Bytes(), nil
+}
+
+//nolint:whitespace // editor/linter issue
+func (s eventLookupTransfer) FromBinary(data []byte) (
+	ret map[string]*proxy.EventData,
+	err error,
+) {
+	result := make(map[string]*proxy.EventData)
+	buf := bytes.NewBuffer(data)
+	for buf.Len() > 0 {
+		var keyLen uint32
+		if err = binary.Read(buf, binary.LittleEndian, &keyLen); err != nil {
+			return nil, fmt.Errorf("error reading map key len: %w", err)
+		}
+
+		key := make([]byte, keyLen)
+		if _, err = buf.Read(key); err != nil {
+			return nil, fmt.Errorf("error reading key: %w", err)
+		}
+
+		var dataLen uint32
+		if err = binary.Read(buf, binary.LittleEndian, &dataLen); err != nil {
+			return nil, fmt.Errorf("error reading map key len: %w", err)
+		}
+
+		edBuf := make([]byte, dataLen)
+		if _, err = buf.Read(edBuf); err != nil {
+			return nil, fmt.Errorf("error reading EventData: %w", err)
+		}
+
+		var eventData proxy.EventData
+		if err = eventData.FromBinary(edBuf); err != nil {
+			return nil, fmt.Errorf("error unmarshalling EventData: %w", err)
+		}
+		result[string(key)] = &eventData
 	}
 	return result, nil
 }
