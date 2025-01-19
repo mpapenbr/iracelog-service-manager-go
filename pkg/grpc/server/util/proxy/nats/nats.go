@@ -38,6 +38,7 @@ type (
 		subRegister    *nats.Subscription
 		subUnregister  *nats.Subscription
 		kv             jetstream.KeyValue
+		globalEvents   *GlobalEvents
 	}
 	Option         func(*NatsProxy)
 	eventContainer struct {
@@ -78,6 +79,10 @@ func NewNatsProxy(conn *nats.Conn, opts ...Option) (*NatsProxy, error) {
 	if err := ret.setupKV(); err != nil {
 		return nil, err
 	}
+	if err := ret.setupGlobalEvents(); err != nil {
+		return nil, err
+	}
+
 	return ret, nil
 }
 
@@ -162,11 +167,12 @@ func (n *NatsProxy) PublishEventRegistered(epd *utils.EventProcessingData) error
 		}
 		n.l.Debug("snapshot channel closed", log.String("eventKey", epd.Event.GetKey()))
 	}()
-
+	n.globalEvents.RegisterEvent(&proxy.EventData{Event: epd.Event, Track: epd.Track})
 	return n.conn.Publish("event.registered", data)
 }
 
 func (n *NatsProxy) PublishEventUnregistered(eventKey string) error {
+	n.globalEvents.UnregisterEvent(eventKey)
 	return n.conn.Publish("event.unregistered", []byte(eventKey))
 }
 
@@ -663,4 +669,23 @@ func (n *NatsProxy) setupKV() error {
 		TTL:    time.Hour * 24,
 	})
 	return err
+}
+
+// this will load all live events from the NATS KV store and add them to the
+// events maps. This is called during startup and ensures this instance can
+// provide data for all live events
+func (n *NatsProxy) setupGlobalEvents() (err error) {
+	if n.globalEvents, err = NewGlobalEvents(n.kv, n.l.Named("gobal")); err != nil {
+		return err
+	}
+	var curEvents map[string]*proxy.EventData
+	if curEvents, err = n.globalEvents.CurrentLiveEvents(); err != nil {
+		return err
+	}
+	for k, v := range curEvents {
+		n.events[k] = &eventContainer{
+			eventData: v,
+		}
+	}
+	return nil
 }
