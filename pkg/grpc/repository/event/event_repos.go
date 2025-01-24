@@ -17,7 +17,7 @@ import (
 
 var selector = `select id, event_key, name, description, event_time,
 	racelogger_version,	team_racing, multi_class, num_car_types, num_car_classes,
-	ir_session_id, track_id, pit_speed,
+	ir_session_id, ir_sub_session_id, track_id, pit_speed,
 	replay_min_timestamp, replay_min_session_time, replay_max_session_time,
 	sessions from event`
 
@@ -33,16 +33,16 @@ func Create(ctx context.Context, conn repository.Querier, event *eventv1.Event) 
 	insert into event (
 		event_key, name, description, event_time, racelogger_version,
 		team_racing, multi_class, num_car_types, num_car_classes,ir_session_id,
-		track_id, pit_speed,
+		ir_sub_session_id, track_id, pit_speed,
 		replay_min_timestamp, replay_min_session_time, replay_max_session_time,
 		sessions
-	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 	returning id
 		`,
 		event.Key, event.Name, event.Description, event.EventTime.AsTime(),
 		event.RaceloggerVersion, event.TeamRacing, event.MultiClass, event.NumCarTypes,
-		event.NumCarClasses, event.IrSessionId, event.TrackId, event.PitSpeed,
-		replayInfo().MinTimestamp.AsTime(), replayInfo().MinSessionTime,
+		event.NumCarClasses, event.IrSessionId, event.IrSubSessionId, event.TrackId,
+		event.PitSpeed, replayInfo().MinTimestamp.AsTime(), replayInfo().MinSessionTime,
 		replayInfo().MaxSessionTime,
 		event.Sessions,
 	)
@@ -183,7 +183,7 @@ func readData(row pgx.Row) (*eventv1.Event, error) {
 		&item.Id, &item.Key,
 		&item.Name, &item.Description, &eventTime, &item.RaceloggerVersion,
 		&item.TeamRacing, &item.MultiClass, &item.NumCarTypes, &item.NumCarClasses,
-		&item.IrSessionId, &item.TrackId, &item.PitSpeed,
+		&item.IrSessionId, &item.IrSubSessionId, &item.TrackId, &item.PitSpeed,
 		&replayMinTimestamp, &replayInfo.MinSessionTime, &replayInfo.MaxSessionTime,
 		&sessions,
 	); err != nil {
