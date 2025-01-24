@@ -343,7 +343,7 @@ func (s *stateServer) GetStates(
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
 	if req.Msg.Start == nil {
-		return nil, util.ErrMissingEventSelector
+		return nil, util.ErrMissingStartSelector
 	}
 	switch req.Msg.Start.Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
