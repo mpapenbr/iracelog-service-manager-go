@@ -4,12 +4,12 @@ go 1.23.0
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250122225235-2ce5e01e0f36.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.3-20250122225235-2ce5e01e0f36.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.4-20250122225235-2ce5e01e0f36.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpchealth v1.3.0
 	connectrpc.com/otelconnect v0.7.1
 	github.com/docker/go-connections v0.5.0
-	github.com/exaring/otelpgx v0.7.0
+	github.com/exaring/otelpgx v0.8.0
 	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
@@ -35,7 +35,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.22.0
 	golang.org/x/net v0.34.0
-	google.golang.org/protobuf v1.36.3
+	google.golang.org/protobuf v1.36.4
 	gotest.tools/v3 v3.5.1
 	moul.io/zapfilter v1.7.0
 )
