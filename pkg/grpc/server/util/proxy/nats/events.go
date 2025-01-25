@@ -56,6 +56,14 @@ func (g *GlobalEvents) CurrentLiveEvents() (
 
 // register watcher on kv store
 func (g *GlobalEvents) setupListener() error {
+	if v, err := g.kv.Get(context.Background(), "events"); err != nil {
+		g.l.Info("events do not exist, creating")
+		if _, cErr := g.kv.Create(context.Background(), "events", []byte{}); cErr != nil {
+			return cErr
+		}
+	} else {
+		g.l.Debug("events already exist", log.Any("value", v))
+	}
 	w, err := g.kv.Watch(context.Background(), "events")
 	if err != nil {
 		return err
