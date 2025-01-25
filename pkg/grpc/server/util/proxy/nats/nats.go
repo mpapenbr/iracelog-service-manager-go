@@ -14,13 +14,11 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/helper"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/broadcast"
 )
 
 type (
@@ -42,18 +40,10 @@ type (
 	}
 	Option         func(*NatsProxy)
 	eventContainer struct {
-		eventData            *proxy.EventData
-		watchDriverData      jetstream.KeyWatcher
-		analysisBroadcaster  *broadcastData[*analysisv1.Analysis]
-		racestateBroadcaster *broadcastData[*racestatev1.PublishStateRequest]
-		speedmapBroadcaster  *broadcastData[*racestatev1.PublishSpeedmapRequest]
-		snapshotBroadcaster  *broadcastData[*analysisv1.SnapshotData]
+		eventData     *proxy.EventData
+		bcstContainer *broadcastContainer
 	}
-	broadcastData[T any] struct {
-		bs       broadcast.BroadcastServer[T]
-		quitChan chan struct{}
-		name     string
-	}
+
 	localDataProvider struct {
 		epd          *utils.EventProcessingData
 		analysisChan <-chan *analysisv1.Analysis
@@ -234,19 +224,7 @@ func (n *NatsProxy) SubscribeRaceStateData(sel *commonv1.EventSelector) (
 	if event, err := n.getEvent(sel); err != nil {
 		return nil, nil, err
 	} else {
-		dataChan := n.getRacestateBroadcaster(event.eventData.Event.GetKey()).Subscribe()
-		quitChan := make(chan struct{})
-		eventKey := event.eventData.Event.GetKey()
-
-		go func() {
-			n.l.Debug("racestate waiting on quitChan", log.String("eventKey", eventKey))
-			<-quitChan
-			n.l.Debug("racestate quitChan was closed", log.String("eventKey", eventKey))
-			// the broadcaster may be already closed if the event was unregistered
-			if bs := n.getRacestateBroadcaster(eventKey); bs != nil {
-				bs.CancelSubscription(dataChan)
-			}
-		}()
+		dataChan, quitChan := event.bcstContainer.createRacestateChannels()
 		return dataChan, quitChan, nil
 	}
 }
@@ -260,72 +238,23 @@ func (n *NatsProxy) SubscribeSpeedmapData(sel *commonv1.EventSelector) (
 	if event, err := n.getEvent(sel); err != nil {
 		return nil, nil, err
 	} else {
-		dataChan := n.getSpeedmapBroadcaster(event.eventData.Event.GetKey()).Subscribe()
-		quitChan := make(chan struct{})
-		eventKey := event.eventData.Event.GetKey()
-
-		go func() {
-			n.l.Debug("speedmap waiting on quitChan", log.String("eventKey", eventKey))
-			<-quitChan
-			n.l.Debug("speedmap quitChan was closed", log.String("eventKey", eventKey))
-			// the broadcaster may be already closed if the event was unregistered
-			if bs := n.getSpeedmapBroadcaster(eventKey); bs != nil {
-				bs.CancelSubscription(dataChan)
-			}
-		}()
+		dataChan, quitChan := event.bcstContainer.createSpeedmapChannels()
 		return dataChan, quitChan, nil
 	}
 }
 
-//nolint:whitespace,dupl,funlen // false positive
+//nolint:whitespace,dupl // false positive
 func (n *NatsProxy) SubscribeDriverData(sel *commonv1.EventSelector) (
 	d <-chan *livedatav1.LiveDriverDataResponse,
 	q chan<- struct{},
 	err error,
 ) {
-	var event *eventContainer
-	if event, err = n.getEvent(sel); err != nil {
+	if event, err := n.getEvent(sel); err != nil {
 		return nil, nil, err
+	} else {
+		dataChan, quitChan := event.bcstContainer.createDriverDataChannels()
+		return dataChan, quitChan, nil
 	}
-	subj := fmt.Sprintf("driverdata.%s", event.eventData.Event.GetKey())
-	dataChan := make(chan *livedatav1.LiveDriverDataResponse)
-	quitChan := make(chan struct{})
-	eventKey := event.eventData.Event.GetKey()
-	w, err := n.kv.Watch(context.Background(), subj)
-	if err != nil {
-		return nil, nil, err
-	}
-	go func() {
-		for kve := range w.Updates() {
-			if kve == nil {
-				n.l.Debug("watchData nil")
-				continue
-			}
-			var req livedatav1.LiveDriverDataResponse
-			n.l.Debug("watchData",
-				log.String("key", fmt.Sprintf("driverdata.%s", eventKey)),
-				log.Int("value-len", len(kve.Value())),
-				log.String("op", kve.Operation().String()),
-				log.Uint64("rev", kve.Revision()),
-			)
-			if uErr := proto.Unmarshal(kve.Value(), &req); uErr != nil {
-				n.l.Error("error unmarshalling driverdata", log.ErrorField(uErr))
-			}
-			n.l.Debug("received driverdata",
-				log.String("eventKey", eventKey))
-			dataChan <- &req
-		}
-		n.l.Debug("driverdata watch done",
-			log.String("eventKey", eventKey))
-	}()
-	go func() {
-		n.l.Debug("driverData waiting on quitChan", log.String("eventKey", eventKey))
-		<-quitChan
-		n.l.Debug("driverData quitChan was closed", log.String("eventKey", eventKey))
-		n.stopWatch(eventKey, w)
-	}()
-
-	return dataChan, quitChan, nil
 }
 
 //nolint:whitespace,dupl // false positive
@@ -334,24 +263,12 @@ func (n *NatsProxy) SubscribeAnalysisData(sel *commonv1.EventSelector) (
 	q chan<- struct{},
 	err error,
 ) {
-	var event *eventContainer
-	if event, err = n.getEvent(sel); err != nil {
+	if event, err := n.getEvent(sel); err != nil {
 		return nil, nil, err
+	} else {
+		dataChan, quitChan := event.bcstContainer.createAnalysisChannels()
+		return dataChan, quitChan, nil
 	}
-	dataChan := n.getAnalysisBroadcaster(event.eventData.Event.GetKey()).Subscribe()
-	quitChan := make(chan struct{})
-	eventKey := event.eventData.Event.GetKey()
-
-	go func() {
-		n.l.Debug("analysis waiting on quitChan", log.String("eventKey", eventKey))
-		<-quitChan
-		n.l.Debug("analysis quitChan was closed", log.String("eventKey", eventKey))
-		// the broadcaster may be already closed if the event was unregistered
-		if bs := n.getAnalysisBroadcaster(eventKey); bs != nil {
-			bs.CancelSubscription(dataChan)
-		}
-	}()
-	return dataChan, quitChan, nil
 }
 
 //nolint:whitespace,dupl // false positive
@@ -360,24 +277,12 @@ func (n *NatsProxy) SubscribeSnapshotData(sel *commonv1.EventSelector) (
 	q chan<- struct{},
 	err error,
 ) {
-	var event *eventContainer
-	if event, err = n.getEvent(sel); err != nil {
+	if event, err := n.getEvent(sel); err != nil {
 		return nil, nil, err
+	} else {
+		dataChan, quitChan := event.bcstContainer.createSnapshotChannels()
+		return dataChan, quitChan, nil
 	}
-	dataChan := n.getSnapshotBroadcaster(event.eventData.Event.GetKey()).Subscribe()
-	quitChan := make(chan struct{})
-	eventKey := event.eventData.Event.GetKey()
-
-	go func() {
-		n.l.Debug("snapshot waiting on quitChan", log.String("eventKey", eventKey))
-		<-quitChan
-		n.l.Debug("snapshot quitChan was closed", log.String("eventKey", eventKey))
-		// the broadcaster may be already closed if the event was unregistered
-		if bs := n.getSnapshotBroadcaster(eventKey); bs != nil {
-			bs.CancelSubscription(dataChan)
-		}
-	}()
-	return dataChan, quitChan, nil
 }
 
 //nolint:lll // readablity
@@ -402,172 +307,6 @@ func (n *NatsProxy) HistorySnapshotData(sel *commonv1.EventSelector) []*analysis
 	} else {
 		n.l.Error("error converting snapshot history", log.ErrorField(cErr))
 		return []*analysisv1.SnapshotData{}
-	}
-}
-
-// we have one broadcaster per event which subscribes to the nats subject.
-// we distribute it within this instance via our own broadcast server
-//
-//nolint:lll,dupl // false positive
-func (n *NatsProxy) getAnalysisBroadcaster(eventKey string) broadcast.BroadcastServer[*analysisv1.Analysis] {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-	if ec, ok := n.events[eventKey]; ok {
-		if ec.analysisBroadcaster == nil {
-			l := n.l.Named("bcst.analsyis")
-			sample := &analysisv1.Analysis{}
-			ec.analysisBroadcaster = createEventBroadcaster(
-				"analysis", eventKey, l, n, sample,
-				func(arg protoreflect.ProtoMessage) *analysisv1.Analysis {
-					return proto.Clone(arg.(*analysisv1.Analysis)).(*analysisv1.Analysis)
-				},
-			)
-		}
-		return ec.analysisBroadcaster.bs
-	}
-	return nil
-}
-
-// we have one broadcaster per event which subscribes to the nats subject.
-// we distribute it within this instance via our own broadcast server
-//
-//nolint:lll,dupl // false positive
-func (n *NatsProxy) getRacestateBroadcaster(eventKey string) broadcast.BroadcastServer[*racestatev1.PublishStateRequest] {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-	if ec, ok := n.events[eventKey]; ok {
-		if ec.racestateBroadcaster == nil {
-			l := n.l.Named("bcst.racestate")
-			sample := &racestatev1.PublishStateRequest{}
-			ec.racestateBroadcaster = createEventBroadcaster(
-				"racestate", eventKey, l, n, sample,
-				func(arg protoreflect.ProtoMessage) *racestatev1.PublishStateRequest {
-					return proto.Clone(arg.(*racestatev1.PublishStateRequest)).(*racestatev1.PublishStateRequest)
-				},
-			)
-		}
-		return ec.racestateBroadcaster.bs
-	}
-	return nil
-}
-
-// we have one broadcaster per event which subscribes to the nats subject.
-// we distribute it within this instance via our own broadcast server
-//
-//nolint:lll,dupl // false positive
-func (n *NatsProxy) getSpeedmapBroadcaster(eventKey string) broadcast.BroadcastServer[*racestatev1.PublishSpeedmapRequest] {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-	if ec, ok := n.events[eventKey]; ok {
-		if ec.speedmapBroadcaster == nil {
-			l := n.l.Named("bcst.speedmap")
-			sample := &racestatev1.PublishSpeedmapRequest{}
-			ec.speedmapBroadcaster = createEventBroadcaster(
-				"speedmap", eventKey, l, n, sample,
-				func(arg protoreflect.ProtoMessage) *racestatev1.PublishSpeedmapRequest {
-					return proto.Clone(arg.(*racestatev1.PublishSpeedmapRequest)).(*racestatev1.PublishSpeedmapRequest)
-				},
-			)
-		}
-		return ec.speedmapBroadcaster.bs
-	}
-	return nil
-}
-
-// we have one broadcaster per event which subscribes to the nats subject.
-// we distribute it within this instance via our own broadcast server
-//
-//nolint:lll,dupl // false positive
-func (n *NatsProxy) getSnapshotBroadcaster(eventKey string) broadcast.BroadcastServer[*analysisv1.SnapshotData] {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-	if ec, ok := n.events[eventKey]; ok {
-		if ec.snapshotBroadcaster == nil {
-			l := n.l.Named("bcst.snapshot")
-			sample := &analysisv1.SnapshotData{}
-			ec.snapshotBroadcaster = createEventBroadcaster(
-				"snapshot", eventKey, l, n, sample,
-				func(arg protoreflect.ProtoMessage) *analysisv1.SnapshotData {
-					return proto.Clone(arg.(*analysisv1.SnapshotData)).(*analysisv1.SnapshotData)
-				},
-			)
-		}
-		return ec.snapshotBroadcaster.bs
-	}
-	return nil
-}
-
-// create a generic event broadcaster for message Type T
-//
-//nolint:whitespace // false positive
-func createEventBroadcaster[T any](
-	name, eventKey string,
-	l *log.Logger,
-	n *NatsProxy,
-	sample protoreflect.ProtoMessage,
-	createClone func(arg protoreflect.ProtoMessage) *T,
-) *broadcastData[*T] {
-	dataChan := make(chan *T)
-	quitChan := make(chan struct{})
-	bs := broadcast.NewBroadcastServer(eventKey, fmt.Sprintf("nats.%s", name), dataChan)
-	var err error
-	var sub *nats.Subscription
-	subj := fmt.Sprintf("%s.%s", name, eventKey)
-	if sub, err = n.conn.Subscribe(subj, func(msg *nats.Msg) {
-		if uErr := proto.Unmarshal(msg.Data, sample); uErr != nil {
-			l.Error("error unmarshalling data",
-				log.String("name", name),
-				log.ErrorField(uErr))
-			return
-		}
-		x := createClone(sample)
-		l.Debug("received data", log.String("name", name), log.String("eventKey", eventKey))
-		dataChan <- x
-	}); err != nil {
-		l.Error("error subscribing to data", log.String("name", name), log.ErrorField(err))
-		return nil
-	}
-	go func() {
-		l.Debug("waiting on quitChan",
-			log.String("name", name), log.String("eventKey", eventKey))
-		<-quitChan
-		l.Debug("quitChan was closed",
-			log.String("name", name), log.String("eventKey", eventKey))
-		bs.Close()
-		n.unsubscribe(sub)
-	}()
-	return &broadcastData[*T]{
-		bs:       bs,
-		quitChan: quitChan,
-		name:     name,
-	}
-}
-
-func (n *NatsProxy) unsubscribe(sub *nats.Subscription) {
-	if sub != nil && sub.IsValid() {
-		if err := sub.Unsubscribe(); err != nil {
-			n.l.Debug("error unsubscribing",
-				log.String("sub", sub.Subject),
-				log.ErrorField(err))
-		} else {
-			n.l.Debug("unsubscribed",
-				log.String("sub", sub.Subject),
-			)
-		}
-	}
-}
-
-func (n *NatsProxy) stopWatch(key string, w jetstream.KeyWatcher) {
-	if w != nil {
-		if err := w.Stop(); err != nil {
-			n.l.Debug("error stopping watch",
-				log.String("key", key),
-				log.ErrorField(err))
-		} else {
-			n.l.Debug("stopped watch",
-				log.String("key", key),
-			)
-		}
 	}
 }
 
@@ -622,6 +361,7 @@ func (n *NatsProxy) handleIncomingEventRegistered(msg *nats.Msg) {
 			Event: regData.Event,
 			Track: regData.Track,
 		},
+		bcstContainer: createBroadcasters(regData.Event.GetKey(), n.conn, n.kv, n.l),
 	}
 }
 
@@ -639,19 +379,7 @@ func (n *NatsProxy) handleIncomingEventUnregistered(msg *nats.Msg) {
 	// cleanup local broadcasters
 	//nolint:nestif //false positive
 	if ec, ok := n.events[string(msg.Data)]; ok {
-		if ec.analysisBroadcaster != nil {
-			close(ec.analysisBroadcaster.quitChan)
-		}
-		if ec.racestateBroadcaster != nil {
-			close(ec.racestateBroadcaster.quitChan)
-		}
-		if ec.speedmapBroadcaster != nil {
-			close(ec.speedmapBroadcaster.quitChan)
-		}
-		if ec.snapshotBroadcaster != nil {
-			close(ec.snapshotBroadcaster.quitChan)
-		}
-		n.stopWatch(ec.eventData.Event.GetKey(), ec.watchDriverData)
+		ec.bcstContainer.close()
 	}
 	delete(n.events, string(msg.Data))
 
@@ -684,7 +412,8 @@ func (n *NatsProxy) setupGlobalEvents() (err error) {
 	}
 	for k, v := range curEvents {
 		n.events[k] = &eventContainer{
-			eventData: v,
+			eventData:     v,
+			bcstContainer: createBroadcasters(v.Event.GetKey(), n.conn, n.kv, n.l),
 		}
 	}
 	return nil
