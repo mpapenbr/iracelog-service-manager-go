@@ -73,7 +73,7 @@ func LoadRange(
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	provider := func() (pgx.Rows, error) {
 		return conn.Query(ctx, `
-select cp.protodata,ri.record_stamp,ri.session_time from car_state_proto cp
+select cp.protodata,ri.record_stamp,ri.session_time,ri.id from car_state_proto cp
 join rs_info ri on ri.id=cp.rs_info_id
 where
 ri.event_id=$1
@@ -95,7 +95,7 @@ func LoadRangeBySessionTime(
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	provider := func() (pgx.Rows, error) {
 		return conn.Query(ctx, `
-select cp.protodata,ri.record_stamp,ri.session_time from car_state_proto cp
+select cp.protodata,ri.record_stamp,ri.session_time,ri.id from car_state_proto cp
 join rs_info ri on ri.id=cp.rs_info_id
 where
 ri.event_id=$1
@@ -108,9 +108,31 @@ order by ri.id asc limit $3
 	return loadRange(provider, limit)
 }
 
+func LoadRangeById(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId int,
+	rsInfoId int,
+	limit int,
+) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
+	provider := func() (pgx.Rows, error) {
+		return conn.Query(ctx, `
+select cp.protodata,ri.record_stamp,ri.session_time,ri.id from car_state_proto cp
+join rs_info ri on ri.id=cp.rs_info_id
+where
+ri.event_id=$1
+and ri.id >= $2
+order by ri.id asc limit $3
+		`,
+			eventId, rsInfoId, limit,
+		)
+	}
+	return loadRange(provider, limit)
+}
+
 // loadRange loads a range of cardata entries from the database
 // queryProvider must include the following columns in the following order:
-// protodata, record_stamp, session_time
+// protodata, record_stamp, session_time, id
 func loadRange(
 	queryProvider func() (pgx.Rows, error),
 	limit int,
@@ -128,7 +150,8 @@ func loadRange(
 		var binaryMessage []byte
 		if err := row.Scan(&binaryMessage,
 			&ret.LastTimestamp,
-			&ret.LastSessionTime); err != nil {
+			&ret.LastSessionTime,
+			&ret.LastRsInfoId); err != nil {
 			return nil, err
 		}
 		driverData := &racestatev1.PublishDriverDataRequest{}

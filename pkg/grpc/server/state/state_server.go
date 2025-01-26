@@ -5,8 +5,6 @@ import (
 	"slices"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
-	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
-	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
@@ -24,7 +22,6 @@ import (
 	racestaterepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	mainUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -295,33 +292,18 @@ func (s *stateServer) GetDriverData(
 	req *connect.Request[racestatev1.GetDriverDataRequest]) (
 	*connect.Response[racestatev1.GetDriverDataResponse], error,
 ) {
-	var data *eventv1.Event
+	var sc *driverDataContainer
 	var err error
-	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.Event)
-	if err != nil {
+	if sc, err = createDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
-	switch req.Msg.Start.Arg.(type) {
-	case *commonv1.StartSelector_RecordStamp:
-		tmp, err = carprotorepos.LoadRange(
-			ctx,
-			s.pool,
-			int(data.Id),
-			req.Msg.Start.GetRecordStamp().AsTime(),
-			int(req.Msg.Num))
-	case *commonv1.StartSelector_SessionTime:
-		tmp, err = carprotorepos.LoadRangeBySessionTime(
-			ctx,
-			s.pool,
-			int(data.Id),
-			float64(req.Msg.Start.GetSessionTime()),
-			int(req.Msg.Num))
-
-	}
+	tmp, err = sc.InitialRequest()
 	if err != nil {
 		return nil, err
 	}
+	// Note: we don't want to return more data then configured in driverDataContainer
+	// if a client needs more, it should call again or use the stream method
 	return connect.NewResponse(&racestatev1.GetDriverDataResponse{
 		DriverData:      tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
@@ -330,43 +312,55 @@ func (s *stateServer) GetDriverData(
 }
 
 //nolint:whitespace,dupl // false positive
+func (s *stateServer) GetDriverDataStream(
+	ctx context.Context,
+	req *connect.Request[racestatev1.GetDriverDataStreamRequest],
+	stream *connect.ServerStream[racestatev1.GetDriverDataStreamResponse],
+) (err error) {
+	var sc *driverDataContainer
+	if sc, err = createDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
+		return err
+	}
+	var rc *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
+	rc, err = sc.InitialRequest()
+	for {
+		if err != nil {
+			return err
+		}
+		if len(rc.Data) == 0 {
+			s.log.Debug("GetDriverDataStream no more data",
+				log.String("event", sc.e.GetKey()))
+			return nil
+		}
+		for _, s := range rc.Data {
+			if sErr := stream.Send(&racestatev1.GetDriverDataStreamResponse{
+				DriverData: s,
+			}); sErr != nil {
+				return sErr
+			}
+		}
+		rc, err = sc.NextRequest()
+	}
+}
+
+//nolint:whitespace,dupl // false positive
 func (s *stateServer) GetStates(
 	ctx context.Context,
 	req *connect.Request[racestatev1.GetStatesRequest]) (
 	*connect.Response[racestatev1.GetStatesResponse], error,
 ) {
-	var data *eventv1.Event
+	var sc *racestatesContainer
 	var err error
-	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.Event)
-	if err != nil {
+	if sc, err = createRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
-	if req.Msg.Start == nil {
-		return nil, util.ErrMissingStartSelector
-	}
-	switch req.Msg.Start.Arg.(type) {
-	case *commonv1.StartSelector_RecordStamp:
-		tmp, err = racestaterepos.LoadRange(
-			ctx,
-			s.pool,
-			int(data.Id),
-			req.Msg.Start.GetRecordStamp().AsTime(),
-			int(req.Msg.Num))
-	case *commonv1.StartSelector_SessionTime:
-		tmp, err = racestaterepos.LoadRangeBySessionTime(
-			ctx,
-			s.pool,
-			int(data.Id),
-			float64(req.Msg.Start.GetSessionTime()),
-			int(req.Msg.Num))
-	default:
-		err = util.ErrInvalidStartSelector
-
-	}
+	tmp, err = sc.InitialRequest()
 	if err != nil {
 		return nil, err
 	}
+	// Note: we don't want to return more data then configured in statesContainer
+	// if a client needs more, it should call again or use the stream method
 	return connect.NewResponse(&racestatev1.GetStatesResponse{
 		States:          tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
@@ -375,51 +369,90 @@ func (s *stateServer) GetStates(
 }
 
 //nolint:whitespace,dupl // false positive
+func (s *stateServer) GetStateStream(
+	ctx context.Context,
+	req *connect.Request[racestatev1.GetStateStreamRequest],
+	stream *connect.ServerStream[racestatev1.GetStateStreamResponse],
+) (err error) {
+	var sc *racestatesContainer
+	if sc, err = createRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
+		return err
+	}
+	var rc *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
+	rc, err = sc.InitialRequest()
+	for {
+		if err != nil {
+			return err
+		}
+		if len(rc.Data) == 0 {
+			s.log.Debug("GetStateStream no more data", log.String("event", sc.e.GetKey()))
+			return nil
+		}
+		for _, s := range rc.Data {
+			if sErr := stream.Send(&racestatev1.GetStateStreamResponse{
+				State: s,
+			}); sErr != nil {
+				return sErr
+			}
+		}
+		rc, err = sc.NextRequest()
+	}
+}
+
+//nolint:whitespace,dupl // false positive
 func (s *stateServer) GetSpeedmaps(
 	ctx context.Context,
 	req *connect.Request[racestatev1.GetSpeedmapsRequest]) (
 	*connect.Response[racestatev1.GetSpeedmapsResponse], error,
 ) {
-	var data *eventv1.Event
+	var sc *speedmapContainer
 	var err error
-	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.Event)
-	if err != nil {
+	if sc, err = createSpeedmapContainer(ctx, s.pool, req.Msg); err != nil {
 		return nil, err
 	}
-
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
-
-	if req.Msg.Start == nil {
-		return nil, util.ErrMissingStartSelector
-	}
-	switch req.Msg.Start.Arg.(type) {
-	case *commonv1.StartSelector_RecordStamp:
-		tmp, err = speedmapprotorepos.LoadRange(
-			ctx,
-			s.pool,
-			int(data.Id),
-			req.Msg.Start.GetRecordStamp().AsTime(),
-			int(req.Msg.Num))
-	case *commonv1.StartSelector_SessionTime:
-		tmp, err = speedmapprotorepos.LoadRangeBySessionTime(
-			ctx,
-			s.pool,
-			int(data.Id),
-			float64(req.Msg.Start.GetSessionTime()),
-			int(req.Msg.Num))
-
-	default:
-		err = util.ErrInvalidStartSelector
-	}
-
+	tmp, err = sc.InitialRequest()
 	if err != nil {
 		return nil, err
 	}
+	// Note: we don't want to return more data then configured in speedmapContainer
+	// if a client needs more, it should call again or use the stream method
 	return connect.NewResponse(&racestatev1.GetSpeedmapsResponse{
 		Speedmaps:       tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
 	}), nil
+}
+
+//nolint:whitespace,dupl // false positive
+func (s *stateServer) GetSpeedmapStream(
+	ctx context.Context,
+	req *connect.Request[racestatev1.GetSpeedmapStreamRequest],
+	stream *connect.ServerStream[racestatev1.GetSpeedmapStreamResponse],
+) (err error) {
+	var sc *speedmapContainer
+	if sc, err = createSpeedmapContainer(ctx, s.pool, req.Msg); err != nil {
+		return err
+	}
+	var rc *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
+	rc, err = sc.InitialRequest()
+	for {
+		if err != nil {
+			return err
+		}
+		if len(rc.Data) == 0 {
+			s.log.Debug("GetSpeedmapStream no more data", log.String("event", sc.e.GetKey()))
+			return nil
+		}
+		for _, s := range rc.Data {
+			if sErr := stream.Send(&racestatev1.GetSpeedmapStreamResponse{
+				Speedmap: s,
+			}); sErr != nil {
+				return sErr
+			}
+		}
+		rc, err = sc.NextRequest()
+	}
 }
 
 // helper function to store data in the database within a transaction
