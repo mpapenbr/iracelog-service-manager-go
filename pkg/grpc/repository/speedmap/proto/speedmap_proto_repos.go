@@ -76,7 +76,7 @@ func LoadRange(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
 		return conn.Query(ctx, `
-		select p.protodata, ri.record_stamp,ri.session_time from speedmap_proto p
+		select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
 		join rs_info ri on ri.id=p.rs_info_id
 		where
 		ri.event_id=$1
@@ -98,7 +98,7 @@ func LoadRangeBySessionTime(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
 		return conn.Query(ctx, `
-		select p.protodata, ri.record_stamp,ri.session_time from speedmap_proto p
+		select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
 		join rs_info ri on ri.id=p.rs_info_id
 		where
 		ri.event_id=$1
@@ -111,9 +111,32 @@ func LoadRangeBySessionTime(
 	return loadRange(provider, limit)
 }
 
+// use this method to load a range of speedmap entries by rsInfoId
+func LoadRangeById(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId int,
+	rsInfoId int,
+	limit int,
+) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
+	provider := func() (rows pgx.Rows, err error) {
+		return conn.Query(ctx, `
+		select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
+		join rs_info ri on ri.id=p.rs_info_id
+		where
+		ri.event_id=$1
+		and ri.id >= $2
+		order by ri.id asc limit $3
+		`,
+			eventId, rsInfoId, limit,
+		)
+	}
+	return loadRange(provider, limit)
+}
+
 // loadRange loads a range of speedmap entries from the database
 // queryProvider must include the following columns in the following order:
-// protodata, record_stamp, session_time
+// protodata, record_stamp, session_time,id
 func loadRange(
 	queryProvider func() (pgx.Rows, error),
 	limit int,
@@ -131,7 +154,8 @@ func loadRange(
 		var binaryMessage []byte
 		if err := row.Scan(&binaryMessage,
 			&ret.LastTimestamp,
-			&ret.LastSessionTime); err != nil {
+			&ret.LastSessionTime,
+			&ret.LastRsInfoId); err != nil {
 			return nil, err
 		}
 		speedmap := &racestatev1.PublishSpeedmapRequest{}
