@@ -9,8 +9,8 @@ require (
 	connectrpc.com/grpchealth v1.3.0
 	connectrpc.com/otelconnect v0.7.1
 	github.com/docker/go-connections v0.5.0
-	github.com/exaring/otelpgx v0.8.0
-	github.com/golang-migrate/migrate/v4 v4.18.1
+	github.com/exaring/otelpgx v0.9.0
+	github.com/golang-migrate/migrate/v4 v4.18.2
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.2
@@ -18,9 +18,9 @@ require (
 	github.com/ohler55/ojg v1.26.1
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
-	github.com/samber/lo v1.47.0
+	github.com/samber/lo v1.49.1
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.19.0
 	github.com/testcontainers/testcontainers-go v0.35.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.59.0
