@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250122225235-2ce5e01e0f36.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.4-20250122225235-2ce5e01e0f36.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-20250122225235-2ce5e01e0f36.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpchealth v1.3.0
 	connectrpc.com/otelconnect v0.7.1
@@ -14,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.2
-	github.com/nats-io/nats.go v1.38.0
+	github.com/nats-io/nats.go v1.39.0
 	github.com/ohler55/ojg v1.26.1
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
@@ -33,9 +33,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.34.0
 	go.opentelemetry.io/otel/sdk/metric v1.34.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/mod v0.22.0
+	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.34.0
-	google.golang.org/protobuf v1.36.4
+	google.golang.org/protobuf v1.36.5
 	gotest.tools/v3 v3.5.1
 	moul.io/zapfilter v1.7.0
 )
