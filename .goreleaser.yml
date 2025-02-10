@@ -30,7 +30,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ["zip"]
 
 dockers:
   - id: backend-amd64

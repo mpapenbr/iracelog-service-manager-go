@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -14,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
@@ -34,7 +35,7 @@ type Telemetry struct {
 	traces  *trace.TracerProvider
 }
 
-func (t Telemetry) Shutdown() {
+func (t *Telemetry) Shutdown() {
 	log.Info("Shutdown telemetry")
 	if err := t.metrics.Shutdown(context.Background()); err != nil {
 		fmt.Printf("shutdown metrics error:%+v\n", err)
@@ -47,10 +48,14 @@ func (t Telemetry) Shutdown() {
 func SetupTelemetry(ctx context.Context) (*Telemetry, error) {
 	res, err := resource.New(ctx,
 		resource.WithSchemaURL(semconv.SchemaURL),
+
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String("iracelog-service-manager"),
 			semconv.ServiceVersionKey.String(version.Version),
+			semconv.ServiceInstanceIDKey.String(hostName()),
 		),
+		resource.WithHost(),
+		resource.WithContainerID(),
 		resource.WithFromEnv())
 	if err != nil {
 		log.Error("Failed to create resource", log.ErrorField(err))
@@ -72,6 +77,14 @@ func SetupTelemetry(ctx context.Context) (*Telemetry, error) {
 	return &ret, nil
 }
 
+func hostName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return name
+}
+
 func setupMetrics(r *resource.Resource) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(
 		context.Background(),
@@ -83,6 +96,7 @@ func setupMetrics(r *resource.Resource) (*metric.MeterProvider, error) {
 	}
 	provider := metric.NewMeterProvider(
 		metric.WithResource(r),
+
 		metric.WithReader(metric.NewPeriodicReader(exporter,
 			metric.WithInterval(15*time.Second))), // TODO: configure?
 	)

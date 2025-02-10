@@ -223,7 +223,9 @@ func (s *grpcServer) SetupDb() {
 
 func (s *grpcServer) SetupGrpcServices() {
 	s.mux = http.NewServeMux()
-	s.otel, _ = otelconnect.NewInterceptor()
+	s.otel, _ = otelconnect.NewInterceptor(
+		otelconnect.WithoutServerPeerAttributes(),
+	)
 	staleDuration, err := time.ParseDuration(config.StaleDuration)
 	if err != nil {
 		staleDuration = 1 * time.Minute
