@@ -52,8 +52,25 @@ func (s *driverDataContainer) InitialRequest() (
 			s.ctx,
 			s.conn,
 			int(s.e.Id),
+			s.getDefaultSessionNum(),
 			float64(s.req.GetStart().GetSessionTime()),
 			s.toFetchEntries())
+	case *commonv1.StartSelector_SessionTimeSelector:
+		ret, err = carrepos.LoadRangeBySessionTime(
+			s.ctx,
+			s.conn,
+			int(s.e.Id),
+			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
+			s.req.GetStart().GetSessionTimeSelector().GetDuration().AsDuration().Seconds(),
+			s.toFetchEntries())
+	case *commonv1.StartSelector_Id:
+		ret, err = carrepos.LoadRangeById(
+			s.ctx,
+			s.conn,
+			int(s.e.Id),
+			int(s.req.GetStart().GetId()),
+			s.toFetchEntries())
+
 	default:
 		ret = nil
 		err = util.ErrInvalidStartSelector
@@ -71,12 +88,23 @@ func (s *driverDataContainer) NextRequest() (
 	ret *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest],
 	err error,
 ) {
-	ret, err = carrepos.LoadRangeById(
-		s.ctx,
-		s.conn,
-		int(s.e.Id),
-		s.lastRsInfoId+1,
-		s.toFetchEntries())
+	switch s.req.GetStart().Arg.(type) {
+	case *commonv1.StartSelector_SessionTimeSelector:
+		ret, err = carrepos.LoadRangeByIdWithinSession(
+			s.ctx,
+			s.conn,
+			int(s.e.Id),
+			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
+			s.lastRsInfoId+1,
+			s.toFetchEntries())
+	default:
+		ret, err = carrepos.LoadRangeById(
+			s.ctx,
+			s.conn,
+			int(s.e.Id),
+			s.lastRsInfoId+1,
+			s.toFetchEntries())
+	}
 	if err == nil {
 		s.lastRsInfoId = ret.LastRsInfoId
 		s.remain -= len(ret.Data)

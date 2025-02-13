@@ -9,6 +9,7 @@ import (
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 type (
@@ -49,6 +50,7 @@ func createStatesContainer(
 	if req.GetNum() > 0 {
 		ret.remain = int(req.GetNum())
 	}
+
 	return ret, nil
 }
 
@@ -57,4 +59,12 @@ func (s *statesContainer) toFetchEntries() int {
 		return min(min(1000, int(s.req.GetNum())), s.remain)
 	}
 	return 1000
+}
+
+func (s *statesContainer) getDefaultSessionNum() uint32 {
+	if raceSession := utils.CollectRaceSessions(s.e); len(raceSession) == 0 {
+		return 0
+	} else {
+		return raceSession[0]
+	}
 }

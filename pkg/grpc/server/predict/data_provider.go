@@ -86,6 +86,7 @@ func GetPredictParam(
 		ctx,
 		pool,
 		eventId,
+		utils.CollectRaceSessions(event)[0],
 		sessionTime.Seconds(),
 		1); err != nil || len(states.Data) == 0 {
 		return nil, err

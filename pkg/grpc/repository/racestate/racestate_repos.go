@@ -28,13 +28,14 @@ func CreateRaceState(
 ) (rsInfoId int, err error) {
 	row := conn.QueryRow(ctx, `
 	insert into rs_info (
-		event_id, record_stamp, session_time, time_of_day, air_temp, track_temp,
-		track_wetness, precipitation
-	) values ($1,$2,$3,$4,$5,$6,$7,$8)
+		event_id, record_stamp, session_time, session_num, time_of_day,
+		air_temp, track_temp,track_wetness, precipitation
+	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	returning id
 		`,
 		eventId, racestate.Timestamp.AsTime(), racestate.Session.SessionTime,
-		racestate.Session.TimeOfDay, racestate.Session.AirTemp, racestate.Session.TrackTemp,
+		racestate.Session.SessionNum, racestate.Session.TimeOfDay,
+		racestate.Session.AirTemp, racestate.Session.TrackTemp,
 		racestate.Session.TrackWetness, racestate.Session.Precipitation,
 	)
 	rsInfoId = 0
@@ -77,21 +78,22 @@ func CreateRaceState(
 }
 
 // this method is used if there are driver data prior to the first race state
-// this should not happen but may occur on migration from old wamp data
 func CreateDummyRaceStateInfo(
 	ctx context.Context,
 	conn repository.Querier,
 	eventId int,
 	ts time.Time,
+	sessionTime float32,
+	sessionNum uint32,
 ) (rsInfoId int, err error) {
 	row := conn.QueryRow(ctx, `
 	insert into rs_info (
-		event_id, record_stamp, session_time, time_of_day, air_temp, track_temp,
-		track_wetness, precipitation
-	) values ($1,$2,$3,$4,$5,$6,$7,$8)
+		event_id, record_stamp, session_time, session_num, time_of_day,
+		air_temp, track_temp, track_wetness, precipitation
+	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	returning id
 		`,
-		eventId, ts, 0, 0, 0, 0, 0, 0,
+		eventId, ts, sessionTime, sessionNum, 0, 0, 0, 0, 0,
 	)
 	rsInfoId = 0
 	//nolint:govet,gocritic // by design
@@ -217,7 +219,7 @@ select p.protodata,ri.record_stamp,ri.session_time,ri.id from race_state_proto p
 join rs_info ri on ri.id=p.rs_info_id
 where
 ri.event_id=$1
-and ri.record_stamp > $2
+and ri.record_stamp >= $2
 order by ri.id asc limit $3
 		`,
 			eventId, startTS, limit,
@@ -227,30 +229,34 @@ order by ri.id asc limit $3
 	return loadRange(provider, limit)
 }
 
+// loads a range of entities starting at sessionTime with session sessionNum
 func LoadRangeBySessionTime(
 	ctx context.Context,
 	conn repository.Querier,
 	eventId int,
+	sessionNum uint32,
 	sessionTime float64,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
 		rows, err = conn.Query(ctx, `
-		select p.protodata,ri.record_stamp,ri.session_time,ri.id from race_state_proto p
-		join rs_info ri on ri.id=p.rs_info_id
-		where
-		ri.event_id=$1
-		and ri.session_time > $2
-		order by ri.id asc limit $3
+select p.protodata,ri.record_stamp,ri.session_time,ri.id from race_state_proto p
+join rs_info ri on ri.id=p.rs_info_id
+where
+ri.event_id=$1
+and ri.session_num = $2
+and ri.session_time >= $3
+order by ri.id asc limit $4
 		`,
-			eventId, sessionTime, limit,
+			eventId, sessionNum, sessionTime, limit,
 		)
 		return rows, err
 	}
 	return loadRange(provider, limit)
 }
 
-// use this method to load a range of racestate entries by rsInfoId
+// loads a range of entities starting at rsInfoId
+// sessionNum is ignored
 func LoadRangeById(
 	ctx context.Context,
 	conn repository.Querier,
@@ -260,14 +266,40 @@ func LoadRangeById(
 ) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
 		rows, err = conn.Query(ctx, `
-		select p.protodata,ri.record_stamp,ri.session_time,ri.id from race_state_proto p
-		join rs_info ri on ri.id=p.rs_info_id
-		where
-		ri.event_id=$1
-		and ri.id >= $2
-		order by ri.id asc limit $3
+select p.protodata,ri.record_stamp,ri.session_time,ri.id from race_state_proto p
+join rs_info ri on ri.id=p.rs_info_id
+where
+ri.event_id=$1
+and ri.id >= $2
+order by ri.id asc limit $3
 		`,
 			eventId, rsInfoId, limit,
+		)
+		return rows, err
+	}
+	return loadRange(provider, limit)
+}
+
+// loads a range of entities starting at rsInfoId within a session
+func LoadRangeByIdWithinSession(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId int,
+	sessionNum uint32,
+	rsInfoId int,
+	limit int,
+) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
+	provider := func() (rows pgx.Rows, err error) {
+		rows, err = conn.Query(ctx, `
+select p.protodata,ri.record_stamp,ri.session_time,ri.id from race_state_proto p
+join rs_info ri on ri.id=p.rs_info_id
+where
+ri.event_id=$1
+and ri.session_num = $2
+and ri.id >= $3
+order by ri.id asc limit $4
+		`,
+			eventId, sessionNum, rsInfoId, limit,
 		)
 		return rows, err
 	}
