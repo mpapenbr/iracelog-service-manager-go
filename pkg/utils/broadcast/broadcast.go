@@ -166,6 +166,10 @@ func (b *broadcastServer[T]) serve() {
 
 					log.Debug("removed listener",
 						log.String("name", b.name), log.Int("len", len(b.listeners)))
+
+					close(listener)
+					log.Debug("closed channel",
+						log.String("name", b.name))
 					// break
 				}
 			}

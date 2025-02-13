@@ -68,7 +68,6 @@ func (bc *driverDataBcstSupport) createChannels() (
 			dataChan <- d
 		}
 		bc.l.Debug("driverData subscription finished", log.String("eventKey", bc.eventKey))
-		close(dataChan)
 	}()
 
 	go func() {
@@ -77,7 +76,9 @@ func (bc *driverDataBcstSupport) createChannels() (
 		bc.l.Debug("driverData quitChan was closed", log.String("eventKey", bc.eventKey))
 		// the broadcaster may be already closed if the event was unregistered
 		if bs := bc.getDriverDataBroadcaster(); bs != nil {
+			bc.l.Debug("cancel subDataChan subscription", log.String("eventKey", bc.eventKey))
 			bs.CancelSubscription(subDataChan)
+			bc.l.Debug("closing dataChan", log.String("eventKey", bc.eventKey))
 			close(dataChan)
 		}
 	}()
