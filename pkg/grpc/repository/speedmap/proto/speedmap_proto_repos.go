@@ -67,6 +67,8 @@ order by ri.id desc limit 1
 	return speedmap, nil
 }
 
+// loads a range of entities starting at startTS
+// Note: sessionNum is ignored
 func LoadRange(
 	ctx context.Context,
 	conn repository.Querier,
@@ -80,7 +82,7 @@ func LoadRange(
 		join rs_info ri on ri.id=p.rs_info_id
 		where
 		ri.event_id=$1
-		and ri.record_stamp > $2
+		and ri.record_stamp >= $2
 		order by ri.id asc limit $3
 		`,
 			eventId, startTS, limit,
@@ -89,29 +91,33 @@ func LoadRange(
 	return loadRange(provider, limit)
 }
 
+// loads a range of entities starting at sessionTime with session sessionNum
 func LoadRangeBySessionTime(
 	ctx context.Context,
 	conn repository.Querier,
 	eventId int,
+	sessionNum uint32,
 	sessionTime float64,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
 		return conn.Query(ctx, `
-		select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
-		join rs_info ri on ri.id=p.rs_info_id
-		where
-		ri.event_id=$1
-		and ri.session_time > $2
-		order by ri.id asc limit $3
+select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
+join rs_info ri on ri.id=p.rs_info_id
+where
+ri.event_id=$1
+and ri.session_num = $2
+and ri.session_time >= $3
+order by ri.id asc limit $4
 		`,
-			eventId, sessionTime, limit,
+			eventId, sessionNum, sessionTime, limit,
 		)
 	}
 	return loadRange(provider, limit)
 }
 
-// use this method to load a range of speedmap entries by rsInfoId
+// loads a range of entities starting at rsInfoId
+// sessionNum is ignored
 func LoadRangeById(
 	ctx context.Context,
 	conn repository.Querier,
@@ -121,14 +127,39 @@ func LoadRangeById(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
 		return conn.Query(ctx, `
-		select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
-		join rs_info ri on ri.id=p.rs_info_id
-		where
-		ri.event_id=$1
-		and ri.id >= $2
-		order by ri.id asc limit $3
+select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
+join rs_info ri on ri.id=p.rs_info_id
+where
+ri.event_id=$1
+and ri.id >= $2
+order by ri.id asc limit $3
 		`,
 			eventId, rsInfoId, limit,
+		)
+	}
+	return loadRange(provider, limit)
+}
+
+// loads a range of entities starting at rsInfoId within a session
+func LoadRangeByIdWithinSession(
+	ctx context.Context,
+	conn repository.Querier,
+	eventId int,
+	sessionNum uint32,
+	rsInfoId int,
+	limit int,
+) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
+	provider := func() (rows pgx.Rows, err error) {
+		return conn.Query(ctx, `
+select p.protodata, ri.record_stamp,ri.session_time,ri.id from speedmap_proto p
+join rs_info ri on ri.id=p.rs_info_id
+where
+ri.event_id=$1
+and ri.session_num = $2
+and ri.id >= $3
+order by ri.id asc limit $4
+		`,
+			eventId, sessionNum, rsInfoId, limit,
 		)
 	}
 	return loadRange(provider, limit)

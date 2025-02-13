@@ -1,7 +1,15 @@
+buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-00000000000000-b9ea8a7c8a46.1 h1:C16mIo+7I8h08z/KTxty2Un3ukWxUq367sDrb/GG+dU=
+buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-00000000000000-b9ea8a7c8a46.1/go.mod h1:nY/ATtoKT9DZ+vbmtCU3dJEHFAoEHlXAaiQiDlYR32k=
 buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250122225235-2ce5e01e0f36.1 h1:ni7iEoMdein96H6wL49doOmEO6SoseUT2fhryxQNDcw=
 buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250122225235-2ce5e01e0f36.1/go.mod h1:UHQ1UEq8w/OaB/EUygra+A+uUZwN+0b8jldOCvI9DC0=
+buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250212110127-05bd9bba74a7.1 h1:p1p3MOy8vqS+MjVdrmztF/eyxhHOSkzge9Zvc7M2gGk=
+buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250212110127-05bd9bba74a7.1/go.mod h1:njrDM4YCWjQLh90GDV46x8Lr/paBZXs7giBqWyTalm4=
+buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-00000000000000-b9ea8a7c8a46.1 h1:S/o39VOoyTOfdnTYgH9c7Eer1t3hKOzjzamkKO5OwOY=
+buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-00000000000000-b9ea8a7c8a46.1/go.mod h1:VCZ6Be0MjXS0miAf3bdyJJ3WybVL+f8b9z7zBt/ZEjs=
 buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-20250122225235-2ce5e01e0f36.1 h1:mYzs7TS6peIQC3ZGPy0m0v5YcxgdXToFvcieIRey57I=
 buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-20250122225235-2ce5e01e0f36.1/go.mod h1:VCZ6Be0MjXS0miAf3bdyJJ3WybVL+f8b9z7zBt/ZEjs=
+buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-20250212110127-05bd9bba74a7.1 h1:BI9jWsQeHGY2A7B/eqPXhdXW57c0MIzoPf0oUpi8h9g=
+buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.5-20250212110127-05bd9bba74a7.1/go.mod h1:VCZ6Be0MjXS0miAf3bdyJJ3WybVL+f8b9z7zBt/ZEjs=
 connectrpc.com/connect v1.18.1 h1:PAg7CjSAGvscaf6YZKUefjoih5Z/qYkyaTrBW8xvYPw=
 connectrpc.com/connect v1.18.1/go.mod h1:0292hj1rnx8oFrStN7cB4jjVBeqs+Yx5yDIC2prWDO8=
 connectrpc.com/grpchealth v1.3.0 h1:FA3OIwAvuMokQIXQrY5LbIy8IenftksTP/lG4PbYN+E=

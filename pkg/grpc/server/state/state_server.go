@@ -174,7 +174,7 @@ func (s *stateServer) PublishSpeedmap(
 	return connect.NewResponse(&racestatev1.PublishSpeedmapResponse{}), nil
 }
 
-//nolint:whitespace // can't make both editor and linter happy
+//nolint:whitespace,funlen // can't make both editor and linter happy
 func (s *stateServer) PublishDriverData(
 	ctx context.Context,
 	req *connect.Request[racestatev1.PublishDriverDataRequest]) (
@@ -201,16 +201,19 @@ func (s *stateServer) PublishDriverData(
 		if err := carrepos.Create(ctx, tx, int(epd.Event.Id), req.Msg); err != nil {
 			s.log.Error("error storing car data", log.ErrorField(err))
 		}
+		rsInfoId := epd.LastRsInfoId
 		if epd.LastRsInfoId == 0 {
 			var rsErr error
-			epd.LastRsInfoId, rsErr = racestaterepos.CreateDummyRaceStateInfo(
-				ctx, tx, int(epd.Event.Id), req.Msg.Timestamp.AsTime())
+			rsInfoId, rsErr = racestaterepos.CreateDummyRaceStateInfo(
+				ctx, tx, int(epd.Event.Id), req.Msg.Timestamp.AsTime(),
+				req.Msg.SessionTime, req.Msg.SessionNum,
+			)
 			if rsErr != nil {
 				s.log.Error("error creating dummy racestate info", log.ErrorField(rsErr))
 				return rsErr
 			}
 		}
-		return carprotorepos.Create(ctx, tx, epd.LastRsInfoId, req.Msg)
+		return carprotorepos.Create(ctx, tx, rsInfoId, req.Msg)
 	}); err != nil {
 		s.log.Error("error storing car state", log.ErrorField(err))
 	}
@@ -308,6 +311,7 @@ func (s *stateServer) GetDriverData(
 		DriverData:      tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
+		LastId:          uint32(tmp.LastRsInfoId),
 	}), nil
 }
 
@@ -365,6 +369,7 @@ func (s *stateServer) GetStates(
 		States:          tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
+		LastId:          uint32(tmp.LastRsInfoId),
 	}), nil
 }
 
@@ -421,6 +426,7 @@ func (s *stateServer) GetSpeedmaps(
 		Speedmaps:       tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
+		LastId:          uint32(tmp.LastRsInfoId),
 	}), nil
 }
 

@@ -115,7 +115,7 @@ func (e *EventLookup) AddEvent(
 	replayInfoSource := make(chan *eventv1.ReplayInfo)
 	snapshotSource := make(chan *analysisv1.SnapshotData)
 
-	raceSessions := collectRaceSessions(event)
+	raceSessions := CollectRaceSessions(event)
 	cp := car.NewCarProcessor(
 		car.WithRaceSessions(raceSessions),
 	)
@@ -311,7 +311,7 @@ func (epd *EventProcessingData) setupOwnListeners() {
 	}()
 }
 
-func collectRaceSessions(e *eventv1.Event) []uint32 {
+func CollectRaceSessions(e *eventv1.Event) []uint32 {
 	ret := make([]uint32, 0)
 	for _, s := range e.Sessions {
 		if s.Type == commonv1.SessionType_SESSION_TYPE_RACE {
