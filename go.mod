@@ -1,6 +1,6 @@
 module github.com/mpapenbr/iracelog-service-manager-go
 
-go 1.23.0
+go 1.24
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250212110127-05bd9bba74a7.1
