@@ -173,6 +173,7 @@ func (bc *broadcastContainer) getAnalysisBroadcaster() broadcast.BroadcastServer
 		bc.analysisBroadcaster = createEventBroadcaster(
 			"analysis", bc.eventKey, l, bc.conn, sample,
 			func(arg protoreflect.ProtoMessage) *analysisv1.Analysis {
+				//nolint:errcheck // by design
 				return proto.Clone(arg.(*analysisv1.Analysis)).(*analysisv1.Analysis)
 			},
 		)
@@ -191,6 +192,7 @@ func (bc *broadcastContainer) getRacestateBroadcaster() broadcast.BroadcastServe
 		bc.racestateBroadcaster = createEventBroadcaster(
 			"racestate", bc.eventKey, l, bc.conn, sample,
 			func(arg protoreflect.ProtoMessage) *racestatev1.PublishStateRequest {
+				//nolint:errcheck // by design
 				return proto.Clone(arg.(*racestatev1.PublishStateRequest)).(*racestatev1.PublishStateRequest)
 			},
 		)
@@ -209,6 +211,7 @@ func (bc *broadcastContainer) getSpeedmapBroadcaster() broadcast.BroadcastServer
 		bc.speedmapBroadcaster = createEventBroadcaster(
 			"speedmap", bc.eventKey, l, bc.conn, sample,
 			func(arg protoreflect.ProtoMessage) *racestatev1.PublishSpeedmapRequest {
+				//nolint:errcheck // by design
 				return proto.Clone(arg.(*racestatev1.PublishSpeedmapRequest)).(*racestatev1.PublishSpeedmapRequest)
 			},
 		)
@@ -227,6 +230,7 @@ func (bc *broadcastContainer) getSnapshotBroadcaster() broadcast.BroadcastServer
 		bc.snapshotBroadcaster = createEventBroadcaster(
 			"snapshot", bc.eventKey, l, bc.conn, sample,
 			func(arg protoreflect.ProtoMessage) *analysisv1.SnapshotData {
+				//nolint:errcheck // by design
 				return proto.Clone(arg.(*analysisv1.SnapshotData)).(*analysisv1.SnapshotData)
 			},
 		)
