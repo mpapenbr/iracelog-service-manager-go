@@ -14,10 +14,12 @@ func Test_eventLookupTransfer_Conversion(t *testing.T) {
 		"sampleKey": {
 			Event: &eventv1.Event{Key: "sampleKey", Name: "sampleName"},
 			Track: &trackv1.Track{Id: 12, Name: "sampleTrack"},
+			// by design no owner
 		},
 		"otherKey": {
 			Event: &eventv1.Event{Key: "otherKey", Name: "otherName"},
 			Track: &trackv1.Track{Id: 14, Name: "otherTrack"},
+			Owner: "someOwner",
 		},
 	}
 

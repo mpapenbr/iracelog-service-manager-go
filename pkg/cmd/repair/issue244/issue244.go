@@ -50,7 +50,7 @@ func copySessionNums(ctx context.Context) {
 	pool := postgres.InitWithUrl(config.DB)
 	defer pool.Close()
 
-	if events, err := eventrepo.LoadAll(ctx, pool); err == nil {
+	if events, err := eventrepo.LoadAll(ctx, pool, nil); err == nil {
 		for _, event := range events {
 			doMigrateRaceStateSessionNums(pool, event.Id)
 		}

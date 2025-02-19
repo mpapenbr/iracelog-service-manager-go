@@ -7,6 +7,7 @@ import (
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	carv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/car/v1"
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"connectrpc.com/connect"
@@ -21,6 +22,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	rProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
 	smProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	eventservice "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/service/event"
@@ -65,7 +67,18 @@ func (s *eventsServer) GetEvents(
 	req *connect.Request[eventv1.GetEventsRequest],
 	stream *connect.ServerStream[eventv1.GetEventsResponse],
 ) error {
-	data, err := event.LoadAll(context.Background(), s.pool)
+	var tenantId *uint32 = nil
+	if t, err := util.ResolveTenant(
+		ctx,
+		s.pool,
+		req.Msg.TenantSelector); err == nil {
+		if t != nil {
+			tenantId = &t.Id
+		}
+	} else {
+		return err
+	}
+	data, err := event.LoadAll(context.Background(), s.pool, tenantId)
 	if err != nil {
 		return err
 	}
@@ -84,7 +97,18 @@ func (s *eventsServer) GetLatestEvents(
 	ctx context.Context,
 	req *connect.Request[eventv1.GetLatestEventsRequest],
 ) (*connect.Response[eventv1.GetLatestEventsResponse], error) {
-	data, err := event.LoadAll(context.Background(), s.pool)
+	var tenantId *uint32 = nil
+	if t, err := util.ResolveTenant(
+		ctx,
+		s.pool,
+		req.Msg.TenantSelector); err == nil {
+		if t != nil {
+			tenantId = &t.Id
+		}
+	} else {
+		return nil, err
+	}
+	data, err := event.LoadAll(context.Background(), s.pool, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -189,15 +213,12 @@ func (s *eventsServer) DeleteEvent(
 	ctx context.Context, req *connect.Request[eventv1.DeleteEventRequest],
 ) (*connect.Response[eventv1.DeleteEventResponse], error) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
+
 	s.log.Debug("DeleteEvent called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
-	var data *eventv1.Event
-	var err error
-	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+
+	data, err := s.validateEventAccess(ctx, a, req.Msg.EventSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -214,15 +235,10 @@ func (s *eventsServer) UpdateEvent(
 	ctx context.Context, req *connect.Request[eventv1.UpdateEventRequest],
 ) (*connect.Response[eventv1.UpdateEventResponse], error) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
 	s.log.Debug("UpdateEvent called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
-	var data *eventv1.Event
-	var err error
-	data, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	data, err := s.validateEventAccess(ctx, a, req.Msg.EventSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -231,4 +247,34 @@ func (s *eventsServer) UpdateEvent(
 		return connect.NewResponse(&eventv1.UpdateEventResponse{Event: data}), nil
 	}
 	return nil, err
+}
+
+func (s *eventsServer) validateEventAccess(
+	ctx context.Context,
+	a auth.Authentication, eventSel *commonv1.EventSelector,
+) (*eventv1.Event, error) {
+	// get the event
+	data, err := util.ResolveEvent(ctx, s.pool, eventSel)
+	if err != nil {
+		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
+			return nil, connect.NewError(
+				connect.CodePermissionDenied,
+				auth.ErrPermissionDenied)
+		} else {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+	}
+	t, err := tenant.LoadByEventId(ctx, s.pool, int(data.Id))
+	if err != nil {
+		return nil, err
+	}
+	if !s.pe.HasObjectPermission(a,
+		permission.PermissionPostRacedata,
+		t.Name) {
+
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied)
+	}
+	return data, nil
 }

@@ -157,7 +157,11 @@ func (n *NatsProxy) PublishEventRegistered(epd *utils.EventProcessingData) error
 		}
 		n.l.Debug("snapshot channel closed", log.String("eventKey", epd.Event.GetKey()))
 	}()
-	n.globalEvents.RegisterEvent(&proxy.EventData{Event: epd.Event, Track: epd.Track})
+	n.globalEvents.RegisterEvent(&proxy.EventData{
+		Event: epd.Event,
+		Track: epd.Track,
+		Owner: epd.Owner,
+	})
 	return n.conn.Publish("event.registered", data)
 }
 

@@ -32,9 +32,15 @@ func (e *EventData) ToBinary() ([]byte, error) {
 	}
 	result.Write(data)
 
+	if err := binary.Write(&result, binary.LittleEndian, int32(len(e.Owner))); err != nil {
+		return nil, fmt.Errorf("failed to write owner length: %w", err)
+	}
+	result.WriteString(e.Owner)
+
 	return result.Bytes(), nil
 }
 
+//nolint:funlen // by design
 func (e *EventData) FromBinary(data []byte) error {
 	var err error
 	var event eventv1.Event
@@ -44,7 +50,7 @@ func (e *EventData) FromBinary(data []byte) error {
 	var msgLen int32
 	// event
 	if err = binary.Read(buffer, binary.LittleEndian, &msgLen); err != nil {
-		return fmt.Errorf("failed to read A length: %w", err)
+		return fmt.Errorf("failed to read event length: %w", err)
 	}
 	msgData := make([]byte, msgLen)
 	if _, err = buffer.Read(msgData); err != nil {
@@ -56,7 +62,7 @@ func (e *EventData) FromBinary(data []byte) error {
 	}
 	// track
 	if err = binary.Read(buffer, binary.LittleEndian, &msgLen); err != nil {
-		return fmt.Errorf("failed to read A length: %w", err)
+		return fmt.Errorf("failed to read track length: %w", err)
 	}
 	msgData = make([]byte, msgLen)
 	if _, err = buffer.Read(msgData); err != nil {
@@ -68,6 +74,18 @@ func (e *EventData) FromBinary(data []byte) error {
 		return fmt.Errorf("error unmarshaling track: %w", err)
 	}
 
+	// owner
+	if err = binary.Read(buffer, binary.LittleEndian, &msgLen); err != nil {
+		return fmt.Errorf("failed to read owner length: %w", err)
+	}
+	if msgLen > 0 {
+		msgData = make([]byte, msgLen)
+		if _, err = buffer.Read(msgData); err != nil {
+			return fmt.Errorf("failed to read owner data: %w", err)
+		}
+		e.Owner = string(msgData)
+	}
+
 	e.Event = &event
 	e.Track = &track
 	return nil
@@ -77,5 +95,7 @@ func (e *EventData) Equals(other *EventData) bool {
 	if e == nil || other == nil {
 		return false
 	}
-	return proto.Equal(e.Event, other.Event) && proto.Equal(e.Track, other.Track)
+	return proto.Equal(e.Event, other.Event) &&
+		proto.Equal(e.Track, other.Track) &&
+		e.Owner == other.Owner
 }

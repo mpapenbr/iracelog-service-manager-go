@@ -1,5 +1,7 @@
 package config
 
+import "context"
+
 // this holds the resolved configuration values from CLI
 //
 //nolint:lll // readablity
@@ -13,7 +15,6 @@ var (
 	EnableTelemetry      bool   // enable telemetry
 	TelemetryEndpoint    string // endpoint for telemetry
 	ProfilingPort        int    // port for profiling
-	PrintMessage         bool   // if true, the message payload will be print on debug level
 	GrpcServerAddr       string // listen addr for gRPC server (insecure)
 	TLSServerAddr        string // listen addr for gRPC server (tls)
 	TLSCertFile          string // path to TLS certificate
@@ -26,11 +27,30 @@ var (
 	StaleDuration        string // duration after which an event is considered stale
 	MaxConcurrentStreams int    // max number of concurrent streams per connection
 	NatsUrl              string // nats server url
-	EnabledNats          bool   // enable nats
-
+	EnableNats           bool   // enable nats
 )
 
 // Config holds the configuration values which are used by the application
-type Config struct {
-	PrintMessage bool // if true, the message payload will be print on debug level
+type (
+	contextKey struct{}
+	Config     struct {
+		PrintMessage   bool // if true, the message payload will be print on debug level
+		SupportTenants bool // if true, tenant support is enabled
+	}
+)
+
+var key = contextKey{}
+
+func NewContext(ctx context.Context, cfg *Config) context.Context {
+	return context.WithValue(ctx, key, cfg)
+}
+
+func FromContext(ctx context.Context) *Config {
+	if ctx == nil {
+		return nil
+	}
+	if cfg, ok := ctx.Value(key).(*Config); ok {
+		return cfg
+	}
+	return nil
 }

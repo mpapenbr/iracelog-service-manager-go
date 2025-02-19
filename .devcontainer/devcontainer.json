@@ -38,6 +38,7 @@
         "github.vscode-pull-request-github",
         "EditorConfig.EditorConfig",
         "cschleiden.vscode-github-actions",
+        "redhat.vscode-yaml",
         "GitHub.copilot"
       ]
     }

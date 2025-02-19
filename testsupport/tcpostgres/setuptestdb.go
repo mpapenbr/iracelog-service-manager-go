@@ -131,6 +131,7 @@ func ClearAllTables(pool *pgxpool.Pool) {
 		"rs_info",
 		"event_ext",
 		"event",
+		"tenant",
 		"track",
 	}
 	err := clearTables(pool, tables)

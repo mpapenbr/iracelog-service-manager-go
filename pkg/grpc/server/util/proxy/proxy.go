@@ -18,6 +18,7 @@ type (
 	EventData struct {
 		Event *eventv1.Event
 		Track *trackv1.Track
+		Owner string
 	}
 	// PublishProxy is the interface for publishing data from (external) race data
 	// providers. These data can be easily converted for response data.

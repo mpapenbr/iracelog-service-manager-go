@@ -85,7 +85,7 @@ func (s *trackServer) EnsureTrack(
 	req *connect.Request[trackv1.EnsureTrackRequest],
 ) (*connect.Response[trackv1.EnsureTrackResponse], error) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleAdmin) {
+	if !s.pe.HasPermission(a, permission.PermissionCreateTrack) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -102,7 +102,7 @@ func (s *trackServer) UpdatePitInfo(
 	req *connect.Request[trackv1.UpdatePitInfoRequest],
 ) (*connect.Response[trackv1.UpdatePitInfoResponse], error) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleAdmin) {
+	if !s.pe.HasPermission(a, permission.PermissionUpdateTrack) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
