@@ -4,7 +4,11 @@ import (
 	"context"
 	"net/http"
 
+	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
+
+	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 )
 
 const (
@@ -15,14 +19,23 @@ type (
 	authInterceptor struct {
 		adminToken    string
 		providerToken string
+		tenantCache   cache.Cache[string, tenantv1.Tenant]
+		authProvider  []AuthenticationProvider
+		l             *log.Logger
 	}
 	Option func(*authInterceptor)
 )
 
-func NewAuthInterceptor(opts ...Option) *authInterceptor {
-	ret := &authInterceptor{}
+func NewAuthInterceptor(opts ...Option) connect.Interceptor {
+	ret := &authInterceptor{
+		l: log.Default().Named("grpc.auth"),
+	}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	ret.authProvider = []AuthenticationProvider{
+		&apiKeyAuthenticator{adminToken: ret.adminToken, tenantCache: ret.tenantCache},
+		&anonymousAuthenticator{},
 	}
 	return ret
 }
@@ -36,6 +49,12 @@ func WithAuthToken(token string) Option {
 func WithProviderToken(token string) Option {
 	return func(srv *authInterceptor) {
 		srv.providerToken = token
+	}
+}
+
+func WithTenantCache(arg cache.Cache[string, tenantv1.Tenant]) Option {
+	return func(srv *authInterceptor) {
+		srv.tenantCache = arg
 	}
 }
 
@@ -69,12 +88,12 @@ var anon = &SimpleAuth{principal: &SimplePrincipal{name: "anon"}, roles: []Role{
 
 type myCtxTypeKey int
 
-func FromContext(ctx *context.Context) *Authentication {
+func FromContext(ctx *context.Context) Authentication {
 	if ctx == nil {
 		return nil
 	}
 	if val, ok := (*ctx).Value(myCtxTypeKey(0)).(*AuthHolder); ok {
-		return &val.auth
+		return val.auth
 	}
 	return nil
 }
@@ -106,23 +125,56 @@ func (i *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 
 //nolint:lll // better readability
 func (i *authInterceptor) handleAuth(ctx context.Context, h http.Header) context.Context {
+	for _, p := range i.authProvider {
+		a, err := p.Authenticate(ctx, h)
+		if a != nil {
+			return context.WithValue(ctx, myCtxTypeKey(0), &AuthHolder{auth: a})
+		}
+		if err != nil {
+			i.l.Error("error authenticating", log.ErrorField(err))
+		}
+	}
+	// if no auth found, continue with current context
+	return ctx
+}
+
+type (
+	anonymousAuthenticator struct{}
+	apiKeyAuthenticator    struct {
+		adminToken  string
+		tenantCache cache.Cache[string, tenantv1.Tenant]
+	}
+)
+
+//nolint:whitespace // editor/linter issue
+func (a *anonymousAuthenticator) Authenticate(
+	ctx context.Context,
+	h http.Header,
+) (Authentication, error) {
+	return anon, nil
+}
+
+//nolint:whitespace // editor/linter issue
+func (a *apiKeyAuthenticator) Authenticate(
+	ctx context.Context,
+	h http.Header,
+) (Authentication, error) {
 	if h.Get(tokenHeader) == "" {
-		// no token, no auth
-		return context.WithValue(ctx, myCtxTypeKey(0), &AuthHolder{auth: anon})
+		return nil, nil
 	}
-	if h.Get(tokenHeader) == i.adminToken {
-		return context.WithValue(ctx, myCtxTypeKey(0), &AuthHolder{auth: &SimpleAuth{
+	if h.Get(tokenHeader) == a.adminToken {
+		return &SimpleAuth{
 			principal: &SimplePrincipal{name: "admin"},
-			roles:     []Role{RoleAdmin, RoleProvider},
-		}})
+			roles:     []Role{RoleAdmin},
+		}, nil
 	}
 
-	if h.Get(tokenHeader) == i.providerToken {
-		return context.WithValue(ctx, myCtxTypeKey(0), &AuthHolder{auth: &SimpleAuth{
-			principal: &SimplePrincipal{name: "provider"},
-			roles:     []Role{RoleProvider},
-		}})
+	if t, err := a.tenantCache.Get(ctx, h.Get(tokenHeader)); err == nil && t.IsActive {
+		return &SimpleAuth{
+			principal: &SimplePrincipal{name: t.Name},
+			roles:     []Role{RoleRaceDataProvider},
+		}, nil
+	} else {
+		return nil, err
 	}
-
-	return context.WithValue(ctx, myCtxTypeKey(0), &AuthHolder{auth: anon})
 }

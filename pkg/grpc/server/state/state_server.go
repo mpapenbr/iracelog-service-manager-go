@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
@@ -89,13 +90,10 @@ func (s *stateServer) PublishState(
 	*connect.Response[racestatev1.PublishStateResponse], error,
 ) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
-	// get the epd. This can only be found in the "local" lookup.
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	// get the epd
+	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
+		return nil, err
 	}
 	if s.debugWire {
 		s.wireLog.Debug("PublishState called",
@@ -146,13 +144,10 @@ func (s *stateServer) PublishSpeedmap(
 	*connect.Response[racestatev1.PublishSpeedmapResponse], error,
 ) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
 	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
+		return nil, err
 	}
 	if s.debugWire {
 		s.wireLog.Debug("PublishSpeedmap called",
@@ -181,14 +176,12 @@ func (s *stateServer) PublishDriverData(
 	*connect.Response[racestatev1.PublishDriverDataResponse], error,
 ) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
 	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
+		return nil, err
 	}
+
 	if s.debugWire {
 		s.wireLog.Debug("PublishDriverData called", log.String("event", epd.Event.Key))
 	}
@@ -225,6 +218,31 @@ func (s *stateServer) PublishDriverData(
 	return connect.NewResponse(&racestatev1.PublishDriverDataResponse{}), nil
 }
 
+func (s *stateServer) validateEventAccess(
+	a auth.Authentication, eventSel *commonv1.EventSelector,
+) (*utils.EventProcessingData, error) {
+	// get the epd
+	epd, err := s.lookup.GetEvent(eventSel)
+	if err != nil {
+		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
+			return nil, connect.NewError(
+				connect.CodePermissionDenied,
+				auth.ErrPermissionDenied)
+		} else {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+	}
+	if !s.pe.HasObjectPermission(a,
+		permission.PermissionPostRacedata,
+		epd.Owner) {
+
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied)
+	}
+	return epd, nil
+}
+
 //nolint:whitespace // can't make both editor and linter happy
 func (s *stateServer) PublishEventExtraInfo(
 	ctx context.Context,
@@ -232,13 +250,10 @@ func (s *stateServer) PublishEventExtraInfo(
 	*connect.Response[racestatev1.PublishEventExtraInfoResponse], error,
 ) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
 	// get the epd
-	epd, err := s.lookup.GetEvent(req.Msg.Event)
+	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
+		return nil, err
 	}
 	if s.debugWire {
 		s.wireLog.Debug("PublishEventExtraInfo called", log.String("event", epd.Event.Key))

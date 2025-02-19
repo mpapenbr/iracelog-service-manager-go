@@ -21,7 +21,12 @@ var selector = `select id, event_key, name, description, event_time,
 	replay_min_timestamp, replay_min_session_time, replay_max_session_time,
 	sessions from event`
 
-func Create(ctx context.Context, conn repository.Querier, event *eventv1.Event) error {
+func Create(
+	ctx context.Context,
+	conn repository.Querier,
+	event *eventv1.Event,
+	tenantId uint32,
+) error {
 	replayInfo := func() *eventv1.ReplayInfo {
 		if event.ReplayInfo == nil {
 			return &eventv1.ReplayInfo{MinTimestamp: event.EventTime}
@@ -35,8 +40,9 @@ func Create(ctx context.Context, conn repository.Querier, event *eventv1.Event) 
 		team_racing, multi_class, num_car_types, num_car_classes,ir_session_id,
 		ir_sub_session_id, track_id, pit_speed,
 		replay_min_timestamp, replay_min_session_time, replay_max_session_time,
-		sessions
-	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		sessions,
+		tenant_id
+	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 	returning id
 		`,
 		event.Key, event.Name, event.Description, event.EventTime.AsTime(),
@@ -45,6 +51,7 @@ func Create(ctx context.Context, conn repository.Querier, event *eventv1.Event) 
 		event.PitSpeed, replayInfo().MinTimestamp.AsTime(), replayInfo().MinSessionTime,
 		replayInfo().MaxSessionTime,
 		event.Sessions,
+		tenantId,
 	)
 	if err := row.Scan(&event.Id); err != nil {
 		return err
@@ -67,10 +74,12 @@ func LoadByKey(ctx context.Context, conn repository.Querier, key string) (
 	return readData(row)
 }
 
-func LoadAll(ctx context.Context, conn repository.Querier) (
+func LoadAll(ctx context.Context, conn repository.Querier, tenantId *uint32) (
 	[]*eventv1.Event, error,
 ) {
-	row, err := conn.Query(ctx, fmt.Sprintf("%s order by event_time desc", selector))
+	row, err := conn.Query(ctx,
+		fmt.Sprintf("%s where tenant_id=coalesce($1,tenant_id) order by event_time desc",
+			selector), tenantId)
 	if err != nil {
 		return nil, err
 	}

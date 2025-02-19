@@ -11,6 +11,7 @@ func Test_eventData_Conversion(t *testing.T) {
 	sampleData := EventData{
 		Event: &eventv1.Event{Key: "sampleKey", Name: "sampleName"},
 		Track: &trackv1.Track{Id: 12, Name: "sampleTrack"},
+		Owner: "sampleOwner",
 	}
 
 	binaryData, err := sampleData.ToBinary()

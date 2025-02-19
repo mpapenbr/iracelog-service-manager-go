@@ -69,6 +69,7 @@ var ErrEventNotFound = errors.New("event not found")
 type EventProcessingData struct {
 	Event               *eventv1.Event
 	Track               *trackv1.Track
+	Owner               string
 	Processor           *processing.Processor
 	AnalysisBroadcast   broadcast.BroadcastServer[*analysisv1.Analysis]
 	RacestateBroadcast  broadcast.BroadcastServer[*racestatev1.PublishStateRequest]
@@ -102,6 +103,7 @@ func (e *EventLookup) AddEvent(
 	event *eventv1.Event,
 	track *trackv1.Track,
 	recordingMode providerev1.RecordingMode,
+	owner string,
 ) *EventProcessingData {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
@@ -127,6 +129,7 @@ func (e *EventLookup) AddEvent(
 	epd := &EventProcessingData{
 		Event:         event,
 		Track:         track,
+		Owner:         owner,
 		RecordingMode: recordingMode,
 		Processor: processing.NewProcessor(
 			processing.WithCarProcessor(cp),

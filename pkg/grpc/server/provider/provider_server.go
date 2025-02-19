@@ -19,6 +19,7 @@ import (
 	aProtoRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
 	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	serverUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -75,10 +76,18 @@ func (s *providerServer) ListLiveEvents(
 	ctx context.Context,
 	req *connect.Request[providerv1.ListLiveEventsRequest],
 ) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
+	t, err := serverUtil.ResolveTenant(ctx, s.pool, req.Msg.TenantSelector)
+	if err != nil {
+		return nil, err
+	}
 	s.log.Debug("ListLiveEvents called")
 	ec := []*providerv1.LiveEventContainer{}
 	for _, v := range s.dataProxy.LiveEvents() {
-		ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
+		if t == nil {
+			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
+		} else if t.Name == v.Owner {
+			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
+		}
 	}
 	return connect.NewResponse(&providerv1.ListLiveEventsResponse{Events: ec}), nil
 }
@@ -90,7 +99,7 @@ func (s *providerServer) RegisterEvent(
 ) (*connect.Response[providerv1.RegisterEventResponse], error) {
 	s.log.Debug("RegisterEvent called", log.Any("header", req.Header()))
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
+	if !s.pe.HasPermission(a, permission.PermissionRegisterEvent) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
@@ -114,7 +123,8 @@ func (s *providerServer) RegisterEvent(
 			if err := trackrepos.EnsureTrack(ctx, tx, req.Msg.Track); err != nil {
 				return err
 			}
-			return eventrepos.Create(ctx, tx, req.Msg.Event)
+			// TODO: get tenant id from auth
+			return eventrepos.Create(ctx, tx, req.Msg.Event, 0) // <- change here
 		}); err != nil {
 		s.log.Error("error creating data", log.ErrorField(err))
 		return nil, err
@@ -125,7 +135,11 @@ func (s *providerServer) RegisterEvent(
 		s.log.Error("error loading track", log.ErrorField(err))
 		dbTrack = req.Msg.Track
 	}
-	epd := s.lookup.AddEvent(req.Msg.Event, dbTrack, req.Msg.RecordingMode)
+	epd := s.lookup.AddEvent(
+		req.Msg.Event,
+		dbTrack,
+		req.Msg.RecordingMode,
+		a.Principal().Name())
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
 	if err = s.dataProxy.PublishEventRegistered(epd); err != nil {
@@ -147,14 +161,9 @@ func (s *providerServer) UnregisterEvent(
 	s.log.Debug("UnregisterEvent",
 		log.Any("event", req.Msg.EventSelector))
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
-	}
-	var ed *proxy.EventData
-	var err error
-	if ed, err = s.dataProxy.GetEvent(req.Msg.EventSelector); err != nil {
-		s.log.Warn("event not found in pubsub", log.ErrorField(err))
-		return nil, connect.NewError(connect.CodeNotFound, err)
+	ed, err := s.validateEventAccess(a, req.Msg.EventSelector)
+	if err != nil {
+		return nil, err
 	}
 	epd, _ := s.lookup.GetEvent(req.Msg.EventSelector)
 	if epd != nil {
@@ -172,13 +181,38 @@ func (s *providerServer) UnregisterEvent(
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
 
+func (s *providerServer) validateEventAccess(
+	a auth.Authentication, eventSel *commonv1.EventSelector,
+) (*proxy.EventData, error) {
+	// get the ed
+	ed, err := s.dataProxy.GetEvent(eventSel)
+	if err != nil {
+		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
+			return nil, connect.NewError(
+				connect.CodePermissionDenied,
+				auth.ErrPermissionDenied)
+		} else {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+	}
+	if !s.pe.HasObjectPermission(a,
+		permission.PermissionPostRacedata,
+		ed.Owner) {
+
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied)
+	}
+	return ed, nil
+}
+
 //nolint:whitespace // can't make both editor and linter happy
 func (s *providerServer) UnregisterAll(
 	ctx context.Context,
 	req *connect.Request[providerv1.UnregisterAllRequest],
 ) (*connect.Response[providerv1.UnregisterAllResponse], error) {
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasRole(a, auth.RoleProvider) {
+	if !s.pe.HasPermission(a, permission.PermissionAdminUnregisterAllEvents) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 	// TODO: data has to retrieved by pubsubData

@@ -16,10 +16,11 @@
         "--log-level",
         "debug",
         "--enable-telemetry",
+        "--enable-tenants",
         "--admin-token",
         "admin",
         "--stale-duration",
-        "10s"
+        "10m"
       ]
     },
     {

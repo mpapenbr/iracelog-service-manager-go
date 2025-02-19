@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "admin": [
+      "unregister-all-events"
+    ],
+    "racedata-provider": [
+      "register-event",
+      "update-event",
+      "delete-event",
+      "unregister-event",
+      "post-racedata"
+    ],
+    "tenant-manager": [
+      "create-tenant",
+      "update-tenant",
+      "delete-tenant",
+      "read-tenant"
+    ],
+    "track-manager": [
+      "create-track",
+      "update-track",
+      "delete-track"
+    ]
+  },
+  "roles_graph": {
+    "admin": [
+      "racedata-provider",
+      "track-manager",
+      "tenant-manager"
+    ],
+    "racedata-provider": [],
+    "tenant-manager": [],
+    "track-manager": []
+  }
+}

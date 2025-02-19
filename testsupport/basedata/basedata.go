@@ -8,12 +8,14 @@ import (
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
+	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	tenantrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 )
 
@@ -95,7 +97,17 @@ func CreateSampleEvent(db *pgxpool.Pool) *eventv1.Event {
 		if err := trackrepos.Create(ctx, tx, sampleTrack); err != nil {
 			return err
 		}
-		err := eventrepos.Create(ctx, tx, sampleEvent)
+		var tenantId uint32
+		if tenant, err := tenantrepos.Create(ctx, tx, &tenantv1.CreateTenantRequest{
+			Name:     "testtenant",
+			ApiKey:   "testapikey",
+			IsActive: true,
+		}); err != nil {
+			return err
+		} else {
+			tenantId = tenant.Id
+		}
+		err := eventrepos.Create(ctx, tx, sampleEvent, tenantId)
 		return err
 	})
 	if err != nil {

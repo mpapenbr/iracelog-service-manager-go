@@ -19,7 +19,9 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/predict/v1/predictv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/tenant/v1/tenantv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
+	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
 	"connectrpc.com/otelconnect"
@@ -36,6 +38,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/analysis"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/event"
@@ -43,11 +46,14 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/predict"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/provider"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/tenant"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/track"
+	serverUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/local"
 	ownNats "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/nats"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
+	utilsCache "github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
 )
 
@@ -59,7 +65,6 @@ func NewServerCmd() *cobra.Command {
 		Use:   "grpc",
 		Short: "starts the gRPC server",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			appConfig = config.Config{}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -112,6 +117,10 @@ func NewServerCmd() *cobra.Command {
 		"print-message",
 		false,
 		"if true and log level is debug, the message payload will be printed")
+	cmd.Flags().BoolVar(&appConfig.SupportTenants,
+		"enable-tenants",
+		false,
+		"enables tenant support")
 	cmd.Flags().StringVar(&config.AdminToken,
 		"admin-token",
 		"",
@@ -128,7 +137,7 @@ func NewServerCmd() *cobra.Command {
 		"max-concurrent-streams",
 		100,
 		"max number of concurrent streams per connection")
-	cmd.Flags().BoolVar(&config.EnabledNats,
+	cmd.Flags().BoolVar(&config.EnableNats,
 		"enable-nats",
 		false,
 		"use NATS as middleware for live data")
@@ -140,15 +149,18 @@ func NewServerCmd() *cobra.Command {
 }
 
 type grpcServer struct {
-	ctx         context.Context
-	log         *log.Logger
-	pool        *pgxpool.Pool
-	mux         *http.ServeMux
-	telemetry   *config.Telemetry
-	otel        *otelconnect.Interceptor
-	eventLookup *utils.EventLookup
-	tlsConfig   *tls.Config
-	dataProxy   proxy.DataProxy
+	ctx               context.Context
+	log               *log.Logger
+	pool              *pgxpool.Pool
+	mux               *http.ServeMux
+	telemetry         *config.Telemetry
+	otel              *otelconnect.Interceptor
+	eventLookup       *utils.EventLookup
+	tlsConfig         *tls.Config
+	dataProxy         proxy.DataProxy
+	authInterceptor   connect.Interceptor
+	configInterceptor connect.Interceptor
+	tenantCache       utilsCache.Cache[string, tenantv1.Tenant]
 }
 
 //nolint:funlen,cyclop // by design
@@ -163,6 +175,10 @@ func startServer(ctx context.Context) error {
 	srv.SetupProfiling()
 	srv.SetupTelemetry()
 	srv.SetupDb()
+	srv.SetupCaches()
+	srv.SetupFeatures()
+	srv.SetupConfigInterceptor()
+	srv.SetupAuthInterceptor()
 	srv.SetupGrpcServices()
 	return srv.Start()
 }
@@ -221,6 +237,27 @@ func (s *grpcServer) SetupDb() {
 	)
 }
 
+func (s *grpcServer) SetupFeatures() {
+	if appConfig.SupportTenants {
+		s.log.Info("Tenant support enabled")
+	}
+}
+
+func (s *grpcServer) SetupCaches() {
+	s.tenantCache = cache.NewTenantCache(s.pool)
+}
+
+func (s *grpcServer) SetupAuthInterceptor() {
+	s.authInterceptor = auth.NewAuthInterceptor(
+		auth.WithAuthToken(config.AdminToken),
+		auth.WithTenantCache(s.tenantCache),
+	)
+}
+
+func (s *grpcServer) SetupConfigInterceptor() {
+	s.configInterceptor = serverUtil.NewAppContextInterceptor(&appConfig)
+}
+
 func (s *grpcServer) SetupGrpcServices() {
 	s.mux = http.NewServeMux()
 	s.otel, _ = otelconnect.NewInterceptor(
@@ -238,7 +275,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.dataProxy = localInst
 	s.eventLookup.SetDeleteEventCB(localInst.DeleteEventCallback)
 	// TODO: rename to cluster?
-	if config.EnabledNats {
+	if config.EnableNats {
 		s.log.Debug("Using NATS as middleware for live data")
 		nc, err := nats.Connect(config.NatsUrl)
 		if err != nil {
@@ -265,6 +302,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerStateServer()
 	s.registerTrackServer()
 	s.registerPredictServer()
+	s.registerTenantServer()
 	s.registerHealthServer()
 }
 
@@ -382,10 +420,7 @@ func (s *grpcServer) registerEventServer() {
 		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := eventv1connect.NewEventServiceHandler(
 		eventService,
-		connect.WithInterceptors(s.otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
-				auth.WithProviderToken(config.ProviderToken)),
-		),
+		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -411,9 +446,7 @@ func (s *grpcServer) registerProviderServer() {
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
-		connect.WithInterceptors(s.otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
-				auth.WithProviderToken(config.ProviderToken))),
+		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -426,9 +459,7 @@ func (s *grpcServer) registerStateServer() {
 		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := racestatev1connect.NewRaceStateServiceHandler(
 		stateService,
-		connect.WithInterceptors(s.otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
-				auth.WithProviderToken(config.ProviderToken))),
+		connect.WithInterceptors(s.otel, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -451,9 +482,19 @@ func (s *grpcServer) registerTrackServer() {
 		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := trackv1connect.NewTrackServiceHandler(
 		trackService,
-		connect.WithInterceptors(s.otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
-				auth.WithProviderToken(config.ProviderToken))),
+		connect.WithInterceptors(s.otel, s.authInterceptor),
+	)
+	s.mux.Handle(path, handler)
+}
+
+func (s *grpcServer) registerTenantServer() {
+	tenantService := tenant.NewServer(
+		tenant.WithPool(s.pool),
+		tenant.WithTenantCache(s.tenantCache),
+		tenant.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+	path, handler := tenantv1connect.NewTenantServiceHandler(
+		tenantService,
+		connect.WithInterceptors(s.otel, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -465,9 +506,7 @@ func (s *grpcServer) registerPredictServer() {
 	)
 	path, handler := predictv1connect.NewPredictServiceHandler(
 		predictService,
-		connect.WithInterceptors(s.otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken),
-				auth.WithProviderToken(config.ProviderToken))),
+		connect.WithInterceptors(s.otel),
 	)
 	s.mux.Handle(path, handler)
 }

@@ -77,7 +77,7 @@ func (l *LocalProxy) LiveEvents() []*proxy.EventData {
 	currentEvents := l.lookup.GetEvents()
 	ret := make([]*proxy.EventData, 0, len(currentEvents))
 	for _, v := range currentEvents {
-		ret = append(ret, &proxy.EventData{Event: v.Event, Track: v.Track})
+		ret = append(ret, &proxy.EventData{Event: v.Event, Track: v.Track, Owner: v.Owner})
 	}
 	return ret
 }
@@ -87,7 +87,11 @@ func (l *LocalProxy) GetEvent(sel *commonv1.EventSelector) (*proxy.EventData, er
 	if err != nil {
 		return nil, err
 	}
-	return &proxy.EventData{Event: epd.Event, Track: epd.Track}, nil
+	return &proxy.EventData{
+		Event: epd.Event,
+		Track: epd.Track,
+		Owner: epd.Owner,
+	}, nil
 }
 
 //nolint:whitespace,dupl // false positive

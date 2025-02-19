@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
+	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	tenantrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
 	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
 	"github.com/mpapenbr/iracelog-service-manager-go/testsupport/testdb"
 )
@@ -61,6 +63,7 @@ var sampleEvent = &eventv1.Event{
 	Sessions:      []*eventv1.Session{{Num: 1, Name: "RACE"}},
 	NumCarClasses: 3,
 }
+var tenantId uint32
 
 func createSampleEntry(db *pgxpool.Pool) *eventv1.Event {
 	ctx := context.Background()
@@ -68,7 +71,17 @@ func createSampleEntry(db *pgxpool.Pool) *eventv1.Event {
 		if err := trackrepos.Create(ctx, tx, sampleTrack); err != nil {
 			return err
 		}
-		err := Create(ctx, tx, sampleEvent)
+
+		if tenant, err := tenantrepos.Create(ctx, tx, &tenantv1.CreateTenantRequest{
+			Name:     "testtenant",
+			ApiKey:   "testapikey",
+			IsActive: true,
+		}); err != nil {
+			return err
+		} else {
+			tenantId = tenant.Id
+		}
+		err := Create(ctx, tx, sampleEvent, tenantId)
 		return err
 	})
 	if err != nil {
@@ -116,7 +129,7 @@ func TestCreate(t *testing.T) {
 	for _, tt := range tests {
 		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
-			err := Create(ctx, pool, tt.args.event)
+			err := Create(ctx, pool, tt.args.event, tenantId)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create error = %v, wantErr %v",
 					err, tt.wantErr)
