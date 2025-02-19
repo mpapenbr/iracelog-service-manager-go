@@ -136,4 +136,3 @@ release-tag:
 update-bufbuild:
 	go get buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go@$(id)
 	go get buf.build/gen/go/mpapenbr/iracelog/connectrpc/go@$(id)
-
