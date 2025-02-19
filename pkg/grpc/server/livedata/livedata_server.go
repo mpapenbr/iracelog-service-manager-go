@@ -339,10 +339,8 @@ func (s *liveDataServer) LiveAnalysisSel(
 	//nolint:errcheck // by design
 	first := proto.Clone(<-dataChan).(*analysisv1.Analysis)
 	if first == nil {
-		close(quitChan)
 		return connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("no analysis data"))
-
 	}
 	firstResp := &livedatav1.LiveAnalysisSelResponse{
 		Timestamp:        timestamppb.Now(),
@@ -359,7 +357,6 @@ func (s *liveDataServer) LiveAnalysisSel(
 	if err := stream.Send(firstResp); err != nil {
 		s.log.Warn("Error sending live analysis data by selector (first)",
 			log.ErrorField(err))
-		close(quitChan)
 		return err
 	}
 	for a := range dataChan {
