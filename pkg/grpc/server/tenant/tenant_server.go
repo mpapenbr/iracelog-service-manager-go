@@ -13,6 +13,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 )
 
@@ -103,6 +104,7 @@ func (s *tenantServer) CreateTenant(
 
 	var err error
 	var ret *tenantv1.Tenant
+	req.Msg.ApiKey = utils.HashApiKey(req.Msg.ApiKey)
 	ret, err = tenant.Create(ctx, s.pool, req.Msg)
 	if err != nil {
 		return nil, err
@@ -123,7 +125,9 @@ func (s *tenantServer) UpdateTenant(
 	s.log.Debug("UpdateTenant called",
 		log.Any("arg", req.Msg),
 	)
-
+	if req.Msg.ApiKey != "" {
+		req.Msg.ApiKey = utils.HashApiKey(req.Msg.ApiKey)
+	}
 	var err error
 	var ret *tenantv1.Tenant
 	ret, err = tenant.Update(ctx, s.pool, req.Msg)

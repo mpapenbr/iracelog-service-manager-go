@@ -10,6 +10,7 @@ import (
 	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/testsupport/testdb"
 )
@@ -163,6 +164,71 @@ func TestDeleteById(t *testing.T) {
 				}
 				if got != tt.want {
 					t.Errorf("DeleteById() = %v, want %v", got, tt.want)
+				}
+				return nil
+			})
+		})
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	db := testdb.InitTestDb()
+
+	type args struct {
+		apply func(req *tenantv1.UpdateTenantRequest)
+	}
+	tests := []struct {
+		name    string
+		args    args
+		verify  func(t *testing.T, preUpdate, actual *tenantv1.Tenant) bool
+		wantErr bool
+	}{
+		{
+			name: "update name",
+			args: args{apply: func(req *tenantv1.UpdateTenantRequest) {
+				req.Name = "newname"
+			}},
+			verify: func(t *testing.T, preUpdate, actual *tenantv1.Tenant) bool {
+				t.Helper()
+				assert.Equal(t, "newname", actual.Name, "name updated")
+				assert.Equal(t, preUpdate.ApiKey, actual.ApiKey, "apiKey unchanged")
+				assert.Equal(t, preUpdate.IsActive, actual.IsActive, "isActive unchanged")
+				return true
+			},
+		},
+		{
+			name: "update apiKey",
+			args: args{apply: func(req *tenantv1.UpdateTenantRequest) {
+				req.ApiKey = "newapikey"
+			}},
+			verify: func(t *testing.T, preUpdate, actual *tenantv1.Tenant) bool {
+				t.Helper()
+				assert.Equal(t, preUpdate.Name, actual.Name, "name unchanged")
+				assert.Equal(t, "newapikey", actual.ApiKey, "apiKey changed")
+				assert.Equal(t, preUpdate.IsActive, actual.IsActive, "isActive unchanged")
+				return true
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
+				sample := createSampleEntry(db)
+				defer DeleteById(ctx, c.Conn(), sample.Id)
+				req := &tenantv1.UpdateTenantRequest{
+					Id:       sample.Id,
+					IsActive: sample.IsActive,
+				}
+				tt.args.apply(req)
+				got, err := Update(ctx, c.Conn(), req)
+
+				if (err != nil) != tt.wantErr {
+					t.Errorf("UpdateById() error = %v, wantErr %v", err, tt.wantErr)
+					return nil
+				}
+				if !tt.verify(t, sample, got) {
+					t.Errorf("UpdateById()")
 				}
 				return nil
 			})
