@@ -59,19 +59,25 @@ func WithTenantCache(arg cache.Cache[string, model.Tenant]) Option {
 	}
 }
 
-type AuthHolder struct {
-	auth Authentication
-}
-
-type SimpleAuth struct {
-	Authentication
-	principal Principal
-	roles     []Role
-}
-type SimplePrincipal struct {
-	Principal
-	name string
-}
+type (
+	AuthHolder struct {
+		auth Authentication
+	}
+	SimpleAuth struct {
+		Authentication
+		principal Principal
+		roles     []Role
+	}
+	SimplePrincipal struct {
+		Principal
+		name string
+	}
+	TenantAuth struct {
+		principal Principal
+		roles     []Role
+		id        uint32
+	}
+)
 
 func (s *SimplePrincipal) Name() string {
 	return s.name
@@ -83,6 +89,18 @@ func (s *SimpleAuth) Principal() Principal {
 
 func (s *SimpleAuth) Roles() []Role {
 	return s.roles
+}
+
+func (s *TenantAuth) Principal() Principal {
+	return s.principal
+}
+
+func (s *TenantAuth) Roles() []Role {
+	return s.roles
+}
+
+func (s *TenantAuth) GetId() uint32 {
+	return s.id
 }
 
 var anon = &SimpleAuth{principal: &SimplePrincipal{name: "anon"}, roles: []Role{}}
@@ -173,9 +191,10 @@ func (a *apiKeyAuthenticator) Authenticate(
 	if t, err := a.tenantCache.Get(ctx, utils.HashApiKey(h.Get(tokenHeader))); err == nil &&
 		t.Tenant.IsActive {
 
-		return &SimpleAuth{
+		return &TenantAuth{
 			principal: &SimplePrincipal{name: t.Tenant.Name},
 			roles:     []Role{RoleRaceDataProvider},
+			id:        t.Id,
 		}, nil
 	} else {
 		return nil, err

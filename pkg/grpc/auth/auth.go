@@ -27,6 +27,10 @@ type (
 		Principal() Principal
 		Roles() []Role
 	}
+	TenantAuthentication interface {
+		Authentication
+		GetId() uint32 // returns the tenant id
+	}
 	AuthenticationProvider interface {
 		Authenticate(ctx context.Context, h http.Header) (Authentication, error)
 	}
