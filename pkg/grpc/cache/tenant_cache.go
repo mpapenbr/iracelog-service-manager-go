@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	utilsCache "github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache/loadercache"
 )
@@ -14,6 +15,6 @@ import (
 func NewTenantCache(pool *pgxpool.Pool) utilsCache.Cache[string, tenantv1.Tenant] {
 	return loadercache.New(loadercache.WithLoader(
 		func(key string) (*tenantv1.Tenant, error) {
-			return tenant.LoadByApiKey(context.Background(), pool, key)
+			return tenant.LoadByApiKey(context.Background(), pool, utils.HashApiKey(key))
 		}))
 }

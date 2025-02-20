@@ -103,7 +103,11 @@ func Update(
 	tenant *tenantv1.UpdateTenantRequest,
 ) (*tenantv1.Tenant, error) {
 	cmdTag, err := conn.Exec(ctx, `
-		update tenant set name=$1, api_key=$2, active=$3 where id=$4
+		update tenant set
+		name=coalesce(nullif($1,''),name),
+		api_key=coalesce(nullif($2,''),api_key),
+		active=$3
+		where id=$4
 	`, tenant.Name, tenant.ApiKey, tenant.IsActive, tenant.Id)
 	if err != nil {
 		return nil, err
