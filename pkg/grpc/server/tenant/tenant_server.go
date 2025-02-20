@@ -11,6 +11,7 @@ import (
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -41,7 +42,7 @@ func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	}
 }
 
-func WithTenantCache(arg cache.Cache[string, tenantv1.Tenant]) Option {
+func WithTenantCache(arg cache.Cache[string, model.Tenant]) Option {
 	return func(srv *tenantServer) {
 		srv.cache = arg
 	}
@@ -55,7 +56,7 @@ type tenantServer struct {
 	pe    permission.PermissionEvaluator
 	pool  *pgxpool.Pool
 	log   *log.Logger
-	cache cache.Cache[string, tenantv1.Tenant]
+	cache cache.Cache[string, model.Tenant]
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -71,7 +72,11 @@ func (s *tenantServer) GetTenants(
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&tenantv1.GetTenantsResponse{Tenants: data}), nil
+	ret := make([]*tenantv1.Tenant, len(data))
+	for i, d := range data {
+		ret[i] = d.Tenant
+	}
+	return connect.NewResponse(&tenantv1.GetTenantsResponse{Tenants: ret}), nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -83,11 +88,11 @@ func (s *tenantServer) GetTenant(
 	if !s.pe.HasPermission(a, permission.PermissionReadTenant) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	data, err := tenant.LoadById(context.Background(), s.pool, req.Msg.Id)
+	data, err := tenant.LoadBySelector(context.Background(), s.pool, req.Msg.Tenant)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&tenantv1.GetTenantResponse{Tenant: data}), nil
+	return connect.NewResponse(&tenantv1.GetTenantResponse{Tenant: data.Tenant}), nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -103,14 +108,14 @@ func (s *tenantServer) CreateTenant(
 	)
 
 	var err error
-	var ret *tenantv1.Tenant
+	var ret *model.Tenant
 	req.Msg.ApiKey = utils.HashApiKey(req.Msg.ApiKey)
 	ret, err = tenant.Create(ctx, s.pool, req.Msg)
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&tenantv1.CreateTenantResponse{
-		Tenant: ret,
+		Tenant: ret.Tenant,
 	}), nil
 }
 
@@ -125,12 +130,17 @@ func (s *tenantServer) UpdateTenant(
 	s.log.Debug("UpdateTenant called",
 		log.Any("arg", req.Msg),
 	)
+	var err error
+	var ret *model.Tenant
+	var t *model.Tenant
+	t, err = tenant.LoadBySelector(ctx, s.pool, req.Msg.Tenant)
+	if err != nil {
+		return nil, err
+	}
 	if req.Msg.ApiKey != "" {
 		req.Msg.ApiKey = utils.HashApiKey(req.Msg.ApiKey)
 	}
-	var err error
-	var ret *tenantv1.Tenant
-	ret, err = tenant.Update(ctx, s.pool, req.Msg)
+	ret, err = tenant.Update(ctx, s.pool, t.Id, req.Msg)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +148,7 @@ func (s *tenantServer) UpdateTenant(
 		s.cache.Invalidate(ctx, ret.ApiKey)
 	}
 	return connect.NewResponse(&tenantv1.UpdateTenantResponse{
-		Tenant: ret,
+		Tenant: ret.Tenant,
 	}), nil
 }
 
@@ -151,16 +161,15 @@ func (s *tenantServer) DeleteTenant(
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 	s.log.Debug("DeleteTenant called",
-		log.Any("arg", req.Msg),
-		log.Uint32("id", req.Msg.Id))
+		log.Any("arg", req.Msg))
 
 	var err error
-	data, err := tenant.LoadById(context.Background(), s.pool, req.Msg.Id)
+	data, err := tenant.LoadBySelector(context.Background(), s.pool, req.Msg.Tenant)
 	if err != nil {
 		return nil, err
 	}
 	var deleted int
-	deleted, err = tenant.DeleteById(ctx, s.pool, req.Msg.Id)
+	deleted, err = tenant.DeleteById(ctx, s.pool, data.Id)
 	if err != nil {
 		return nil, err
 	}

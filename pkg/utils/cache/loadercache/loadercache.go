@@ -95,6 +95,11 @@ func (c *loaderCache[K, V]) load(ctx context.Context, key K) (*V, error) {
 func (c *loaderCache[K, V]) Invalidate(ctx context.Context, key K) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	c.config.l.Debug("Invalidate", log.Any("key", key))
 
 	delete(c.items, key)
+	c.config.l.Debug("Invalidate", log.Int("remain items", len(c.items)))
+	for k, v := range c.items {
+		c.config.l.Debug("Invalidate", log.Any("key", k), log.Any("value", v))
+	}
 }

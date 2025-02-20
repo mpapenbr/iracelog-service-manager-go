@@ -5,11 +5,11 @@ import (
 	"errors"
 
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
-	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
 )
@@ -24,8 +24,8 @@ func ResolveTenant(
 	ctx context.Context,
 	conn repository.Querier,
 	sel *commonv1.TenantSelector,
-) (*tenantv1.Tenant, error) {
-	var data *tenantv1.Tenant
+) (*model.Tenant, error) {
+	var data *model.Tenant
 	var err error
 	cfg := config.FromContext(ctx)
 	if cfg == nil {
