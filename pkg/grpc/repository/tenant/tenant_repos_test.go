@@ -12,21 +12,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/testsupport/testdb"
 )
 
-var sampleTrack = &tenantv1.CreateTenantRequest{
+var sampleTenant = &tenantv1.CreateTenantRequest{
 	Name:     "testtenant",
 	ApiKey:   "testapikey",
 	IsActive: true,
 }
 
-func createSampleEntry(db *pgxpool.Pool) *tenantv1.Tenant {
+func createSampleEntry(db *pgxpool.Pool) *model.Tenant {
 	ctx := context.Background()
-	var ret *tenantv1.Tenant
+	var ret *model.Tenant
 	err := pgx.BeginFunc(context.Background(), db, func(tx pgx.Tx) error {
 		var err error
-		ret, err = Create(ctx, tx, sampleTrack)
+		ret, err = Create(ctx, tx, sampleTenant)
 		return err
 	})
 	if err != nil {
@@ -95,7 +96,7 @@ func TestLoadById(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *tenantv1.Tenant
+		want    *model.Tenant
 		wantErr bool
 	}{
 		{
@@ -171,6 +172,7 @@ func TestDeleteById(t *testing.T) {
 	}
 }
 
+//nolint:lll // readability
 func TestUpdate(t *testing.T) {
 	db := testdb.InitTestDb()
 
@@ -180,7 +182,7 @@ func TestUpdate(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		verify  func(t *testing.T, preUpdate, actual *tenantv1.Tenant) bool
+		verify  func(t *testing.T, preUpdate, actual *model.Tenant) bool
 		wantErr bool
 	}{
 		{
@@ -188,11 +190,11 @@ func TestUpdate(t *testing.T) {
 			args: args{apply: func(req *tenantv1.UpdateTenantRequest) {
 				req.Name = "newname"
 			}},
-			verify: func(t *testing.T, preUpdate, actual *tenantv1.Tenant) bool {
+			verify: func(t *testing.T, preUpdate, actual *model.Tenant) bool {
 				t.Helper()
-				assert.Equal(t, "newname", actual.Name, "name updated")
+				assert.Equal(t, "newname", actual.Tenant.Name, "name updated")
 				assert.Equal(t, preUpdate.ApiKey, actual.ApiKey, "apiKey unchanged")
-				assert.Equal(t, preUpdate.IsActive, actual.IsActive, "isActive unchanged")
+				assert.Equal(t, preUpdate.Tenant.IsActive, actual.Tenant.IsActive, "isActive unchanged")
 				return true
 			},
 		},
@@ -201,11 +203,11 @@ func TestUpdate(t *testing.T) {
 			args: args{apply: func(req *tenantv1.UpdateTenantRequest) {
 				req.ApiKey = "newapikey"
 			}},
-			verify: func(t *testing.T, preUpdate, actual *tenantv1.Tenant) bool {
+			verify: func(t *testing.T, preUpdate, actual *model.Tenant) bool {
 				t.Helper()
-				assert.Equal(t, preUpdate.Name, actual.Name, "name unchanged")
+				assert.Equal(t, preUpdate.Tenant.Name, actual.Tenant.Name, "name unchanged")
 				assert.Equal(t, "newapikey", actual.ApiKey, "apiKey changed")
-				assert.Equal(t, preUpdate.IsActive, actual.IsActive, "isActive unchanged")
+				assert.Equal(t, preUpdate.Tenant.IsActive, actual.Tenant.IsActive, "isActive unchanged")
 				return true
 			},
 		},
@@ -217,11 +219,10 @@ func TestUpdate(t *testing.T) {
 				sample := createSampleEntry(db)
 				defer DeleteById(ctx, c.Conn(), sample.Id)
 				req := &tenantv1.UpdateTenantRequest{
-					Id:       sample.Id,
-					IsActive: sample.IsActive,
+					IsActive: sample.Tenant.IsActive,
 				}
 				tt.args.apply(req)
-				got, err := Update(ctx, c.Conn(), req)
+				got, err := Update(ctx, c.Conn(), sample.Id, req)
 
 				if (err != nil) != tt.wantErr {
 					t.Errorf("UpdateById() error = %v, wantErr %v", err, tt.wantErr)

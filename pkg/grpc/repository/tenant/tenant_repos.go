@@ -3,12 +3,14 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
 )
 
@@ -19,7 +21,7 @@ func Create(
 	ctx context.Context,
 	conn repository.Querier,
 	tenant *tenantv1.CreateTenantRequest,
-) (*tenantv1.Tenant, error) {
+) (*model.Tenant, error) {
 	row := conn.QueryRow(ctx, `
 	insert into tenant (
 		name, api_key, active, external_id
@@ -36,7 +38,7 @@ func Create(
 }
 
 func LoadById(ctx context.Context, conn repository.Querier, id uint32) (
-	*tenantv1.Tenant, error,
+	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where t.id=$1", selector), id)
 
@@ -44,7 +46,7 @@ func LoadById(ctx context.Context, conn repository.Querier, id uint32) (
 }
 
 func LoadByExternalId(ctx context.Context, conn repository.Querier, externalId string) (
-	*tenantv1.Tenant, error,
+	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where t.external_id=$1", selector), externalId)
@@ -53,7 +55,7 @@ func LoadByExternalId(ctx context.Context, conn repository.Querier, externalId s
 }
 
 func LoadByApiKey(ctx context.Context, conn repository.Querier, apiKey string) (
-	*tenantv1.Tenant, error,
+	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where t.api_key=$1", selector), apiKey)
 
@@ -61,7 +63,7 @@ func LoadByApiKey(ctx context.Context, conn repository.Querier, apiKey string) (
 }
 
 func LoadByName(ctx context.Context, conn repository.Querier, name string) (
-	*tenantv1.Tenant, error,
+	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where t.name=$1", selector), name)
 
@@ -69,7 +71,7 @@ func LoadByName(ctx context.Context, conn repository.Querier, name string) (
 }
 
 func LoadByEventId(ctx context.Context, conn repository.Querier, eventId int) (
-	*tenantv1.Tenant, error,
+	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where t.id=(select tenant_id from event where id=$1)", selector),
@@ -78,13 +80,13 @@ func LoadByEventId(ctx context.Context, conn repository.Querier, eventId int) (
 }
 
 func LoadAll(ctx context.Context, conn repository.Querier) (
-	[]*tenantv1.Tenant, error,
+	[]*model.Tenant, error,
 ) {
 	row, err := conn.Query(ctx, fmt.Sprintf("%s order by t.id asc", selector))
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]*tenantv1.Tenant, 0)
+	ret := make([]*model.Tenant, 0)
 	defer row.Close()
 	for row.Next() {
 		item, err := readData(row)
@@ -97,25 +99,51 @@ func LoadAll(ctx context.Context, conn repository.Querier) (
 	return ret, nil
 }
 
+func LoadBySelector(
+	ctx context.Context,
+	conn repository.Querier,
+	sel *commonv1.TenantSelector,
+) (*model.Tenant, error) {
+	var data *model.Tenant
+	var err error
+
+	switch sel.Arg.(type) {
+	case *commonv1.TenantSelector_ExternalId:
+		data, err = LoadByExternalId(ctx, conn, sel.GetExternalId().GetId())
+	case *commonv1.TenantSelector_Name:
+		data, err = LoadByName(ctx, conn, sel.GetName())
+	default:
+		return nil, fmt.Errorf("unknown selector %v", sel)
+	}
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, repository.ErrNoData
+		}
+		return nil, err
+	}
+	return data, nil
+}
+
 func Update(
 	ctx context.Context,
 	conn repository.Querier,
+	id uint32,
 	tenant *tenantv1.UpdateTenantRequest,
-) (*tenantv1.Tenant, error) {
+) (*model.Tenant, error) {
 	cmdTag, err := conn.Exec(ctx, `
 		update tenant set
 		name=coalesce(nullif($1,''),name),
 		api_key=coalesce(nullif($2,''),api_key),
 		active=$3
 		where id=$4
-	`, tenant.Name, tenant.ApiKey, tenant.IsActive, tenant.Id)
+	`, tenant.Name, tenant.ApiKey, tenant.IsActive, id)
 	if err != nil {
 		return nil, err
 	}
 	if cmdTag.RowsAffected() == 0 {
 		return nil, pgx.ErrNoRows
 	}
-	return LoadById(ctx, conn, tenant.Id)
+	return LoadById(ctx, conn, id)
 }
 
 // deletes an entry from the database, returns number of rows deleted.
@@ -127,18 +155,20 @@ func DeleteById(ctx context.Context, conn repository.Querier, id uint32) (int, e
 	return int(cmdTag.RowsAffected()), nil
 }
 
-func readData(row pgx.Row) (*tenantv1.Tenant, error) {
-	var item tenantv1.Tenant
+func readData(row pgx.Row) (*model.Tenant, error) {
+	var item model.Tenant
+	var t tenantv1.Tenant
 	var extId string
 	if err := row.Scan(
 		&item.Id,
 		&extId,
-		&item.Name,
+		&t.Name,
 		&item.ApiKey,
-		&item.IsActive,
+		&t.IsActive,
 	); err != nil {
 		return nil, err
 	}
-	item.ExternalId = &commonv1.UUID{Id: extId}
+	t.ExternalId = &commonv1.UUID{Id: extId}
+	item.Tenant = &t
 	return &item, nil
 }

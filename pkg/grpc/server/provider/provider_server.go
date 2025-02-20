@@ -85,7 +85,7 @@ func (s *providerServer) ListLiveEvents(
 	for _, v := range s.dataProxy.LiveEvents() {
 		if t == nil {
 			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
-		} else if t.Name == v.Owner {
+		} else if t.Tenant.Name == v.Owner {
 			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 		}
 	}

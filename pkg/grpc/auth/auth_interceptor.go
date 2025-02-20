@@ -4,10 +4,11 @@ import (
 	"context"
 	"net/http"
 
-	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 )
 
@@ -19,7 +20,7 @@ type (
 	authInterceptor struct {
 		adminToken    string
 		providerToken string
-		tenantCache   cache.Cache[string, tenantv1.Tenant]
+		tenantCache   cache.Cache[string, model.Tenant]
 		authProvider  []AuthenticationProvider
 		l             *log.Logger
 	}
@@ -52,7 +53,7 @@ func WithProviderToken(token string) Option {
 	}
 }
 
-func WithTenantCache(arg cache.Cache[string, tenantv1.Tenant]) Option {
+func WithTenantCache(arg cache.Cache[string, model.Tenant]) Option {
 	return func(srv *authInterceptor) {
 		srv.tenantCache = arg
 	}
@@ -142,7 +143,7 @@ type (
 	anonymousAuthenticator struct{}
 	apiKeyAuthenticator    struct {
 		adminToken  string
-		tenantCache cache.Cache[string, tenantv1.Tenant]
+		tenantCache cache.Cache[string, model.Tenant]
 	}
 )
 
@@ -154,7 +155,7 @@ func (a *anonymousAuthenticator) Authenticate(
 	return anon, nil
 }
 
-//nolint:whitespace // editor/linter issue
+//nolint:lll,whitespace // editor/linter issue
 func (a *apiKeyAuthenticator) Authenticate(
 	ctx context.Context,
 	h http.Header,
@@ -169,9 +170,11 @@ func (a *apiKeyAuthenticator) Authenticate(
 		}, nil
 	}
 
-	if t, err := a.tenantCache.Get(ctx, h.Get(tokenHeader)); err == nil && t.IsActive {
+	if t, err := a.tenantCache.Get(ctx, utils.HashApiKey(h.Get(tokenHeader))); err == nil &&
+		t.Tenant.IsActive {
+
 		return &SimpleAuth{
-			principal: &SimplePrincipal{name: t.Name},
+			principal: &SimplePrincipal{name: t.Tenant.Name},
 			roles:     []Role{RoleRaceDataProvider},
 		}, nil
 	} else {

@@ -270,7 +270,7 @@ func (s *eventsServer) validateEventAccess(
 	}
 	if !s.pe.HasObjectPermission(a,
 		permission.PermissionPostRacedata,
-		t.Name) {
+		t.Tenant.Name) {
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,

@@ -21,7 +21,6 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/tenant/v1/tenantv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
-	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
 	"connectrpc.com/otelconnect"
@@ -39,6 +38,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/cache"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/analysis"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/event"
@@ -160,7 +160,7 @@ type grpcServer struct {
 	dataProxy         proxy.DataProxy
 	authInterceptor   connect.Interceptor
 	configInterceptor connect.Interceptor
-	tenantCache       utilsCache.Cache[string, tenantv1.Tenant]
+	tenantCache       utilsCache.Cache[string, model.Tenant]
 }
 
 //nolint:funlen,cyclop // by design
