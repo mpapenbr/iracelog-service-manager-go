@@ -8,6 +8,7 @@ import (
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
@@ -189,7 +190,7 @@ func (s *providerServer) UnregisterEvent(
 
 func (s *providerServer) validateEventAccess(
 	a auth.Authentication, eventSel *commonv1.EventSelector,
-) (*proxy.EventData, error) {
+) (*containerv1.EventContainer, error) {
 	// get the ed
 	ed, err := s.dataProxy.GetEvent(eventSel)
 	if err != nil {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 )
 
 type (
@@ -17,7 +17,7 @@ type (
 	// data as well.
 	GlobalEvents struct {
 		kv     jetstream.KeyValue
-		events map[string]*proxy.EventData
+		events map[string]*containerv1.EventContainer
 		mutex  sync.Mutex
 		l      *log.Logger
 		rev    uint64
@@ -28,7 +28,7 @@ func NewGlobalEvents(kv jetstream.KeyValue, l *log.Logger) (*GlobalEvents, error
 	ret := &GlobalEvents{
 		kv:     kv,
 		mutex:  sync.Mutex{},
-		events: make(map[string]*proxy.EventData),
+		events: make(map[string]*containerv1.EventContainer),
 		l:      l,
 	}
 	if err := ret.setupListener(); err != nil {
@@ -39,7 +39,7 @@ func NewGlobalEvents(kv jetstream.KeyValue, l *log.Logger) (*GlobalEvents, error
 
 //nolint:whitespace // editor/linter issue
 func (g *GlobalEvents) CurrentLiveEvents() (
-	lookup map[string]*proxy.EventData,
+	lookup map[string]*containerv1.EventContainer,
 	err error,
 ) {
 	var kve jetstream.KeyValueEntry
@@ -47,6 +47,7 @@ func (g *GlobalEvents) CurrentLiveEvents() (
 		return nil, err
 	}
 	conv := eventLookupTransfer{}
+
 	if lookup, err = conv.FromBinary(kve.Value()); err == nil {
 		return lookup, nil
 	} else {
@@ -81,7 +82,7 @@ func (g *GlobalEvents) setupListener() error {
 				log.Uint64("rev", kve.Revision()),
 			)
 			g.rev = kve.Revision()
-			var incomingData map[string]*proxy.EventData
+			var incomingData map[string]*containerv1.EventContainer
 			if incomingData, err = conv.FromBinary(kve.Value()); err == nil {
 				g.mutex.Lock()
 				g.events = incomingData
@@ -97,7 +98,7 @@ func (g *GlobalEvents) setupListener() error {
 }
 
 // called when this instance is recording an event
-func (g *GlobalEvents) RegisterEvent(e *proxy.EventData) {
+func (g *GlobalEvents) RegisterEvent(e *containerv1.EventContainer) {
 	g.l.Debug("RegisterEvent", log.String("key", e.Event.GetKey()))
 	g.mutex.Lock()
 	defer g.mutex.Unlock()

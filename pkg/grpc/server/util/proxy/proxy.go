@@ -6,20 +6,15 @@ import (
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
-	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	livedatav1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/livedata/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
-	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
 type (
-	EventData struct {
-		Event *eventv1.Event
-		Track *trackv1.Track
-		Owner string
-	}
+
 	// PublishProxy is the interface for publishing data from (external) race data
 	// providers. These data can be easily converted for response data.
 	PublishProxy interface {
@@ -40,10 +35,10 @@ type (
 
 	DataProxy interface {
 		PublishProxy
-		LiveEvents() []*EventData
+		LiveEvents() []*containerv1.EventContainer
 
 		// returns the event data for the given selector
-		GetEvent(sel *commonv1.EventSelector) (*EventData, error)
+		GetEvent(sel *commonv1.EventSelector) (*containerv1.EventContainer, error)
 
 		// subscribe to race state data
 		// the returned channel is the provider for outgoing live messages
@@ -115,7 +110,8 @@ func (e EmptyProxy) PublishDriverData(req *racestatev1.PublishDriverDataRequest)
 	return fmt.Errorf("PublishDriverData not implemented")
 }
 
-func (e EmptyProxy) GetEvent(sel *commonv1.EventSelector) (*EventData, error) {
+//nolint:lll // readability
+func (e EmptyProxy) GetEvent(sel *commonv1.EventSelector) (*containerv1.EventContainer, error) {
 	return nil, fmt.Errorf("GetEvent not implemented")
 }
 
@@ -169,7 +165,7 @@ func (e EmptyProxy) HistorySnapshotData(sel *commonv1.EventSelector) []*analysis
 	return []*analysisv1.SnapshotData{}
 }
 
-func (e EmptyProxy) LiveEvents() []*EventData {
+func (e EmptyProxy) LiveEvents() []*containerv1.EventContainer {
 	return nil
 }
 

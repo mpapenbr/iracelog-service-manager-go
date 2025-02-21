@@ -8,8 +8,8 @@ import (
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	livedatav1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/livedata/v1"
-	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -40,7 +40,7 @@ type (
 	}
 	Option         func(*NatsProxy)
 	eventContainer struct {
-		eventData     *proxy.EventData
+		eventData     *containerv1.EventContainer
 		bcstContainer *broadcastContainer
 	}
 
@@ -105,11 +105,12 @@ func (n *NatsProxy) SetOnUnregisterCB(cb func(sel *commonv1.EventSelector)) {
 
 //nolint:funlen // by design
 func (n *NatsProxy) PublishEventRegistered(epd *utils.EventProcessingData) error {
-	builder := providerv1.RegisterEventResponse_builder{
+	msg := &containerv1.EventContainer{
 		Event: epd.Event,
 		Track: epd.Track,
+		Owner: epd.Owner,
 	}
-	msg := builder.Build()
+
 	data, _ := proto.Marshal(msg)
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
@@ -157,11 +158,7 @@ func (n *NatsProxy) PublishEventRegistered(epd *utils.EventProcessingData) error
 		}
 		n.l.Debug("snapshot channel closed", log.String("eventKey", epd.Event.GetKey()))
 	}()
-	n.globalEvents.RegisterEvent(&proxy.EventData{
-		Event: epd.Event,
-		Track: epd.Track,
-		Owner: epd.Owner,
-	})
+	n.globalEvents.RegisterEvent(msg)
 	return n.conn.Publish("event.registered", data)
 }
 
@@ -198,10 +195,10 @@ func (n *NatsProxy) PublishAnalysisData(eventKey string, a *analysisv1.Analysis)
 	return n.conn.Publish(fmt.Sprintf("analysis.%s", eventKey), data)
 }
 
-func (n *NatsProxy) LiveEvents() []*proxy.EventData {
+func (n *NatsProxy) LiveEvents() []*containerv1.EventContainer {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
-	events := make([]*proxy.EventData, 0, len(n.events))
+	events := make([]*containerv1.EventContainer, 0, len(n.events))
 	for _, event := range n.events {
 		events = append(events, event.eventData)
 	}
@@ -210,7 +207,7 @@ func (n *NatsProxy) LiveEvents() []*proxy.EventData {
 
 //nolint:whitespace // false positive
 func (n *NatsProxy) GetEvent(selector *commonv1.EventSelector) (
-	*proxy.EventData, error,
+	*containerv1.EventContainer, error,
 ) {
 	if event, err := n.getEvent(selector); err != nil {
 		return nil, err
@@ -352,7 +349,7 @@ func (n *NatsProxy) setupSubscriptions() error {
 }
 
 func (n *NatsProxy) handleIncomingEventRegistered(msg *nats.Msg) {
-	var regData providerv1.RegisterEventResponse
+	var regData containerv1.EventContainer
 	if uErr := proto.Unmarshal(msg.Data, &regData); uErr != nil {
 		n.l.Error("error unmarshalling event.registered", log.ErrorField(uErr))
 		return
@@ -361,10 +358,7 @@ func (n *NatsProxy) handleIncomingEventRegistered(msg *nats.Msg) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 	n.events[regData.Event.Key] = &eventContainer{
-		eventData: &proxy.EventData{
-			Event: regData.Event,
-			Track: regData.Track,
-		},
+		eventData:     &regData,
 		bcstContainer: createBroadcasters(regData.Event.GetKey(), n.conn, n.kv, n.l),
 	}
 }
@@ -410,7 +404,7 @@ func (n *NatsProxy) setupGlobalEvents() (err error) {
 	if n.globalEvents, err = NewGlobalEvents(n.kv, n.l.Named("gobal")); err != nil {
 		return err
 	}
-	var curEvents map[string]*proxy.EventData
+	var curEvents map[string]*containerv1.EventContainer
 	if curEvents, err = n.globalEvents.CurrentLiveEvents(); err != nil {
 		return err
 	}
