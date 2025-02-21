@@ -6,9 +6,8 @@ import (
 	"fmt"
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 )
 
 type snapHist struct{}
@@ -60,7 +59,7 @@ func (s snapHist) FromBinary(data []byte) ([]*analysisv1.SnapshotData, error) {
 type eventLookupTransfer struct{}
 
 //nolint:whitespace // editor/linter issue
-func (s eventLookupTransfer) ToBinary(input map[string]*proxy.EventData) (
+func (s eventLookupTransfer) ToBinary(input map[string]*containerv1.EventContainer) (
 	ret []byte, err error,
 ) {
 	var result bytes.Buffer
@@ -73,7 +72,7 @@ func (s eventLookupTransfer) ToBinary(input map[string]*proxy.EventData) (
 			return nil, fmt.Errorf("error writing key: %w", err)
 		}
 
-		data, err := v.ToBinary()
+		data, err := proto.Marshal(v)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling EventData: %w", err)
 		}
@@ -95,10 +94,10 @@ func (s eventLookupTransfer) ToBinary(input map[string]*proxy.EventData) (
 
 //nolint:whitespace // editor/linter issue
 func (s eventLookupTransfer) FromBinary(data []byte) (
-	ret map[string]*proxy.EventData,
+	ret map[string]*containerv1.EventContainer,
 	err error,
 ) {
-	result := make(map[string]*proxy.EventData)
+	result := make(map[string]*containerv1.EventContainer)
 	buf := bytes.NewBuffer(data)
 	for buf.Len() > 0 {
 		var keyLen uint32
@@ -121,8 +120,8 @@ func (s eventLookupTransfer) FromBinary(data []byte) (
 			return nil, fmt.Errorf("error reading EventData: %w", err)
 		}
 
-		var eventData proxy.EventData
-		if err = eventData.FromBinary(edBuf); err != nil {
+		var eventData containerv1.EventContainer
+		if err = proto.Unmarshal(edBuf, &eventData); err != nil {
 			return nil, fmt.Errorf("error unmarshalling EventData: %w", err)
 		}
 		result[string(key)] = &eventData

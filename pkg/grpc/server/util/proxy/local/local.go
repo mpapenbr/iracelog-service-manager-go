@@ -5,6 +5,7 @@ import (
 
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	livedatav1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/livedata/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 
@@ -73,21 +74,29 @@ func (l *LocalProxy) DeleteEventCallback(eventKey string) {
 	l.l.Debug("DeleteEventCallback", log.String("eventKey", eventKey))
 }
 
-func (l *LocalProxy) LiveEvents() []*proxy.EventData {
+func (l *LocalProxy) LiveEvents() []*containerv1.EventContainer {
 	currentEvents := l.lookup.GetEvents()
-	ret := make([]*proxy.EventData, 0, len(currentEvents))
+	ret := make([]*containerv1.EventContainer, 0, len(currentEvents))
 	for _, v := range currentEvents {
-		ret = append(ret, &proxy.EventData{Event: v.Event, Track: v.Track, Owner: v.Owner})
+		ret = append(ret, &containerv1.EventContainer{
+			Event: v.Event,
+			Track: v.Track,
+			Owner: v.Owner,
+		})
 	}
 	return ret
 }
 
-func (l *LocalProxy) GetEvent(sel *commonv1.EventSelector) (*proxy.EventData, error) {
+//nolint:whitespace // editor/linter issue
+func (l *LocalProxy) GetEvent(sel *commonv1.EventSelector) (
+	*containerv1.EventContainer,
+	error,
+) {
 	epd, err := l.lookup.GetEvent(sel)
 	if err != nil {
 		return nil, err
 	}
-	return &proxy.EventData{
+	return &containerv1.EventContainer{
 		Event: epd.Event,
 		Track: epd.Track,
 		Owner: epd.Owner,

@@ -3,14 +3,14 @@ package nats
 import (
 	"testing"
 
+	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
-
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
+	"google.golang.org/protobuf/proto"
 )
 
 func Test_eventLookupTransfer_Conversion(t *testing.T) {
-	sampleData := map[string]*proxy.EventData{
+	sampleData := map[string]*containerv1.EventContainer{
 		"sampleKey": {
 			Event: &eventv1.Event{Key: "sampleKey", Name: "sampleName"},
 			Track: &trackv1.Track{Id: 12, Name: "sampleTrack"},
@@ -34,7 +34,7 @@ func Test_eventLookupTransfer_Conversion(t *testing.T) {
 		t.Fatalf("eventLookupTransfer.FromBinary() error = %v", err)
 	}
 	for k, v := range sampleData {
-		if !v.Equals(result[k]) {
+		if !proto.Equal(v, result[k]) {
 			t.Errorf("eventLookupTransfer.FromBinary() key %v  got %v, want %v", k, result[k], v)
 		}
 	}
