@@ -97,7 +97,7 @@ func CreateSampleEvent(db *pgxpool.Pool) *eventv1.Event {
 		if err := trackrepos.Create(ctx, tx, sampleTrack); err != nil {
 			return err
 		}
-		var tenantId uint32
+		var tenantID uint32
 		if tenant, err := tenantrepos.Create(ctx, tx, &tenantv1.CreateTenantRequest{
 			Name:     "testtenant",
 			ApiKey:   "testapikey",
@@ -105,9 +105,9 @@ func CreateSampleEvent(db *pgxpool.Pool) *eventv1.Event {
 		}); err != nil {
 			return err
 		} else {
-			tenantId = tenant.Id
+			tenantID = tenant.ID
 		}
-		err := eventrepos.Create(ctx, tx, sampleEvent, tenantId)
+		err := eventrepos.Create(ctx, tx, sampleEvent, tenantID)
 		return err
 	})
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 // we cannot use salts here.
 // In general just hashing is not enough, but since the apiKeys are
 // generated random strings this seems to be reasonable solution.
-func HashApiKey(arg string) string {
+func HashAPIKey(arg string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(arg))
 	return hex.EncodeToString(hasher.Sum(nil))

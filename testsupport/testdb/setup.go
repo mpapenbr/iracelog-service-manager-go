@@ -11,13 +11,13 @@ import (
 	tcpg "github.com/mpapenbr/iracelog-service-manager-go/testsupport/tcpostgres"
 )
 
-func InitTestDb() *pgxpool.Pool {
+func InitTestDB() *pgxpool.Pool {
 	var pool *pgxpool.Pool
 
 	if os.Getenv("TESTDB_URL") != "" {
-		pool = tcpg.SetupExternalTestDb()
+		pool = tcpg.SetupExternalTestDB()
 	} else {
-		pool = tcpg.SetupTestDb()
+		pool = tcpg.SetupTestDB()
 	}
 	if err := pgx.BeginFunc(context.Background(), pool, func(tx pgx.Tx) error {
 		tcpg.ClearAllTables(pool)

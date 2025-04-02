@@ -56,7 +56,7 @@ var (
 func GetPredictParam(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	eventId int,
+	eventID int,
 	sessionTime time.Duration,
 	carNum string,
 	laptimeSel predictv1.LaptimeSelector,
@@ -67,17 +67,17 @@ func GetPredictParam(
 	var analysis *analysisv1.Analysis
 	var carInfo *racestatev1.PublishDriverDataRequest
 
-	if event, err = eventRepo.LoadById(ctx, pool, eventId); err != nil {
+	if event, err = eventRepo.LoadByID(ctx, pool, eventID); err != nil {
 		return nil, err
 	}
-	if track, err = trackRepo.LoadById(ctx, pool, int(event.TrackId)); err != nil {
+	if track, err = trackRepo.LoadByID(ctx, pool, int(event.TrackId)); err != nil {
 		return nil, err
 	}
 
-	if analysis, err = aRepo.LoadByEventId(ctx, pool, eventId); err != nil {
+	if analysis, err = aRepo.LoadByEventID(ctx, pool, eventID); err != nil {
 		return nil, err
 	}
-	if carInfo, err = carRepo.LoadLatest(ctx, pool, eventId); err != nil {
+	if carInfo, err = carRepo.LoadLatest(ctx, pool, eventID); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +85,7 @@ func GetPredictParam(
 	if states, err = rsRepo.LoadRangeBySessionTime(
 		ctx,
 		pool,
-		eventId,
+		eventID,
 		utils.CollectRaceSessions(event)[0],
 		sessionTime.Seconds(),
 		1); err != nil || len(states.Data) == 0 {
@@ -158,7 +158,9 @@ func (pd *predictData) PredictParam() (*predictv1.PredictParam, error) {
 		CurrentTrackPos: pd.myData.stateData.TrackPos,
 		InPit:           pd.myData.stateData.State == racestatev1.CarState_CAR_STATE_PIT,
 		StintLap:        int32(pd.myData.stateData.StintLap),
-		RemainLapTime:   pd.toDur((1 - pd.myData.stateData.TrackPos) * float32(stintParam.AvgLaptime.Seconds)),
+		RemainLapTime: pd.toDur(
+			(1 - pd.myData.stateData.TrackPos) * float32(stintParam.AvgLaptime.Seconds),
+		),
 	}
 	return &predictv1.PredictParam{
 		Race:  raceParam,

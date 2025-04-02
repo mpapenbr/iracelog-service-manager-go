@@ -40,15 +40,15 @@ func displayLaps(ctx context.Context, eventArg string) {
 		logger.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	eventId, _ := strconv.Atoi(eventArg)
+	eventID, _ := strconv.Atoi(eventArg)
 
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		logger.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	data, err := aRepo.LoadByEventId(ctx, pool, eventId)
+	data, err := aRepo.LoadByEventID(ctx, pool, eventID)
 	if err != nil {
 		logger.Fatal("error loading data", log.ErrorField(err))
 	}

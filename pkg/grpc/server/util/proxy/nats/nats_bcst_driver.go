@@ -85,6 +85,7 @@ func (bc *driverDataBcstSupport) createChannels() (
 	return dataChan, quitChan
 }
 
+//
 //nolint:whitespace,lll,funlen // editor/linter issue
 func (bc *driverDataBcstSupport) getDriverDataBroadcaster() broadcast.BroadcastServer[*livedatav1.LiveDriverDataResponse] {
 	if bc.bcData != nil {

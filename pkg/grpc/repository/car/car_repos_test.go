@@ -1,4 +1,4 @@
-//nolint:whitespace,lll // readability
+//nolint:whitespace,lll,funlen // readability
 package car
 
 import (
@@ -17,7 +17,16 @@ func sampleRequestData() *racestatev1.PublishDriverDataRequest {
 	return &racestatev1.PublishDriverDataRequest{
 		SessionTime: 1000,
 		Cars: []*carv1.CarInfo{
-			{Name: "car1", NameShort: "shortCar1", CarId: 1, CarClassId: 12, FuelPct: 1, PowerAdjust: -0.1, WeightPenalty: 10, DryTireSets: 4},
+			{
+				Name:          "car1",
+				NameShort:     "shortCar1",
+				CarId:         1,
+				CarClassId:    12,
+				FuelPct:       1,
+				PowerAdjust:   -0.1,
+				WeightPenalty: 10,
+				DryTireSets:   4,
+			},
 		},
 		CarClasses: []*carv1.CarClass{
 			{Name: "carClass1", Id: 12},
@@ -25,11 +34,38 @@ func sampleRequestData() *racestatev1.PublishDriverDataRequest {
 		},
 		Entries: []*carv1.CarEntry{
 			{
-				Car:  &carv1.Car{CarIdx: 1, CarId: 1, Name: "car1", CarNumber: "10", CarNumberRaw: 10, CarClassId: 12},
+				Car: &carv1.Car{
+					CarIdx:       1,
+					CarId:        1,
+					Name:         "car1",
+					CarNumber:    "10",
+					CarNumberRaw: 10,
+					CarClassId:   12,
+				},
 				Team: &driverv1.Team{Id: 901, Name: "team1"},
 				Drivers: []*driverv1.Driver{
-					{Id: 991, Name: "driver1", CarIdx: 1, IRating: 1000, Initials: "D1", AbbrevName: "AbbrD1", LicLevel: 24, LicSubLevel: 413, LicString: "P 4.13"},
-					{Id: 992, Name: "driver2", CarIdx: 1, IRating: 2000, Initials: "D2", AbbrevName: "AbbrD2", LicLevel: 23, LicSubLevel: 423, LicString: "A 4.23"},
+					{
+						Id:          991,
+						Name:        "driver1",
+						CarIdx:      1,
+						IRating:     1000,
+						Initials:    "D1",
+						AbbrevName:  "AbbrD1",
+						LicLevel:    24,
+						LicSubLevel: 413,
+						LicString:   "P 4.13",
+					},
+					{
+						Id:          992,
+						Name:        "driver2",
+						CarIdx:      1,
+						IRating:     2000,
+						Initials:    "D2",
+						AbbrevName:  "AbbrD2",
+						LicLevel:    23,
+						LicSubLevel: 423,
+						LicString:   "A 4.23",
+					},
 				},
 			},
 		},
@@ -38,7 +74,7 @@ func sampleRequestData() *racestatev1.PublishDriverDataRequest {
 }
 
 func TestCreate(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 	var err error
 	req := sampleRequestData()
@@ -49,7 +85,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestAddToExisting(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 	var err error
 	req := sampleRequestData()
@@ -57,23 +93,80 @@ func TestAddToExisting(t *testing.T) {
 	if err != nil {
 		t.Errorf("Create() error = %v", err)
 	}
-	req.Cars = append(req.Cars, &carv1.CarInfo{Name: "car2", NameShort: "shortCar2", CarId: 2, CarClassId: 34})
+	req.Cars = append(
+		req.Cars,
+		&carv1.CarInfo{Name: "car2", NameShort: "shortCar2", CarId: 2, CarClassId: 34},
+	)
 	req.CarClasses = append(req.CarClasses, &carv1.CarClass{Name: "carClass3", Id: 56})
 	req.Entries = []*carv1.CarEntry{
 		{
-			Car:  &carv1.Car{CarIdx: 1, CarId: 1, Name: "car1", CarNumber: "10", CarNumberRaw: 10, CarClassId: 12},
+			Car: &carv1.Car{
+				CarIdx:       1,
+				CarId:        1,
+				Name:         "car1",
+				CarNumber:    "10",
+				CarNumberRaw: 10,
+				CarClassId:   12,
+			},
 			Team: &driverv1.Team{Id: 901, Name: "team1"},
 			Drivers: []*driverv1.Driver{
-				{Id: 991, Name: "driver1", CarIdx: 1, IRating: 1000, Initials: "D1", AbbrevName: "AbbrD1", LicLevel: 24, LicSubLevel: 413, LicString: "P 4.13"},
-				{Id: 992, Name: "driver2", CarIdx: 1, IRating: 2000, Initials: "D2", AbbrevName: "AbbrD2", LicLevel: 23, LicSubLevel: 423, LicString: "A 4.23"},
-				{Id: 993, Name: "driver3", CarIdx: 1, IRating: 3000, Initials: "D3", AbbrevName: "AbbrD3", LicLevel: 24, LicSubLevel: 413, LicString: "P 4.13"},
+				{
+					Id:          991,
+					Name:        "driver1",
+					CarIdx:      1,
+					IRating:     1000,
+					Initials:    "D1",
+					AbbrevName:  "AbbrD1",
+					LicLevel:    24,
+					LicSubLevel: 413,
+					LicString:   "P 4.13",
+				},
+				{
+					Id:          992,
+					Name:        "driver2",
+					CarIdx:      1,
+					IRating:     2000,
+					Initials:    "D2",
+					AbbrevName:  "AbbrD2",
+					LicLevel:    23,
+					LicSubLevel: 423,
+					LicString:   "A 4.23",
+				},
+				{
+					Id:          993,
+					Name:        "driver3",
+					CarIdx:      1,
+					IRating:     3000,
+					Initials:    "D3",
+					AbbrevName:  "AbbrD3",
+					LicLevel:    24,
+					LicSubLevel: 413,
+					LicString:   "P 4.13",
+				},
 			},
 		},
 		{
-			Car:  &carv1.Car{CarIdx: 2, CarId: 2, Name: "car2", CarNumber: "20", CarNumberRaw: 20, CarClassId: 56},
+			Car: &carv1.Car{
+				CarIdx:       2,
+				CarId:        2,
+				Name:         "car2",
+				CarNumber:    "20",
+				CarNumberRaw: 20,
+				CarClassId:   56,
+			},
 			Team: &driverv1.Team{Id: 902, Name: "team2"},
 			Drivers: []*driverv1.Driver{
-				{Id: 994, Name: "driver10", CarIdx: 2, IRating: 1000, Initials: "D10", AbbrevName: "AbbrD10", LicLevel: 24, LicSubLevel: 413, LicString: "P 4.13"},
+				{
+					Id:          994,
+					Name:        "driver10",
+					CarIdx:      2,
+					IRating:     1000,
+					Initials:    "D10",
+					AbbrevName:  "AbbrD10",
+					LicLevel:    24,
+					LicSubLevel: 413,
+					LicString:   "P 4.13",
+				},
 			},
 		},
 	}
@@ -85,14 +178,14 @@ func TestAddToExisting(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 	var err error
 	err = Create(context.Background(), pool, int(event.Id), sampleRequestData())
 	if err != nil {
 		t.Errorf("Create() error = %v", err)
 	}
-	num, err := DeleteByEventId(context.Background(), pool, int(event.Id))
+	num, err := DeleteByEventID(context.Background(), pool, int(event.Id))
 	if err != nil {
 		t.Errorf("DeleteByEventId() error = %v", err)
 	}

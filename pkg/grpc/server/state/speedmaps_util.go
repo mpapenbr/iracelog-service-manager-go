@@ -64,7 +64,7 @@ func (s *speedmapContainer) InitialRequest() (
 			s.req.GetStart().GetSessionTimeSelector().GetDuration().AsDuration().Seconds(),
 			s.toFetchEntries())
 	case *commonv1.StartSelector_Id:
-		ret, err = speedmaprepos.LoadRangeById(
+		ret, err = speedmaprepos.LoadRangeByID(
 			s.ctx,
 			s.conn,
 			int(s.e.Id),
@@ -76,7 +76,7 @@ func (s *speedmapContainer) InitialRequest() (
 
 	}
 	if err == nil {
-		s.lastRsInfoId = ret.LastRsInfoId
+		s.lastRsInfoID = ret.LastRsInfoID
 		s.remain -= len(ret.Data)
 	}
 	return ret, err
@@ -89,23 +89,23 @@ func (s *speedmapContainer) NextRequest() (
 ) {
 	switch s.req.GetStart().Arg.(type) {
 	case *commonv1.StartSelector_SessionTimeSelector:
-		ret, err = speedmaprepos.LoadRangeByIdWithinSession(
+		ret, err = speedmaprepos.LoadRangeByIDWithinSession(
 			s.ctx,
 			s.conn,
 			int(s.e.Id),
 			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
-			s.lastRsInfoId+1,
+			s.lastRsInfoID+1,
 			s.toFetchEntries())
 	default:
-		ret, err = speedmaprepos.LoadRangeById(
+		ret, err = speedmaprepos.LoadRangeByID(
 			s.ctx,
 			s.conn,
 			int(s.e.Id),
-			s.lastRsInfoId+1,
+			s.lastRsInfoID+1,
 			s.toFetchEntries())
 	}
 	if err == nil {
-		s.lastRsInfoId = ret.LastRsInfoId
+		s.lastRsInfoID = ret.LastRsInfoID
 		s.remain -= len(ret.Data)
 	}
 	return ret, err

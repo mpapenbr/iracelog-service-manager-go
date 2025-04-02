@@ -38,7 +38,7 @@ func ResolveEvent(
 	}
 	switch sel.Arg.(type) {
 	case *commonv1.EventSelector_Id:
-		data, err = event.LoadById(ctx, conn, int(sel.GetId()))
+		data, err = event.LoadByID(ctx, conn, int(sel.GetId()))
 	case *commonv1.EventSelector_Key:
 		data, err = event.LoadByKey(ctx, conn, sel.GetKey())
 	default:

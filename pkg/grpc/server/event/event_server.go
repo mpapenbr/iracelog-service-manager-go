@@ -67,18 +67,18 @@ func (s *eventsServer) GetEvents(
 	req *connect.Request[eventv1.GetEventsRequest],
 	stream *connect.ServerStream[eventv1.GetEventsResponse],
 ) error {
-	var tenantId *uint32 = nil
+	var tenantID *uint32 = nil
 	if t, err := util.ResolveTenant(
 		ctx,
 		s.pool,
 		req.Msg.TenantSelector); err == nil {
 		if t != nil {
-			tenantId = &t.Id
+			tenantID = &t.ID
 		}
 	} else {
 		return err
 	}
-	data, err := event.LoadAll(context.Background(), s.pool, tenantId)
+	data, err := event.LoadAll(context.Background(), s.pool, tenantID)
 	if err != nil {
 		return err
 	}
@@ -97,18 +97,18 @@ func (s *eventsServer) GetLatestEvents(
 	ctx context.Context,
 	req *connect.Request[eventv1.GetLatestEventsRequest],
 ) (*connect.Response[eventv1.GetLatestEventsResponse], error) {
-	var tenantId *uint32 = nil
+	var tenantID *uint32 = nil
 	if t, err := util.ResolveTenant(
 		ctx,
 		s.pool,
 		req.Msg.TenantSelector); err == nil {
 		if t != nil {
-			tenantId = &t.Id
+			tenantID = &t.ID
 		}
 	} else {
 		return nil, err
 	}
-	data, err := event.LoadAll(context.Background(), s.pool, tenantId)
+	data, err := event.LoadAll(context.Background(), s.pool, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (s *eventsServer) GetEvent(
 		return nil, err
 	}
 
-	a, err = aProto.LoadByEventId(ctx, s.pool, int(e.Id))
+	a, err = aProto.LoadByEventID(ctx, s.pool, int(e.Id))
 	if err != nil {
 		s.log.Error("error loading event",
 			log.Uint32("eventId", e.Id),
@@ -143,7 +143,7 @@ func (s *eventsServer) GetEvent(
 		return nil, err
 	}
 
-	t, err := track.LoadById(ctx, s.pool, int(e.TrackId))
+	t, err := track.LoadByID(ctx, s.pool, int(e.TrackId))
 	if err != nil {
 		s.log.Error("error loading track",
 			log.Uint32("eventId", e.Id),
@@ -264,7 +264,7 @@ func (s *eventsServer) validateEventAccess(
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
 	}
-	t, err := tenant.LoadByEventId(ctx, s.pool, int(data.Id))
+	t, err := tenant.LoadByEventID(ctx, s.pool, int(data.Id))
 	if err != nil {
 		return nil, err
 	}

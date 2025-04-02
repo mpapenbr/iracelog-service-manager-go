@@ -16,7 +16,7 @@ import (
 func Create(
 	ctx context.Context,
 	conn repository.Querier,
-	rsInfoId int,
+	rsInfoID int,
 	driverstate *racestatev1.PublishDriverDataRequest,
 ) error {
 	binaryMessage, err := proto.Marshal(driverstate)
@@ -29,7 +29,7 @@ func Create(
 	) values ($1,$2)
 	returning id
 		`,
-		rsInfoId, binaryMessage,
+		rsInfoID, binaryMessage,
 	)
 	id := 0
 	if err := row.Scan(&id); err != nil {
@@ -41,7 +41,7 @@ func Create(
 func LoadLatest(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (*racestatev1.PublishDriverDataRequest, error) {
 	row := conn.QueryRow(ctx, `
 select cp.protodata from car_state_proto cp
@@ -49,7 +49,7 @@ join rs_info ri on ri.id=cp.rs_info_id
 where ri.event_id=$1
 order by ri.id desc limit 1
 		`,
-		eventId,
+		eventID,
 	)
 	var binaryMessage []byte
 	if err := row.Scan(&binaryMessage); err != nil {
@@ -69,7 +69,7 @@ order by ri.id desc limit 1
 func LoadRange(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	startTS time.Time,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
@@ -82,7 +82,7 @@ ri.event_id=$1
 and ri.record_stamp >= $2
 order by ri.id asc limit $3
 		`,
-			eventId, startTS, limit,
+			eventID, startTS, limit,
 		)
 	}
 	return loadRange(provider, limit)
@@ -92,7 +92,7 @@ order by ri.id asc limit $3
 func LoadRangeBySessionTime(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionNum uint32,
 	sessionTime float64,
 	limit int,
@@ -107,7 +107,7 @@ and ri.session_num = $2
 and ri.session_time >= $3
 order by ri.id asc limit $4
 		`,
-			eventId, sessionNum, sessionTime, limit,
+			eventID, sessionNum, sessionTime, limit,
 		)
 	}
 	return loadRange(provider, limit)
@@ -115,11 +115,11 @@ order by ri.id asc limit $4
 
 // loads a range of entities starting at rsInfoId
 // sessionNum is ignored
-func LoadRangeById(
+func LoadRangeByID(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
-	rsInfoId int,
+	eventID int,
+	rsInfoID int,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	provider := func() (pgx.Rows, error) {
@@ -131,19 +131,19 @@ ri.event_id=$1
 and ri.id >= $2
 order by ri.id asc, ri.record_stamp asc limit $3
 		`,
-			eventId, rsInfoId, limit,
+			eventID, rsInfoID, limit,
 		)
 	}
 	return loadRange(provider, limit)
 }
 
 // loads a range of entities starting at rsInfoId within a session
-func LoadRangeByIdWithinSession(
+func LoadRangeByIDWithinSession(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionNum uint32,
-	rsInfoId int,
+	rsInfoID int,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	provider := func() (pgx.Rows, error) {
@@ -156,7 +156,7 @@ and ri.session_num = $2
 and ri.id >= $3
 order by ri.id asc, ri.record_stamp asc limit $4
 		`,
-			eventId, sessionNum, rsInfoId, limit,
+			eventID, sessionNum, rsInfoID, limit,
 		)
 	}
 	return loadRange(provider, limit)
@@ -183,7 +183,7 @@ func loadRange(
 		if err := row.Scan(&binaryMessage,
 			&ret.LastTimestamp,
 			&ret.LastSessionTime,
-			&ret.LastRsInfoId); err != nil {
+			&ret.LastRsInfoID); err != nil {
 			return nil, err
 		}
 		driverData := &racestatev1.PublishDriverDataRequest{}
@@ -199,9 +199,12 @@ func loadRange(
 // deletes an entry from the database, returns number of rows deleted.
 
 //nolint:lll // readability
-func DeleteByEventId(ctx context.Context, conn repository.Querier, eventId int) (int, error) {
-	cmdTag, err := conn.Exec(ctx,
-		"delete from car_state_proto where rs_info_id in (select id from rs_info where event_id=$1)", eventId)
+func DeleteByEventID(ctx context.Context, conn repository.Querier, eventID int) (int, error) {
+	cmdTag, err := conn.Exec(
+		ctx,
+		"delete from car_state_proto where rs_info_id in (select id from rs_info where event_id=$1)",
+		eventID,
+	)
 	if err != nil {
 		return 0, err
 	}

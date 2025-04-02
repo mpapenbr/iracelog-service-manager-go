@@ -49,21 +49,21 @@ func checkDriverDataFetcher(eventArg string) {
 		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	eventId, _ := strconv.Atoi(eventArg)
+	eventID, _ := strconv.Atoi(eventArg)
 	ctx := context.Background()
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	sourceEvent, err := eventrepo.LoadById(ctx, pool, eventId)
+	sourceEvent, err := eventrepo.LoadByID(ctx, pool, eventID)
 	if err != nil {
 		log.Error("event not found", log.ErrorField(err))
 		return
 	}
 	log.Info("event found", log.String("event", sourceEvent.Key))
-	df := initDriverDataFetcher(pool, eventId, time.Time{}, 50)
+	df := initDriverDataFetcher(pool, eventID, time.Time{}, 50)
 	i := 0
 	for {
 		data := df.next()
@@ -76,12 +76,18 @@ func checkDriverDataFetcher(eventArg string) {
 	}
 }
 
-//nolint:lll // readablity
-func initDriverDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishDriverDataRequest] {
+//
+//nolint:lll,whitespace // readablity
+func initDriverDataFetcher(
+	pool *pgxpool.Pool,
+	eventID int,
+	lastTS time.Time,
+	limit int,
+) myFetcher[racestatev1.PublishDriverDataRequest] {
 	df := &commonFetcher[racestatev1.PublishDriverDataRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
-			return csRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
+			return csRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
 		},
 	}
 

@@ -10,7 +10,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 	var err error
 	var id int
@@ -25,7 +25,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 	req := base.SamplePublishSateRequest()
 	var err error
@@ -33,7 +33,7 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("Create() error = %v", err)
 	}
-	num, err := DeleteByEventId(context.Background(), pool, int(event.Id))
+	num, err := DeleteByEventID(context.Background(), pool, int(event.Id))
 	if err != nil {
 		t.Errorf("DeleteByEventId() error = %v", err)
 	}
@@ -44,15 +44,15 @@ func TestDelete(t *testing.T) {
 
 //nolint:errcheck // by design
 func TestFindNearestRaceState(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 
 	req := base.SamplePublishSateRequest()
 
-	rsInfoIdLow, _ := CreateRaceState(context.Background(), pool, int(event.Id), req)
+	rsInfoIDLow, _ := CreateRaceState(context.Background(), pool, int(event.Id), req)
 
 	req.Session.SessionTime = 1100
-	rsInfoIdHigh, _ := CreateRaceState(context.Background(), pool, int(event.Id), req)
+	rsInfoIDHigh, _ := CreateRaceState(context.Background(), pool, int(event.Id), req)
 
 	type args struct {
 		sessionTime float32
@@ -60,23 +60,28 @@ func TestFindNearestRaceState(t *testing.T) {
 	tests := []struct {
 		name         string
 		args         args
-		wantRsInfoId int
+		wantRsInfoID int
 		wantErr      bool
 	}{
-		{"below", args{sessionTime: 0}, rsInfoIdLow, false},
-		{"equal", args{sessionTime: 1000}, rsInfoIdLow, false},
-		{"between", args{sessionTime: 1080}, rsInfoIdLow, false},
-		{"above", args{sessionTime: 1110}, rsInfoIdHigh, false},
+		{"below", args{sessionTime: 0}, rsInfoIDLow, false},
+		{"equal", args{sessionTime: 1000}, rsInfoIDLow, false},
+		{"between", args{sessionTime: 1080}, rsInfoIDLow, false},
+		{"above", args{sessionTime: 1110}, rsInfoIDHigh, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRsInfoId, err := FindNearestRaceState(context.Background(), pool, int(event.Id), tt.args.sessionTime)
+			gotRsInfoID, err := FindNearestRaceState(
+				context.Background(),
+				pool,
+				int(event.Id),
+				tt.args.sessionTime,
+			)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FindNearestRaceState() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotRsInfoId != tt.wantRsInfoId {
-				t.Errorf("FindNearestRaceState() = %v, want %v", gotRsInfoId, tt.wantRsInfoId)
+			if gotRsInfoID != tt.wantRsInfoID {
+				t.Errorf("FindNearestRaceState() = %v, want %v", gotRsInfoID, tt.wantRsInfoID)
 			}
 		})
 	}

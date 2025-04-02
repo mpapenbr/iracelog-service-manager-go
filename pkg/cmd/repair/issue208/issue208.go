@@ -43,11 +43,11 @@ func migrateCarStates(ctx context.Context) {
 		timeout = 60 * time.Second
 	}
 
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
 
 	if events, err := eventrepo.LoadAll(ctx, pool, nil); err == nil {
@@ -60,7 +60,7 @@ func migrateCarStates(ctx context.Context) {
 }
 
 //nolint:funlen // long function
-func doMigrateCarStates(pool *pgxpool.Pool, eventId uint32) {
+func doMigrateCarStates(pool *pgxpool.Pool, eventID uint32) {
 	updateErr := pgx.BeginFunc(context.Background(), pool, func(tx pgx.Tx) error {
 		rows, err := pool.Query(context.Background(), `
 select
@@ -72,7 +72,7 @@ where
 ri.event_id=$1
 order by ri.id asc
 	`,
-			eventId,
+			eventID,
 		)
 		if err != nil {
 			log.Error("error fetching car states", log.ErrorField(err))
@@ -86,8 +86,8 @@ order by ri.id asc
 
 			var recordStamp time.Time
 			var sessionTime float64
-			var rsId int
-			err = rows.Scan(&csProtodata, &rsProtodata, &recordStamp, &sessionTime, &rsId)
+			var rsID int
+			err = rows.Scan(&csProtodata, &rsProtodata, &recordStamp, &sessionTime, &rsID)
 			if err != nil {
 				log.Error("error scanning car states", log.ErrorField(err))
 				return err
@@ -105,7 +105,7 @@ order by ri.id asc
 			log.Debug("race state", log.Float64("sessionTime", sessionTime),
 				log.Uint32("sessionNum (ds)", driverstate.SessionNum),
 				log.Uint32("sessionNum (rs)", racestate.Session.SessionNum),
-				log.Int("rsId", rsId),
+				log.Int("rsId", rsID),
 			)
 			driverstate.SessionNum = racestate.Session.SessionNum
 			if binaryMessage, err := proto.Marshal(driverstate); err != nil {
@@ -114,7 +114,7 @@ order by ri.id asc
 			} else {
 				if cmdTag, err := pool.Exec(context.Background(),
 					`update car_state_proto set protodata=$1 where rs_info_id=$2`,
-					binaryMessage, rsId); err != nil {
+					binaryMessage, rsID); err != nil {
 					log.Error("error updating car state", log.ErrorField(err))
 				} else {
 					updated += cmdTag.RowsAffected()
@@ -122,7 +122,7 @@ order by ri.id asc
 			}
 		}
 		log.Info("updated car states",
-			log.Uint32("eventId", eventId),
+			log.Uint32("eventId", eventID),
 			log.Int64("updated", updated))
 		return nil
 	})

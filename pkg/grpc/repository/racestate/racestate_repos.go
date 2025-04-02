@@ -23,9 +23,9 @@ import (
 func CreateRaceState(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	racestate *racestatev1.PublishStateRequest,
-) (rsInfoId int, err error) {
+) (rsInfoID int, err error) {
 	row := conn.QueryRow(ctx, `
 	insert into rs_info (
 		event_id, record_stamp, session_time, session_num, time_of_day,
@@ -33,14 +33,14 @@ func CreateRaceState(
 	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	returning id
 		`,
-		eventId, racestate.Timestamp.AsTime(), racestate.Session.SessionTime,
+		eventID, racestate.Timestamp.AsTime(), racestate.Session.SessionTime,
 		racestate.Session.SessionNum, racestate.Session.TimeOfDay,
 		racestate.Session.AirTemp, racestate.Session.TrackTemp,
 		racestate.Session.TrackWetness, racestate.Session.Precipitation,
 	)
-	rsInfoId = 0
+	rsInfoID = 0
 	//nolint:govet,gocritic // by design
-	if err = row.Scan(&rsInfoId); err != nil {
+	if err = row.Scan(&rsInfoID); err != nil {
 		return 0, err
 	}
 
@@ -53,7 +53,7 @@ func CreateRaceState(
 		rs_info_id, protodata
 	) values ($1,$2)
 		`,
-		rsInfoId, binaryMessage,
+		rsInfoID, binaryMessage,
 	)
 	if err != nil {
 		return 0, err
@@ -68,24 +68,24 @@ func CreateRaceState(
 			rs_info_id, protodata
 		) values ($1,$2)
 			`,
-			rsInfoId, binaryMessage,
+			rsInfoID, binaryMessage,
 		)
 		if err != nil {
 			return 0, err
 		}
 	}
-	return rsInfoId, nil
+	return rsInfoID, nil
 }
 
 // this method is used if there are driver data prior to the first race state
 func CreateDummyRaceStateInfo(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	ts time.Time,
 	sessionTime float32,
 	sessionNum uint32,
-) (rsInfoId int, err error) {
+) (rsInfoID int, err error) {
 	row := conn.QueryRow(ctx, `
 	insert into rs_info (
 		event_id, record_stamp, session_time, session_num, time_of_day,
@@ -93,53 +93,53 @@ func CreateDummyRaceStateInfo(
 	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	returning id
 		`,
-		eventId, ts, sessionTime, sessionNum, 0, 0, 0, 0, 0,
+		eventID, ts, sessionTime, sessionNum, 0, 0, 0, 0, 0,
 	)
-	rsInfoId = 0
+	rsInfoID = 0
 	//nolint:govet,gocritic // by design
-	if err = row.Scan(&rsInfoId); err != nil {
+	if err = row.Scan(&rsInfoID); err != nil {
 		return 0, err
 	}
-	return rsInfoId, nil
+	return rsInfoID, nil
 }
 
 func FindNearestRaceState(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionTime float32,
-) (rsInfoId int, err error) {
+) (rsInfoID int, err error) {
 	row := conn.QueryRow(ctx, `
 	select id from rs_info where event_id=$1 and session_time <= $2
 	order by session_time desc limit 1
 		`,
-		eventId, sessionTime,
+		eventID, sessionTime,
 	)
-	rsInfoId = 0
+	rsInfoID = 0
 	//nolint:nestif // tricky case ;)
-	if err = row.Scan(&rsInfoId); err != nil {
+	if err = row.Scan(&rsInfoID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			row = conn.QueryRow(ctx,
 				"select id from rs_info where event_id=$1 order by session_time asc limit 1",
-				eventId,
+				eventID,
 			)
 			//nolint:gocritic // by design
-			if err = row.Scan(&rsInfoId); err != nil {
+			if err = row.Scan(&rsInfoID); err != nil {
 				return 0, err
 			} else {
-				return rsInfoId, nil
+				return rsInfoID, nil
 			}
 		} else {
 			return 0, err
 		}
 	}
-	return rsInfoId, nil
+	return rsInfoID, nil
 }
 
 func LoadLatest(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (*racestatev1.PublishStateRequest, error) {
 	row := conn.QueryRow(ctx, `
 select rp.protodata from race_state_proto rp
@@ -147,7 +147,7 @@ join rs_info ri on ri.id=rp.rs_info_id
 where ri.event_id=$1
 order by ri.id desc limit 1
 		`,
-		eventId,
+		eventID,
 	)
 	var binaryMessage []byte
 	if err := row.Scan(&binaryMessage); err != nil {
@@ -165,7 +165,7 @@ order by ri.id desc limit 1
 func CollectMessages(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) ([]*racestatev1.MessageContainer, error) {
 	row, err := conn.Query(ctx, `
 select ri.session_time, ri.record_stamp, rp.protodata from msg_state_proto rp
@@ -173,7 +173,7 @@ join rs_info ri on ri.id=rp.rs_info_id
 where ri.event_id=$1
 order by ri.id asc
 		`,
-		eventId,
+		eventID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -209,7 +209,7 @@ order by ri.id asc
 func LoadRange(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	startTS time.Time,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
@@ -222,7 +222,7 @@ ri.event_id=$1
 and ri.record_stamp >= $2
 order by ri.id asc limit $3
 		`,
-			eventId, startTS, limit,
+			eventID, startTS, limit,
 		)
 		return row, err
 	}
@@ -233,7 +233,7 @@ order by ri.id asc limit $3
 func LoadRangeBySessionTime(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionNum uint32,
 	sessionTime float64,
 	limit int,
@@ -248,7 +248,7 @@ and ri.session_num = $2
 and ri.session_time >= $3
 order by ri.id asc limit $4
 		`,
-			eventId, sessionNum, sessionTime, limit,
+			eventID, sessionNum, sessionTime, limit,
 		)
 		return rows, err
 	}
@@ -257,11 +257,11 @@ order by ri.id asc limit $4
 
 // loads a range of entities starting at rsInfoId
 // sessionNum is ignored
-func LoadRangeById(
+func LoadRangeByID(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
-	rsInfoId int,
+	eventID int,
+	rsInfoID int,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
@@ -273,7 +273,7 @@ ri.event_id=$1
 and ri.id >= $2
 order by ri.id asc limit $3
 		`,
-			eventId, rsInfoId, limit,
+			eventID, rsInfoID, limit,
 		)
 		return rows, err
 	}
@@ -281,12 +281,12 @@ order by ri.id asc limit $3
 }
 
 // loads a range of entities starting at rsInfoId within a session
-func LoadRangeByIdWithinSession(
+func LoadRangeByIDWithinSession(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionNum uint32,
-	rsInfoId int,
+	rsInfoID int,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
@@ -299,7 +299,7 @@ and ri.session_num = $2
 and ri.id >= $3
 order by ri.id asc limit $4
 		`,
-			eventId, sessionNum, rsInfoId, limit,
+			eventID, sessionNum, rsInfoID, limit,
 		)
 		return rows, err
 	}
@@ -327,7 +327,7 @@ func loadRange(
 		if err := row.Scan(&binaryMessage,
 			&ret.LastTimestamp,
 			&ret.LastSessionTime,
-			&ret.LastRsInfoId); err != nil {
+			&ret.LastRsInfoID); err != nil {
 			return nil, err
 		}
 		racesate := &racestatev1.PublishStateRequest{}
@@ -343,21 +343,27 @@ func loadRange(
 // deletes all entries for an event from the database, returns number of rows deleted.
 //
 //nolint:lll // readability
-func DeleteByEventId(ctx context.Context, conn repository.Querier, eventId int) (int, error) {
+func DeleteByEventID(ctx context.Context, conn repository.Querier, eventID int) (int, error) {
 	var cmdTag pgconn.CommandTag
 	var err error
 
-	_, err = conn.Exec(ctx,
-		"delete from race_state_proto where rs_info_id in (select id from rs_info where event_id=$1)", eventId)
+	_, err = conn.Exec(
+		ctx,
+		"delete from race_state_proto where rs_info_id in (select id from rs_info where event_id=$1)",
+		eventID,
+	)
 	if err != nil {
 		return 0, err
 	}
-	_, err = conn.Exec(ctx,
-		"delete from msg_state_proto where rs_info_id in (select id from rs_info where event_id=$1)", eventId)
+	_, err = conn.Exec(
+		ctx,
+		"delete from msg_state_proto where rs_info_id in (select id from rs_info where event_id=$1)",
+		eventID,
+	)
 	if err != nil {
 		return 0, err
 	}
-	cmdTag, err = conn.Exec(ctx, "delete from rs_info where event_id=$1", eventId)
+	cmdTag, err = conn.Exec(ctx, "delete from rs_info where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
 	}

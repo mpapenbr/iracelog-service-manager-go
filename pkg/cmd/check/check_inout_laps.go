@@ -39,15 +39,15 @@ func checkStateInoutMarker(ctx context.Context, eventArg string) {
 		logger.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	eventId, _ := strconv.Atoi(eventArg)
+	eventID, _ := strconv.Atoi(eventArg)
 
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		logger.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	states, _ := stateRepo.LoadRange(ctx, pool, eventId, time.Time{}, 1500)
+	states, _ := stateRepo.LoadRange(ctx, pool, eventID, time.Time{}, 1500)
 	logger.Info("got racestates: ", log.Int("count", len(states.Data)))
 	for i, d := range states.Data {
 		for _, c := range d.Cars {

@@ -107,7 +107,7 @@ func (s *stateServer) PublishState(
 		if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
 			id, err := racestaterepos.CreateRaceState(ctx, tx, int(epd.Event.Id), req.Msg)
 			if err == nil {
-				epd.LastRsInfoId = id
+				epd.LastRsInfoID = id
 			}
 			return err
 		}); err != nil {
@@ -159,7 +159,7 @@ func (s *stateServer) PublishSpeedmap(
 		s.log.Error("error publishing speedmap", log.ErrorField(err))
 	}
 	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
-		return speedmapprotorepos.Create(ctx, tx, epd.LastRsInfoId, req.Msg)
+		return speedmapprotorepos.Create(ctx, tx, epd.LastRsInfoID, req.Msg)
 	}); err != nil {
 		s.log.Error("error storing speedmap", log.ErrorField(err))
 	}
@@ -194,10 +194,10 @@ func (s *stateServer) PublishDriverData(
 		if err := carrepos.Create(ctx, tx, int(epd.Event.Id), req.Msg); err != nil {
 			s.log.Error("error storing car data", log.ErrorField(err))
 		}
-		rsInfoId := epd.LastRsInfoId
-		if epd.LastRsInfoId == 0 {
+		rsInfoID := epd.LastRsInfoID
+		if epd.LastRsInfoID == 0 {
 			var rsErr error
-			rsInfoId, rsErr = racestaterepos.CreateDummyRaceStateInfo(
+			rsInfoID, rsErr = racestaterepos.CreateDummyRaceStateInfo(
 				ctx, tx, int(epd.Event.Id), req.Msg.Timestamp.AsTime(),
 				req.Msg.SessionTime, req.Msg.SessionNum,
 			)
@@ -206,7 +206,7 @@ func (s *stateServer) PublishDriverData(
 				return rsErr
 			}
 		}
-		return carprotorepos.Create(ctx, tx, rsInfoId, req.Msg)
+		return carprotorepos.Create(ctx, tx, rsInfoID, req.Msg)
 	}); err != nil {
 		s.log.Error("error storing car state", log.ErrorField(err))
 	}
@@ -274,7 +274,7 @@ func (s *stateServer) PublishEventExtraInfo(
 func (s *stateServer) handlePitInfoUpdate(
 	ctx context.Context,
 	tx pgx.Tx,
-	trackId int,
+	trackID int,
 	pitInfo *trackv1.PitInfo,
 ) {
 	if pitInfo == nil {
@@ -284,7 +284,7 @@ func (s *stateServer) handlePitInfoUpdate(
 		return
 	}
 	//nolint:nestif // by design
-	if t, err := trackrepos.LoadById(ctx, tx, trackId); err != nil {
+	if t, err := trackrepos.LoadByID(ctx, tx, trackID); err != nil {
 		s.log.Error("error loading track", log.ErrorField(err))
 		return
 	} else {
@@ -297,7 +297,7 @@ func (s *stateServer) handlePitInfoUpdate(
 		t.PitInfo.Entry = pitInfo.Entry
 		t.PitInfo.Exit = pitInfo.Exit
 		t.PitInfo.LaneLength = pitInfo.LaneLength
-		_, err := trackrepos.UpdatePitInfo(ctx, tx, trackId, t.PitInfo)
+		_, err := trackrepos.UpdatePitInfo(ctx, tx, trackID, t.PitInfo)
 		if err != nil {
 			s.log.Error("error updating pit info", log.ErrorField(err))
 		}
@@ -326,7 +326,7 @@ func (s *stateServer) GetDriverData(
 		DriverData:      tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
-		LastId:          uint32(tmp.LastRsInfoId),
+		LastId:          uint32(tmp.LastRsInfoID),
 	}), nil
 }
 
@@ -384,7 +384,7 @@ func (s *stateServer) GetStates(
 		States:          tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
-		LastId:          uint32(tmp.LastRsInfoId),
+		LastId:          uint32(tmp.LastRsInfoID),
 	}), nil
 }
 
@@ -441,7 +441,7 @@ func (s *stateServer) GetSpeedmaps(
 		Speedmaps:       tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
 		LastSessionTime: tmp.LastSessionTime,
-		LastId:          uint32(tmp.LastRsInfoId),
+		LastId:          uint32(tmp.LastRsInfoID),
 	}), nil
 }
 

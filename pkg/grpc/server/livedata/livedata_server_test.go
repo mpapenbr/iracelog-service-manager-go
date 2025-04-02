@@ -18,8 +18,16 @@ func Test_tailedCarlaps(t *testing.T) {
 		args args
 		want []*analysisv1.CarLaps
 	}{
-		{name: "empty", args: args{in: []*analysisv1.CarLaps{}, tail: 0}, want: []*analysisv1.CarLaps{}},
-		{name: "last when empty", args: args{in: []*analysisv1.CarLaps{}, tail: 1}, want: []*analysisv1.CarLaps{}},
+		{
+			name: "empty",
+			args: args{in: []*analysisv1.CarLaps{}, tail: 0},
+			want: []*analysisv1.CarLaps{},
+		},
+		{
+			name: "last when empty",
+			args: args{in: []*analysisv1.CarLaps{}, tail: 1},
+			want: []*analysisv1.CarLaps{},
+		},
 		{
 			name: "last on single",
 			args: args{

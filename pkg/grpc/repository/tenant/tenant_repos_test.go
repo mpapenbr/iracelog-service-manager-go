@@ -37,7 +37,7 @@ func createSampleEntry(db *pgxpool.Pool) *model.Tenant {
 }
 
 func TestCreate(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	type args struct {
 		req *tenantv1.CreateTenantRequest
 	}
@@ -88,7 +88,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestLoadById(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	sample := createSampleEntry(pool)
 	type args struct {
 		id uint32
@@ -101,7 +101,7 @@ func TestLoadById(t *testing.T) {
 	}{
 		{
 			name: "existing entry",
-			args: args{id: sample.Id},
+			args: args{id: sample.ID},
 			want: sample,
 		},
 		{
@@ -115,7 +115,7 @@ func TestLoadById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			pool.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
-				got, err := LoadById(ctx, c.Conn(), tt.args.id)
+				got, err := LoadByID(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("LoadEventById() error = %v, wantErr %v", err, tt.wantErr)
 					return err
@@ -130,7 +130,7 @@ func TestLoadById(t *testing.T) {
 }
 
 func TestDeleteById(t *testing.T) {
-	db := testdb.InitTestDb()
+	db := testdb.InitTestDB()
 	sample := createSampleEntry(db)
 
 	type args struct {
@@ -145,7 +145,7 @@ func TestDeleteById(t *testing.T) {
 	}{
 		{
 			name: "delete_existing",
-			args: args{id: sample.Id},
+			args: args{id: sample.ID},
 			want: 1,
 		},
 		{
@@ -158,7 +158,7 @@ func TestDeleteById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
-				got, err := DeleteById(ctx, c.Conn(), tt.args.id)
+				got, err := DeleteByID(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("DeleteById() error = %v, wantErr %v", err, tt.wantErr)
 					return nil
@@ -174,7 +174,7 @@ func TestDeleteById(t *testing.T) {
 
 //nolint:lll // readability
 func TestUpdate(t *testing.T) {
-	db := testdb.InitTestDb()
+	db := testdb.InitTestDB()
 
 	type args struct {
 		apply func(req *tenantv1.UpdateTenantRequest)
@@ -193,8 +193,13 @@ func TestUpdate(t *testing.T) {
 			verify: func(t *testing.T, preUpdate, actual *model.Tenant) bool {
 				t.Helper()
 				assert.Equal(t, "newname", actual.Tenant.Name, "name updated")
-				assert.Equal(t, preUpdate.ApiKey, actual.ApiKey, "apiKey unchanged")
-				assert.Equal(t, preUpdate.Tenant.IsActive, actual.Tenant.IsActive, "isActive unchanged")
+				assert.Equal(t, preUpdate.APIKey, actual.APIKey, "apiKey unchanged")
+				assert.Equal(
+					t,
+					preUpdate.Tenant.IsActive,
+					actual.Tenant.IsActive,
+					"isActive unchanged",
+				)
 				return true
 			},
 		},
@@ -206,8 +211,13 @@ func TestUpdate(t *testing.T) {
 			verify: func(t *testing.T, preUpdate, actual *model.Tenant) bool {
 				t.Helper()
 				assert.Equal(t, preUpdate.Tenant.Name, actual.Tenant.Name, "name unchanged")
-				assert.Equal(t, "newapikey", actual.ApiKey, "apiKey changed")
-				assert.Equal(t, preUpdate.Tenant.IsActive, actual.Tenant.IsActive, "isActive unchanged")
+				assert.Equal(t, "newapikey", actual.APIKey, "apiKey changed")
+				assert.Equal(
+					t,
+					preUpdate.Tenant.IsActive,
+					actual.Tenant.IsActive,
+					"isActive unchanged",
+				)
 				return true
 			},
 		},
@@ -217,12 +227,12 @@ func TestUpdate(t *testing.T) {
 			ctx := context.Background()
 			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
 				sample := createSampleEntry(db)
-				defer DeleteById(ctx, c.Conn(), sample.Id)
+				defer DeleteByID(ctx, c.Conn(), sample.ID)
 				req := &tenantv1.UpdateTenantRequest{
 					IsActive: sample.Tenant.IsActive,
 				}
 				tt.args.apply(req)
-				got, err := Update(ctx, c.Conn(), sample.Id, req)
+				got, err := Update(ctx, c.Conn(), sample.ID, req)
 
 				if (err != nil) != tt.wantErr {
 					t.Errorf("UpdateById() error = %v, wantErr %v", err, tt.wantErr)

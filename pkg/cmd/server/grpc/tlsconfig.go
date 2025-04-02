@@ -22,7 +22,7 @@ type certs struct {
 	mu        sync.RWMutex
 }
 
-func NewTlsConfigProvider(ctx context.Context) *tls.Config {
+func NewTLSConfigProvider(ctx context.Context) *tls.Config {
 	c := &certs{
 		ctx: ctx,
 		log: log.GetFromContext(ctx).Named("grpc.certs"),

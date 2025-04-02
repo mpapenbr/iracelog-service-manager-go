@@ -14,7 +14,7 @@ import (
 )
 
 func TestUpsert(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 
 	// simulate first save
@@ -36,7 +36,7 @@ func TestUpsert(t *testing.T) {
 
 	// verify raceorder contains last values
 
-	pitInfo, err := LoadByEventId(context.Background(), pool, int(event.Id))
+	pitInfo, err := LoadByEventID(context.Background(), pool, int(event.Id))
 	if err != nil {
 		t.Errorf("LoadByEventId() error = %v", err)
 	}
@@ -47,7 +47,7 @@ func TestUpsert(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
 
 	var err error
@@ -58,7 +58,7 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("Create() error = %v", err)
 	}
-	num, err := DeleteByEventId(context.Background(), pool, int(event.Id))
+	num, err := DeleteByEventID(context.Background(), pool, int(event.Id))
 	if err != nil {
 		t.Errorf("DeleteByEventId() error = %v", err)
 	}

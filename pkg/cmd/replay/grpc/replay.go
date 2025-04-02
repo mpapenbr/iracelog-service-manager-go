@@ -58,25 +58,25 @@ func startReplay(eventArg string) error {
 		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
 
-	eventId, err := strconv.Atoi(eventArg)
+	eventID, err := strconv.Atoi(eventArg)
 	if err != nil {
 		return err
 	}
-	grpcReplay, err := newGrpcReplayTask(pool, eventId)
+	grpcReplay, err := newGrpcReplayTask(pool, eventID)
 	if err != nil {
 		return err
 	}
 
 	log.Info("Starting replay")
 	r := util.NewReplayTask(grpcReplay, util.CollectReplayOptions()...)
-	if err := r.Replay(eventId); err != nil {
+	if err := r.Replay(eventID); err != nil {
 		return err
 	}
 
@@ -87,7 +87,7 @@ func startReplay(eventArg string) error {
 type grpcReplayTask struct {
 	util.ReplayDataProvider
 	pool        *pgxpool.Pool
-	eventId     int
+	eventID     int
 	sourceEvent *eventv1.Event
 	sourceTrack *trackv1.Track
 
@@ -97,29 +97,29 @@ type grpcReplayTask struct {
 	driverDataFetcher myFetcher[racestatev1.PublishDriverDataRequest]
 }
 
-func newGrpcReplayTask(pool *pgxpool.Pool, eventId int) (*grpcReplayTask, error) {
+func newGrpcReplayTask(pool *pgxpool.Pool, eventID int) (*grpcReplayTask, error) {
 	var err error
-	ret := &grpcReplayTask{pool: pool, eventId: eventId}
+	ret := &grpcReplayTask{pool: pool, eventID: eventID}
 
-	ret.sourceEvent, err = eventrepo.LoadById(context.Background(), pool, eventId)
+	ret.sourceEvent, err = eventrepo.LoadByID(context.Background(), pool, eventID)
 	if err != nil {
 		return nil, err
 	}
-	ret.sourceTrack, err = trackrepo.LoadById(context.Background(), pool,
+	ret.sourceTrack, err = trackrepo.LoadByID(context.Background(), pool,
 		int(ret.sourceEvent.TrackId))
 	if err != nil {
 		return nil, err
 	}
 
-	ret.driverDataFetcher = initDriverDataFetcher(pool, eventId, time.Time{}, 50)
-	ret.stateFetcher = initStateDataFetcher(pool, eventId, time.Time{}, 100)
-	ret.speedmapFetcher = initSpeedmapDataFetcher(pool, eventId, time.Time{}, 100)
+	ret.driverDataFetcher = initDriverDataFetcher(pool, eventID, time.Time{}, 50)
+	ret.stateFetcher = initStateDataFetcher(pool, eventID, time.Time{}, 100)
+	ret.speedmapFetcher = initSpeedmapDataFetcher(pool, eventID, time.Time{}, 100)
 
 	return ret, nil
 }
 
 //nolint:lll // readablity
-func (r *grpcReplayTask) ProvideEventData(eventId int) *providerv1.RegisterEventRequest {
+func (r *grpcReplayTask) ProvideEventData(eventID int) *providerv1.RegisterEventRequest {
 	recordingMode := func() providerv1.RecordingMode {
 		if util.DoNotPersist {
 			return providerv1.RecordingMode_RECORDING_MODE_DO_NOT_PERSIST
@@ -132,7 +132,9 @@ func (r *grpcReplayTask) ProvideEventData(eventId int) *providerv1.RegisterEvent
 		util.EventKey = uuid.New().String()
 	}
 	r.sourceEvent.Key = util.EventKey
-	r.eventSelector = &commonv1.EventSelector{Arg: &commonv1.EventSelector_Key{Key: r.sourceEvent.Key}}
+	r.eventSelector = &commonv1.EventSelector{
+		Arg: &commonv1.EventSelector_Key{Key: r.sourceEvent.Key},
+	}
 	return &providerv1.RegisterEventRequest{
 		Event:         r.sourceEvent,
 		Track:         r.sourceTrack,

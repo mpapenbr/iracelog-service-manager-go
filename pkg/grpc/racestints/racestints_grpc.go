@@ -19,7 +19,7 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 	parts := make([]*predictv1.Part, 0)
 	// curLap is the lap when the stint computation starts
 	curLap := int32(1)
-	raceStarted := !(c.Race.Lc == 0 && c.Car.StintLap == 0)
+	raceStarted := c.Race.Lc != 0 || c.Car.StintLap != 0
 	if raceStarted {
 		// LC is the number of laps completed
 		// we add +2 because

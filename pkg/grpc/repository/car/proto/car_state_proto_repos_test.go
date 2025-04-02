@@ -14,11 +14,11 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/testsupport/testdb"
 )
 
-func createSampleRsInfo(pool *pgxpool.Pool, eventId int) int {
+func createSampleRsInfo(pool *pgxpool.Pool, eventID int) int {
 	var err error
 	var id int
 	req := base.SamplePublishSateRequest()
-	id, err = racestaterepos.CreateRaceState(context.Background(), pool, eventId, req)
+	id, err = racestaterepos.CreateRaceState(context.Background(), pool, eventID, req)
 	if err != nil {
 		return 0
 	}
@@ -36,25 +36,25 @@ func sampleRequest() *racestatev1.PublishDriverDataRequest {
 }
 
 func TestCreate(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
-	rsInfoId := createSampleRsInfo(pool, int(event.Id))
-	err := Create(context.Background(), pool, rsInfoId, sampleRequest())
+	rsInfoID := createSampleRsInfo(pool, int(event.Id))
+	err := Create(context.Background(), pool, rsInfoID, sampleRequest())
 	if err != nil {
 		t.Errorf("Create() error = %v", err)
 	}
 }
 
 func TestDelete(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	event := base.CreateSampleEvent(pool)
-	rsInfoId := createSampleRsInfo(pool, int(event.Id))
+	rsInfoID := createSampleRsInfo(pool, int(event.Id))
 	var err error
-	err = Create(context.Background(), pool, rsInfoId, sampleRequest())
+	err = Create(context.Background(), pool, rsInfoID, sampleRequest())
 	if err != nil {
 		t.Errorf("Create() error = %v", err)
 	}
-	num, err := DeleteByEventId(context.Background(), pool, int(event.Id))
+	num, err := DeleteByEventID(context.Background(), pool, int(event.Id))
 	if err != nil {
 		t.Errorf("DeleteByEventId() error = %v", err)
 	}

@@ -42,7 +42,7 @@ func ResolveTenant(
 	}
 	switch sel.Arg.(type) {
 	case *commonv1.TenantSelector_ExternalId:
-		data, err = tenant.LoadByExternalId(ctx, conn, sel.GetExternalId().GetId())
+		data, err = tenant.LoadByExternalID(ctx, conn, sel.GetExternalId().GetId())
 	case *commonv1.TenantSelector_Name:
 		data, err = tenant.LoadByName(ctx, conn, sel.GetName())
 	default:

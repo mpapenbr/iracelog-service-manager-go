@@ -26,13 +26,19 @@ func (i *configInjector) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	})
 }
 
-//nolint:lll // better readability
-func (i *configInjector) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+//
+//nolint:lll,whitespace // readablity, editor/linter
+func (i *configInjector) WrapStreamingClient(
+	next connect.StreamingClientFunc,
+) connect.StreamingClientFunc {
 	return next
 }
 
-//nolint:lll,whitespace // better readability
-func (i *configInjector) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+//
+//nolint:lll,whitespace // readablity, editor/linter
+func (i *configInjector) WrapStreamingHandler(
+	next connect.StreamingHandlerFunc,
+) connect.StreamingHandlerFunc {
 	return connect.StreamingHandlerFunc(func(
 		ctx context.Context,
 		conn connect.StreamingHandlerConn,

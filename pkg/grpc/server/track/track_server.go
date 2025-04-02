@@ -72,7 +72,7 @@ func (s *trackServer) GetTrack(
 	ctx context.Context,
 	req *connect.Request[trackv1.GetTrackRequest],
 ) (*connect.Response[trackv1.GetTrackResponse], error) {
-	data, err := track.LoadById(context.Background(), s.pool, int(req.Msg.Id))
+	data, err := track.LoadByID(context.Background(), s.pool, int(req.Msg.Id))
 	if err != nil {
 		return nil, err
 	}

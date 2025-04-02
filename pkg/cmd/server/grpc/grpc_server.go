@@ -141,7 +141,7 @@ func NewServerCmd() *cobra.Command {
 		"enable-nats",
 		false,
 		"use NATS as middleware for live data")
-	cmd.Flags().StringVar(&config.NatsUrl,
+	cmd.Flags().StringVar(&config.NatsURL,
 		"nats-url",
 		"nats://localhost:4222",
 		"url of the NATS server")
@@ -167,14 +167,14 @@ type grpcServer struct {
 func startServer(ctx context.Context) error {
 	srv := grpcServer{
 		ctx:       ctx,
-		tlsConfig: NewTlsConfigProvider(ctx),
+		tlsConfig: NewTLSConfigProvider(ctx),
 	}
 	srv.SetupLogger()
 	srv.waitForRequiredServices()
 	srv.log.Info("Starting iRaclog backend", log.String("version", version.FullVersion))
 	srv.SetupProfiling()
 	srv.SetupTelemetry()
-	srv.SetupDb()
+	srv.SetupDB()
 	srv.SetupCaches()
 	srv.SetupFeatures()
 	srv.SetupConfigInterceptor()
@@ -213,7 +213,7 @@ func (s *grpcServer) SetupLogger() {
 	s.log = log.GetFromContext(s.ctx).Named("grpc")
 }
 
-func (s *grpcServer) SetupDb() {
+func (s *grpcServer) SetupDB() {
 	pgTracer := pgxtrace.CompositeQueryTracer{
 		postgres.NewMyTracer(log.Default().Named("sql"), log.DebugLevel),
 	}
@@ -231,7 +231,7 @@ func (s *grpcServer) SetupDb() {
 		postgres.WithTracer(pgTracer),
 	}
 	s.log.Info("Init database connection")
-	s.pool = postgres.InitWithUrl(
+	s.pool = postgres.InitWithURL(
 		config.DB,
 		pgOptions...,
 	)
@@ -277,7 +277,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	// TODO: rename to cluster?
 	if config.EnableNats {
 		s.log.Debug("Using NATS as middleware for live data")
-		nc, err := nats.Connect(config.NatsUrl)
+		nc, err := nats.Connect(config.NatsURL)
 		if err != nil {
 			s.log.Error("Could not connect to NATS", log.ErrorField(err))
 		}
@@ -390,16 +390,16 @@ func (s *grpcServer) waitForRequiredServices() {
 	}
 
 	wg := sync.WaitGroup{}
-	checkTcp := func(addr string) {
+	checkTCP := func(addr string) {
 		if err = utils.WaitForTCP(addr, timeout); err != nil {
 			s.log.Fatal("required services not ready", log.ErrorField(err))
 		}
 		wg.Done()
 	}
 
-	if postgresAddr := utils.ExtractFromDBUrl(config.DB); postgresAddr != "" {
+	if postgresAddr := utils.ExtractFromDBURL(config.DB); postgresAddr != "" {
 		wg.Add(1)
-		go checkTcp(postgresAddr)
+		go checkTCP(postgresAddr)
 	}
 
 	// TODO: check for NATS if enabled

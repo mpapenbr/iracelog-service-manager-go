@@ -26,7 +26,7 @@ func NewMigrateCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&config.MigrationSourceUrl,
+	cmd.Flags().StringVarP(&config.MigrationSourceURL,
 		"migrationSourceUrl",
 		"m",
 		"file:///migrations",
@@ -57,16 +57,16 @@ func startMigration() error {
 		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
 
-	log.Info("Using migrations files at", log.String("source", config.MigrationSourceUrl))
-	dbUrl := prepareDbUrl(config.DB)
-	log.Info("Using dbUrl", log.String("url", dbUrl))
+	log.Info("Using migrations files at", log.String("source", config.MigrationSourceURL))
+	dbURL := prepareURLForDB(config.DB)
+	log.Info("Using dbUrl", log.String("url", dbURL))
 
-	m, err := migrate.New(config.MigrationSourceUrl, dbUrl)
+	m, err := migrate.New(config.MigrationSourceURL, dbURL)
 	if err != nil {
 		log.Fatal("Could not create migration", log.ErrorField(err))
 	}
@@ -78,7 +78,7 @@ func startMigration() error {
 	return err
 }
 
-func prepareDbUrl(url string) string {
+func prepareURLForDB(url string) string {
 	options := "sslmode=disable"
 	if strings.Contains(url, options) {
 		return url

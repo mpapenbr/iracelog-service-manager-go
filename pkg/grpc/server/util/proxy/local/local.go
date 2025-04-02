@@ -53,17 +53,17 @@ func (l *LocalProxy) PublishEventUnregistered(eventKey string) error {
 	return nil
 }
 
-func (e *LocalProxy) PublishRaceStateData(req *racestatev1.PublishStateRequest) error {
+func (l *LocalProxy) PublishRaceStateData(req *racestatev1.PublishStateRequest) error {
 	return nil
 }
 
 //nolint:lll // readablity
-func (e *LocalProxy) PublishSpeedmapData(req *racestatev1.PublishSpeedmapRequest) error {
+func (l *LocalProxy) PublishSpeedmapData(req *racestatev1.PublishSpeedmapRequest) error {
 	return nil
 }
 
 //nolint:lll // readablity
-func (e *LocalProxy) PublishDriverData(req *racestatev1.PublishDriverDataRequest) error {
+func (l *LocalProxy) PublishDriverData(req *racestatev1.PublishDriverDataRequest) error {
 	return nil
 }
 
