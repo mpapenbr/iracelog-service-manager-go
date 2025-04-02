@@ -12,7 +12,7 @@ import (
 func Upsert(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	extra *racestatev1.ExtraInfo,
 ) error {
 	var err error
@@ -22,20 +22,20 @@ func Upsert(
 	) values ($1,$2)
 	on conflict (event_id) do update set extra_info=$2
 		`,
-		eventId, extra,
+		eventID, extra,
 	)
 
 	return err
 }
 
-func LoadByEventId(
+func LoadByEventID(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (*racestatev1.ExtraInfo, error) {
 	row := conn.QueryRow(ctx, `
 	select extra_info from event_ext where event_id=$1
-	`, eventId)
+	`, eventID)
 
 	extra := racestatev1.ExtraInfo{}
 	if err := row.Scan(&extra); err != nil {
@@ -48,9 +48,9 @@ func LoadByEventId(
 // deletes an entry from the database, returns number of rows deleted.
 //
 //nolint:lll // readability
-func DeleteByEventId(ctx context.Context, conn repository.Querier, eventId int) (int, error) {
+func DeleteByEventID(ctx context.Context, conn repository.Querier, eventID int) (int, error) {
 	cmdTag, err := conn.Exec(ctx,
-		"delete from event_ext where event_id=$1", eventId)
+		"delete from event_ext where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
 	}

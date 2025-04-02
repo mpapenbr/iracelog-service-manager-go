@@ -66,7 +66,7 @@ func (s *analysisServer) GetAnalysis(
 			log.ErrorField(err))
 		return nil, err
 	}
-	analysisData, err = aProto.LoadByEventId(ctx, s.pool, int(e.GetId()))
+	analysisData, err = aProto.LoadByEventID(ctx, s.pool, int(e.GetId()))
 	if err != nil {
 		return nil, err
 	}

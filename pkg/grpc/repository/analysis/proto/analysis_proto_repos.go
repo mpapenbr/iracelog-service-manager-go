@@ -14,7 +14,7 @@ import (
 func Upsert(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	analysis *analysisv1.Analysis,
 ) error {
 	binaryMessage, err := proto.Marshal(analysis)
@@ -27,20 +27,20 @@ func Upsert(
 	) values ($1,$2,$3)
 	on conflict (event_id) do update set record_stamp=$2, protodata=$3
 		`,
-		eventId, time.Now(), binaryMessage,
+		eventID, time.Now(), binaryMessage,
 	)
 
 	return err
 }
 
-func LoadByEventId(
+func LoadByEventID(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (*analysisv1.Analysis, error) {
 	row := conn.QueryRow(ctx, `
 	select protodata from analysis_proto where event_id=$1
-	`, eventId)
+	`, eventID)
 
 	var binaryMessage []byte
 	if err := row.Scan(&binaryMessage); err != nil {
@@ -81,9 +81,9 @@ func LoadByEventKey(
 // deletes an entry from the database, returns number of rows deleted.
 //
 //nolint:lll // readability
-func DeleteByEventId(ctx context.Context, conn repository.Querier, eventId int) (int, error) {
+func DeleteByEventID(ctx context.Context, conn repository.Querier, eventID int) (int, error) {
 	cmdTag, err := conn.Exec(ctx,
-		"delete from analysis_proto where event_id=$1", eventId)
+		"delete from analysis_proto where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
 	}

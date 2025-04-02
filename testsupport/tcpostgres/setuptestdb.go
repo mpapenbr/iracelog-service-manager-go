@@ -18,7 +18,7 @@ import (
 )
 
 // create a pg connection pool for the iracelog testdatabase
-func SetupTestDb() *pgxpool.Pool {
+func SetupTestDB() *pgxpool.Pool {
 	ctx := context.Background()
 	port, err := nat.NewPort("tcp", "5432")
 	if err != nil {
@@ -39,27 +39,27 @@ func SetupTestDb() *pgxpool.Pool {
 	//nolint fmt.Printf("%+v\n", container)
 	containerPort, _ := container.MappedPort(ctx, port)
 	host, _ := container.Host(ctx)
-	dbUrl := fmt.Sprintf("postgresql://postgres:password@%s:%s/postgres",
+	dbURL := fmt.Sprintf("postgresql://postgres:password@%s:%s/postgres",
 		host, containerPort.Port())
 
-	if err = migrate.MigrateDb(dbUrl); err != nil {
+	if err = migrate.MigrateDB(dbURL); err != nil {
 		log.Fatal(err)
 	}
 
-	pool := database.InitWithUrl(dbUrl)
+	pool := database.InitWithURL(dbURL)
 	return pool
 }
 
 // create a pg connection pool for the local iracelog testdatabase
-func SetupExternalTestDb() *pgxpool.Pool {
+func SetupExternalTestDB() *pgxpool.Pool {
 	var err error
 
-	dbUrl := os.Getenv("TESTDB_URL")
-	if err = migrate.MigrateDb(dbUrl); err != nil {
+	dbURL := os.Getenv("TESTDB_URL")
+	if err = migrate.MigrateDB(dbURL); err != nil {
 		log.Fatal(err)
 	}
 
-	pool := database.InitWithUrl(dbUrl)
+	pool := database.InitWithURL(dbURL)
 	return pool
 }
 

@@ -15,7 +15,7 @@ import (
 type persister struct {
 	ctx            context.Context
 	conn           repository.Querier
-	eventId        int
+	eventID        int
 	carLookup      map[uint32]int
 	carClassLookup map[uint32]int
 	entryLookup    map[uint32]int
@@ -24,13 +24,13 @@ type persister struct {
 
 func newPersister(
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	in *racestatev1.PublishDriverDataRequest,
 ) *persister {
 	return &persister{
 		ctx:            context.Background(),
 		conn:           conn,
-		eventId:        eventId,
+		eventID:        eventID,
 		in:             in,
 		carLookup:      make(map[uint32]int),
 		carClassLookup: make(map[uint32]int),
@@ -48,7 +48,7 @@ func (p *persister) persistCarClass() error {
 	) values ($1,$2,$3)
 	returning id
 		`,
-			p.eventId, c.Name, c.Id,
+			p.eventID, c.Name, c.Id,
 		)
 		id := 0
 		if err := row.Scan(&id); err != nil {
@@ -70,7 +70,7 @@ func (p *persister) persistCar() error {
 	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	returning id
 		`,
-			p.eventId, c.Name, c.NameShort, c.CarId,
+			p.eventID, c.Name, c.NameShort, c.CarId,
 			p.carClassLookup[uint32(c.CarClassId)], c.FuelPct, c.PowerAdjust,
 			c.WeightPenalty, c.DryTireSets,
 		)
@@ -87,17 +87,17 @@ func (p *persister) persistCar() error {
 func (p *persister) newCarClasses() []*carv1.CarClass {
 	rows, err := p.conn.Query(p.ctx,
 		`select id,car_class_id from c_car_class where event_id=$1`,
-		p.eventId)
+		p.eventID)
 	if err != nil {
 		return nil
 	}
 
 	for rows.Next() {
-		var id, carClassId uint32
-		if err := rows.Scan(&id, &carClassId); err != nil {
+		var id, carClassID uint32
+		if err := rows.Scan(&id, &carClassID); err != nil {
 			return nil
 		}
-		p.carClassLookup[carClassId] = int(id)
+		p.carClassLookup[carClassID] = int(id)
 	}
 
 	ret := make([]*carv1.CarClass, 0, len(p.in.CarClasses))
@@ -112,17 +112,17 @@ func (p *persister) newCarClasses() []*carv1.CarClass {
 // returns a list of cars that are not yet in the database
 func (p *persister) newCars() []*carv1.CarInfo {
 	rows, err := p.conn.Query(p.ctx, `select id,car_id from c_car where event_id=$1`,
-		p.eventId)
+		p.eventID)
 	if err != nil {
 		return nil
 	}
 
 	for rows.Next() {
-		var id, carId uint32
-		if err := rows.Scan(&id, &carId); err != nil {
+		var id, carID uint32
+		if err := rows.Scan(&id, &carID); err != nil {
 			return nil
 		}
-		p.carLookup[carId] = int(id)
+		p.carLookup[carID] = int(id)
 	}
 
 	ret := make([]*carv1.CarInfo, 0, len(p.in.Cars))
@@ -138,7 +138,7 @@ func (p *persister) newCars() []*carv1.CarInfo {
 func (p *persister) newEntries() []*carv1.CarEntry {
 	rows, err := p.conn.Query(p.ctx,
 		`select id, car_idx from c_car_entry where event_id=$1`,
-		p.eventId)
+		p.eventID)
 	if err != nil {
 		return nil
 	}
@@ -163,21 +163,21 @@ func (p *persister) newEntries() []*carv1.CarEntry {
 // returns a list of cars that are not yet in the database
 //
 //nolint:lll // readability
-func (p *persister) newDrivers(carEntryId int, drivers []*driverv1.Driver) []*driverv1.Driver {
+func (p *persister) newDrivers(carEntryID int, drivers []*driverv1.Driver) []*driverv1.Driver {
 	rows, err := p.conn.Query(p.ctx,
 		`select id, driver_id from c_car_driver where c_car_entry_id=$1`,
-		carEntryId)
+		carEntryID)
 	if err != nil {
 		return nil
 	}
 
 	lookup := map[uint32]int{}
 	for rows.Next() {
-		var id, driverId uint32
-		if err := rows.Scan(&id, &driverId); err != nil {
+		var id, driverID uint32
+		if err := rows.Scan(&id, &driverID); err != nil {
 			return nil
 		}
-		lookup[driverId] = int(id)
+		lookup[driverID] = int(id)
 	}
 
 	ret := make([]*driverv1.Driver, 0, len(drivers))
@@ -202,11 +202,11 @@ func (p *persister) persistEntries() error {
 	) values ($1,$2,$3,$4,$5)
 	returning id
 		`,
-			p.eventId, p.carLookup[c.Car.CarId], c.Car.CarIdx,
+			p.eventID, p.carLookup[c.Car.CarId], c.Car.CarIdx,
 			c.Car.CarNumber, c.Car.CarNumberRaw,
 		)
-		entryId := 0
-		err = row.Scan(&entryId)
+		entryID := 0
+		err = row.Scan(&entryID)
 		if err != nil {
 			return err
 		}
@@ -216,12 +216,12 @@ func (p *persister) persistEntries() error {
 		c_car_entry_id,team_id,name
 	) values ($1,$2,$3)
 		`,
-			entryId, c.Team.Id, c.Team.Name,
+			entryID, c.Team.Id, c.Team.Name,
 		)
 		if err != nil {
 			return err
 		}
-		p.entryLookup[c.Car.CarIdx] = entryId
+		p.entryLookup[c.Car.CarIdx] = entryID
 	}
 	// we need to check drivers for each entry
 	for i := range p.in.Entries {
@@ -251,10 +251,10 @@ func (p *persister) persistEntries() error {
 func Create(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	driverstate *racestatev1.PublishDriverDataRequest,
 ) error {
-	p := newPersister(conn, eventId, driverstate)
+	p := newPersister(conn, eventID, driverstate)
 	if err := p.persistCarClass(); err != nil {
 		return err
 	}
@@ -267,10 +267,10 @@ func Create(
 	return nil
 }
 
-func LoadByEventId(
+func LoadByEventID(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (*racestatev1.PublishDriverDataRequest, error) {
 	return nil, nil
 }
@@ -278,33 +278,33 @@ func LoadByEventId(
 // deletes an entry from the database, returns number of rows deleted.
 
 //nolint:lll // readability
-func DeleteByEventId(ctx context.Context, conn repository.Querier, eventId int) (int, error) {
+func DeleteByEventID(ctx context.Context, conn repository.Querier, eventID int) (int, error) {
 	var err error
 	var cmdTag pgconn.CommandTag
 	_, err = conn.Exec(ctx, `
 	delete from c_car_team where c_car_entry_id
 	  in (select id from c_car_entry where event_id=$1)
-	`, eventId)
+	`, eventID)
 	if err != nil {
 		return 0, err
 	}
 	_, err = conn.Exec(ctx, `
 	delete from c_car_driver where c_car_entry_id
 	  in (select id from c_car_entry where event_id=$1)
-	`, eventId)
+	`, eventID)
 	if err != nil {
 		return 0, err
 	}
-	cmdTag, err = conn.Exec(ctx, "delete from c_car_entry where event_id=$1", eventId)
+	cmdTag, err = conn.Exec(ctx, "delete from c_car_entry where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = conn.Exec(ctx, "delete from c_car where event_id=$1", eventId)
+	_, err = conn.Exec(ctx, "delete from c_car where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
 	}
-	_, err = conn.Exec(ctx, "delete from c_car_class where event_id=$1", eventId)
+	_, err = conn.Exec(ctx, "delete from c_car_class where event_id=$1", eventID)
 	if err != nil {
 		return 0, err
 	}

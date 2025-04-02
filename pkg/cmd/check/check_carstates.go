@@ -41,25 +41,25 @@ func checkCarStates(ctx context.Context, eventArg string) {
 		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	eventId, _ := strconv.Atoi(eventArg)
+	eventID, _ := strconv.Atoi(eventArg)
 
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	sourceEvent, err := eventrepo.LoadById(ctx, pool, eventId)
+	sourceEvent, err := eventrepo.LoadByID(ctx, pool, eventID)
 	if err != nil {
 		log.Error("event not found", log.ErrorField(err))
 		return
 	}
 	log.Debug("event found", log.String("event", sourceEvent.Key))
-	showCombined(pool, eventId)
+	showCombined(pool, eventID)
 }
 
 //nolint:funlen // by design
-func showCombined(pool *pgxpool.Pool, eventId int) {
+func showCombined(pool *pgxpool.Pool, eventID int) {
 	rows, err := pool.Query(context.Background(), `
 select cp.protodata, rsp.protodata, ri.record_stamp,ri.session_time,ri.id
 from car_state_proto cp
@@ -69,7 +69,7 @@ where
 ri.event_id=$1
 order by ri.id asc limit $2
 		`,
-		eventId, 300,
+		eventID, 300,
 	)
 	if err != nil {
 		log.Error("error fetching car states", log.ErrorField(err))
@@ -82,8 +82,8 @@ order by ri.id asc limit $2
 
 		var recordStamp time.Time
 		var sessionTime float64
-		var rsId int
-		err = rows.Scan(&csProtodata, &rsProtodata, &recordStamp, &sessionTime, &rsId)
+		var rsID int
+		err = rows.Scan(&csProtodata, &rsProtodata, &recordStamp, &sessionTime, &rsID)
 		if err != nil {
 			log.Error("error scanning car states", log.ErrorField(err))
 			return
@@ -101,9 +101,9 @@ order by ri.id asc limit $2
 		log.Info("race state", log.Float64("sessionTime", sessionTime),
 			log.Uint32("sessionNum (ds)", driverstate.SessionNum),
 			log.Uint32("sessionNum (rs)", racestate.Session.SessionNum),
-			log.Int("rsId", rsId),
+			log.Int("rsId", rsID),
 		)
 		fmt.Printf("ds: %d rs: %d rsId: %d\n",
-			driverstate.SessionNum, racestate.Session.SessionNum, rsId)
+			driverstate.SessionNum, racestate.Session.SessionNum, rsID)
 	}
 }

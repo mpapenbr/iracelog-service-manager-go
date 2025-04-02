@@ -38,7 +38,7 @@ func Create(ctx context.Context, conn repository.Querier, track *trackv1.Track) 
 	return nil
 }
 
-func LoadById(ctx context.Context, conn repository.Querier, id int) (
+func LoadByID(ctx context.Context, conn repository.Querier, id int) (
 	*trackv1.Track, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where id=$1", selector), id)
@@ -72,7 +72,7 @@ func EnsureTrack(
 	conn repository.Querier,
 	track *trackv1.Track,
 ) error {
-	_, err := LoadById(ctx, conn, int(track.Id))
+	_, err := LoadByID(ctx, conn, int(track.Id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Create(ctx, conn, track)
 	}
@@ -101,7 +101,7 @@ func UpdatePitInfo(
 }
 
 // deletes an entry from the database, returns number of rows deleted.
-func DeleteById(ctx context.Context, conn repository.Querier, id int) (int, error) {
+func DeleteByID(ctx context.Context, conn repository.Querier, id int) (int, error) {
 	cmdTag, err := conn.Exec(ctx, "delete from track where id=$1", id)
 	if err != nil {
 		return 0, err

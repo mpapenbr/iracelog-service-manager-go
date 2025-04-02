@@ -137,7 +137,7 @@ func (s *providerServer) RegisterEvent(
 		return nil, err
 	}
 	// read track from db to include pit stop info if already there
-	dbTrack, err := trackrepos.LoadById(ctx, s.pool, int(req.Msg.Event.TrackId))
+	dbTrack, err := trackrepos.LoadByID(ctx, s.pool, int(req.Msg.Event.TrackId))
 	if err != nil {
 		s.log.Error("error loading track", log.ErrorField(err))
 		dbTrack = req.Msg.Track

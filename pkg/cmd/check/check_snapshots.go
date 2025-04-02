@@ -45,15 +45,15 @@ func checkSnapshot(eventArg string) {
 		log.Warn("Invalid duration value. Setting default 60s", log.ErrorField(err))
 		timeout = 60 * time.Second
 	}
-	eventId, _ := strconv.Atoi(eventArg)
+	eventID, _ := strconv.Atoi(eventArg)
 	ctx := context.Background()
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	data, _ := proto.LoadSnapshots(ctx, pool, eventId, 300)
+	data, _ := proto.LoadSnapshots(ctx, pool, eventID, 300)
 	log.Info("got snapshots: ", log.Int("count", len(data)))
 	for i, d := range data {
 		log.Info("snapshot", log.Int("idx", i), log.String("data", d.String()))

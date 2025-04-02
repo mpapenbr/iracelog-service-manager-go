@@ -24,7 +24,7 @@ type CarProcessor struct {
 
 type CarProcessorOption func(cp *CarProcessor)
 
-const OUT_THRESHOLD = 60.0
+const OutThreshold = 60.0
 
 func WithRaceSessions(raceSessions []uint32) CarProcessorOption {
 	return func(cp *CarProcessor) {
@@ -292,7 +292,7 @@ func (p *CarProcessor) handleComputeStateRun(
 	case racestatev1.CarState_CAR_STATE_OUT:
 		if carComputeState.OutEncountered == 0.0 {
 			carComputeState.OutEncountered = sessionTime
-		} else if sessionTime-carComputeState.OutEncountered > OUT_THRESHOLD {
+		} else if sessionTime-carComputeState.OutEncountered > OutThreshold {
 			// stint ended
 			stint.History = append(stint.History, stint.Current)
 			// reset current stint
@@ -356,7 +356,7 @@ func (p *CarProcessor) handleComputeStatePit(
 	case racestatev1.CarState_CAR_STATE_OUT:
 		if carComputeState.OutEncountered == 0.0 {
 			carComputeState.OutEncountered = sessionTime
-		} else if sessionTime-carComputeState.OutEncountered > OUT_THRESHOLD {
+		} else if sessionTime-carComputeState.OutEncountered > OutThreshold {
 			carComputeState.CarState = racestatev1.CarState_CAR_STATE_OUT
 		}
 	case racestatev1.CarState_CAR_STATE_PIT:

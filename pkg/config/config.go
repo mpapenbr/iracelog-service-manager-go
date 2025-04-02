@@ -11,7 +11,7 @@ var (
 	LogLevel             string // sets the log level (zap log level values)
 	LogFormat            string // text vs json
 	LogConfig            string // path to log config file
-	MigrationSourceUrl   string // location of migration files
+	MigrationSourceURL   string // location of migration files
 	EnableTelemetry      bool   // enable telemetry
 	TelemetryEndpoint    string // endpoint for telemetry
 	ProfilingPort        int    // port for profiling
@@ -26,7 +26,7 @@ var (
 	AdminToken           string // token for admin access
 	StaleDuration        string // duration after which an event is considered stale
 	MaxConcurrentStreams int    // max number of concurrent streams per connection
-	NatsUrl              string // nats server url
+	NatsURL              string // nats server url
 	EnableNats           bool   // enable nats
 )
 

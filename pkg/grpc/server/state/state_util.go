@@ -24,7 +24,7 @@ type (
 		conn         repository.Querier
 		req          statesRequest
 		remain       int
-		lastRsInfoId int
+		lastRsInfoID int
 	}
 )
 

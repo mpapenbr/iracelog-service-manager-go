@@ -18,7 +18,7 @@ import (
 )
 
 type ReplayDataProvider interface {
-	ProvideEventData(eventId int) *providerv1.RegisterEventRequest
+	ProvideEventData(eventID int) *providerv1.RegisterEventRequest
 	NextDriverData() *racestatev1.PublishDriverDataRequest
 	NextStateData() *racestatev1.PublishStateRequest
 	NextSpeedmapData() *racestatev1.PublishSpeedmapRequest
@@ -102,7 +102,7 @@ func (p *peekSpeedmapData) publish() error {
 	return nil
 }
 
-func (r *ReplayTask) Replay(eventId int) error {
+func (r *ReplayTask) Replay(eventID int) error {
 	r.providerService = providerv1connect.NewProviderServiceClient(
 		http.DefaultClient, Addr, connect.WithGRPC())
 	r.raceStateService = racestatev1connect.NewRaceStateServiceClient(
@@ -115,7 +115,7 @@ func (r *ReplayTask) Replay(eventId int) error {
 	r.driverDataChan = make(chan *racestatev1.PublishDriverDataRequest)
 
 	var err error
-	registerReq := r.dataProvider.ProvideEventData(eventId)
+	registerReq := r.dataProvider.ProvideEventData(eventID)
 
 	if r.event, err = r.registerEvent(registerReq); err != nil {
 		return err
@@ -167,7 +167,7 @@ func (r *ReplayTask) sendData() {
 			log.Debug("exhausted", log.String("provider", string(p.provider())))
 		}
 	}
-	lastTs := time.Time{}
+	lastTS := time.Time{}
 
 	var selector providerType
 	var current peek
@@ -175,30 +175,30 @@ func (r *ReplayTask) sendData() {
 		var delta time.Duration
 		var currentIdx int
 		// create a max time from  (don't use time.Unix(1<<63-1), that's not what we want)
-		nextTs := time.Unix(0, 0).Add(1<<63 - 1)
+		nextTS := time.Unix(0, 0).Add(1<<63 - 1)
 
 		for i, p := range pData {
-			if p.ts().Before(nextTs) {
-				nextTs = p.ts()
+			if p.ts().Before(nextTS) {
+				nextTS = p.ts()
 				selector = p.provider()
 				current = pData[i]
 				currentIdx = i
 			}
 		}
-		r.computeFastForwardStop(nextTs)
+		r.computeFastForwardStop(nextTS)
 
-		if !lastTs.IsZero() {
-			wait := r.calcWaitTime(nextTs, lastTs)
+		if !lastTS.IsZero() {
+			wait := r.calcWaitTime(nextTS, lastTS)
 			if wait > 0 {
 				log.Debug("Sleeping",
-					log.Time("time", nextTs),
+					log.Time("time", nextTS),
 					log.Duration("delta", delta),
 					log.Duration("wait", wait),
 				)
 				time.Sleep(wait)
 			}
 		}
-		lastTs = nextTs
+		lastTS = nextTS
 
 		if err := current.publish(); err != nil {
 			log.Error("Error publishing data", log.ErrorField(err))
@@ -222,11 +222,11 @@ func (r *ReplayTask) computeFastForwardStop(cur time.Time) {
 	}
 }
 
-func (r *ReplayTask) calcWaitTime(nextTs, lastTs time.Time) time.Duration {
-	delta := nextTs.Sub(lastTs)
+func (r *ReplayTask) calcWaitTime(nextTS, lastTS time.Time) time.Duration {
+	delta := nextTS.Sub(lastTS)
 
 	// handle fast forward
-	if nextTs.Before(r.ffStopTime) {
+	if nextTS.Before(r.ffStopTime) {
 		return 0
 	}
 	if Speed > 0 {

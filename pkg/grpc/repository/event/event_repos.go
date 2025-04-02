@@ -25,7 +25,7 @@ func Create(
 	ctx context.Context,
 	conn repository.Querier,
 	event *eventv1.Event,
-	tenantId uint32,
+	tenantID uint32,
 ) error {
 	replayInfo := func() *eventv1.ReplayInfo {
 		if event.ReplayInfo == nil {
@@ -51,7 +51,7 @@ func Create(
 		event.PitSpeed, replayInfo().MinTimestamp.AsTime(), replayInfo().MinSessionTime,
 		replayInfo().MaxSessionTime,
 		event.Sessions,
-		tenantId,
+		tenantID,
 	)
 	if err := row.Scan(&event.Id); err != nil {
 		return err
@@ -59,7 +59,7 @@ func Create(
 	return nil
 }
 
-func LoadById(ctx context.Context, conn repository.Querier, id int) (
+func LoadByID(ctx context.Context, conn repository.Querier, id int) (
 	*eventv1.Event, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where id=$1", selector), id)
@@ -74,12 +74,12 @@ func LoadByKey(ctx context.Context, conn repository.Querier, key string) (
 	return readData(row)
 }
 
-func LoadAll(ctx context.Context, conn repository.Querier, tenantId *uint32) (
+func LoadAll(ctx context.Context, conn repository.Querier, tenantID *uint32) (
 	[]*eventv1.Event, error,
 ) {
 	row, err := conn.Query(ctx,
 		fmt.Sprintf("%s where tenant_id=coalesce($1,tenant_id) order by event_time desc",
-			selector), tenantId)
+			selector), tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func UpdateReplayInfo(
 }
 
 // deletes an entry from the database, returns number of rows deleted.
-func DeleteById(ctx context.Context, conn repository.Querier, id int) (int, error) {
+func DeleteByID(ctx context.Context, conn repository.Querier, id int) (int, error) {
 	cmdTag, err := conn.Exec(ctx, "delete from event where id=$1", id)
 	if err != nil {
 		return 0, err

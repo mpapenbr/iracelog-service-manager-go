@@ -15,6 +15,6 @@ import (
 func NewTenantCache(pool *pgxpool.Pool) utilsCache.Cache[string, model.Tenant] {
 	return loadercache.New(loadercache.WithLoader(
 		func(key string) (*model.Tenant, error) {
-			return tenant.LoadByApiKey(context.Background(), pool, key)
+			return tenant.LoadByAPIKey(context.Background(), pool, key)
 		}))
 }

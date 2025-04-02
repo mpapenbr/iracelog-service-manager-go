@@ -63,7 +63,7 @@ var sampleEvent = &eventv1.Event{
 	Sessions:      []*eventv1.Session{{Num: 1, Name: "RACE"}},
 	NumCarClasses: 3,
 }
-var tenantId uint32
+var tenantID uint32
 
 func createSampleEntry(db *pgxpool.Pool) *eventv1.Event {
 	ctx := context.Background()
@@ -79,9 +79,9 @@ func createSampleEntry(db *pgxpool.Pool) *eventv1.Event {
 		}); err != nil {
 			return err
 		} else {
-			tenantId = tenant.Id
+			tenantID = tenant.ID
 		}
-		err := Create(ctx, tx, sampleEvent, tenantId)
+		err := Create(ctx, tx, sampleEvent, tenantID)
 		return err
 	})
 	if err != nil {
@@ -92,7 +92,7 @@ func createSampleEntry(db *pgxpool.Pool) *eventv1.Event {
 }
 
 func TestCreate(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	type args struct {
 		event *eventv1.Event
 	}
@@ -129,7 +129,7 @@ func TestCreate(t *testing.T) {
 	for _, tt := range tests {
 		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
-			err := Create(ctx, pool, tt.args.event, tenantId)
+			err := Create(ctx, pool, tt.args.event, tenantID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create error = %v, wantErr %v",
 					err, tt.wantErr)
@@ -139,7 +139,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestLoadById(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	sample := createSampleEntry(pool)
 	type args struct {
 		id int
@@ -166,7 +166,7 @@ func TestLoadById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			pool.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
-				got, err := LoadById(ctx, c.Conn(), tt.args.id)
+				got, err := LoadByID(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("LoadEventById() error = %v, wantErr %v", err, tt.wantErr)
 					return err
@@ -181,7 +181,7 @@ func TestLoadById(t *testing.T) {
 }
 
 func TestLoadByKey(t *testing.T) {
-	pool := testdb.InitTestDb()
+	pool := testdb.InitTestDB()
 	sample := createSampleEntry(pool)
 	type args struct {
 		key string
@@ -223,7 +223,7 @@ func TestLoadByKey(t *testing.T) {
 }
 
 func TestUpdateEvent(t *testing.T) {
-	db := testdb.InitTestDb()
+	db := testdb.InitTestDB()
 	sample := createSampleEntry(db)
 
 	type args struct {
@@ -310,7 +310,7 @@ func TestUpdateEvent(t *testing.T) {
 					t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
 					return nil
 				}
-				updated, _ := LoadById(ctx, c.Conn(), tt.args.id)
+				updated, _ := LoadByID(ctx, c.Conn(), tt.args.id)
 				checkChangedValues(t, updated, tt.args)
 				return nil
 			})
@@ -319,7 +319,7 @@ func TestUpdateEvent(t *testing.T) {
 }
 
 func TestDeleteById(t *testing.T) {
-	db := testdb.InitTestDb()
+	db := testdb.InitTestDB()
 	sample := createSampleEntry(db)
 
 	type args struct {
@@ -347,7 +347,7 @@ func TestDeleteById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			db.AcquireFunc(ctx, func(c *pgxpool.Conn) error {
-				got, err := DeleteById(ctx, c.Conn(), tt.args.id)
+				got, err := DeleteByID(ctx, c.Conn(), tt.args.id)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("DeleteById() error = %v, wantErr %v", err, tt.wantErr)
 					return nil

@@ -99,7 +99,7 @@ func (s *TenantAuth) Roles() []Role {
 	return s.roles
 }
 
-func (s *TenantAuth) GetId() uint32 {
+func (s *TenantAuth) GetID() uint32 {
 	return s.id
 }
 
@@ -127,13 +127,19 @@ func (i *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	})
 }
 
-//nolint:lll // better readability
-func (i *authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+//
+//nolint:whitespace // editor/linter issue
+func (i *authInterceptor) WrapStreamingClient(
+	next connect.StreamingClientFunc,
+) connect.StreamingClientFunc {
 	return next
 }
 
+//
 //nolint:lll,whitespace // better readability
-func (i *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+func (i *authInterceptor) WrapStreamingHandler(
+	next connect.StreamingHandlerFunc,
+) connect.StreamingHandlerFunc {
 	return connect.StreamingHandlerFunc(func(
 		ctx context.Context,
 		conn connect.StreamingHandlerConn,
@@ -188,13 +194,13 @@ func (a *apiKeyAuthenticator) Authenticate(
 		}, nil
 	}
 
-	if t, err := a.tenantCache.Get(ctx, utils.HashApiKey(h.Get(tokenHeader))); err == nil &&
+	if t, err := a.tenantCache.Get(ctx, utils.HashAPIKey(h.Get(tokenHeader))); err == nil &&
 		t.Tenant.IsActive {
 
 		return &TenantAuth{
 			principal: &SimplePrincipal{name: t.Tenant.Name},
 			roles:     []Role{RoleRaceDataProvider},
-			id:        t.Id,
+			id:        t.ID,
 		}, nil
 	} else {
 		return nil, err

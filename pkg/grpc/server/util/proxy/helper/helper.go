@@ -7,8 +7,10 @@ import (
 
 // creates a new LiveDriverDataResponse from a PublishDriverDataRequest
 //
-//nolint:lll // editor probs + readability
-func ComposeLiveDriverDataResponse(a *racestatev1.PublishDriverDataRequest) *livedatav1.LiveDriverDataResponse {
+//nolint:whitespace // readablity, editor/linter
+func ComposeLiveDriverDataResponse(
+	a *racestatev1.PublishDriverDataRequest,
+) *livedatav1.LiveDriverDataResponse {
 	return &livedatav1.LiveDriverDataResponse{
 		Timestamp:      a.Timestamp,
 		Entries:        a.Entries,

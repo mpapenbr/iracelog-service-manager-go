@@ -43,11 +43,11 @@ func copySessionNums(ctx context.Context) {
 		timeout = 60 * time.Second
 	}
 
-	postgresAddr := utils.ExtractFromDBUrl(config.DB)
+	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))
 	}
-	pool := postgres.InitWithUrl(config.DB)
+	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
 
 	if events, err := eventrepo.LoadAll(ctx, pool, nil); err == nil {
@@ -60,7 +60,7 @@ func copySessionNums(ctx context.Context) {
 }
 
 //nolint:funlen // long function
-func doMigrateRaceStateSessionNums(pool *pgxpool.Pool, eventId uint32) {
+func doMigrateRaceStateSessionNums(pool *pgxpool.Pool, eventID uint32) {
 	// we update only by race_state_proto data
 	// car_state_proto entries prior to race session are mostly associcated
 	// to one dummy entry
@@ -77,7 +77,7 @@ where
 ri.event_id=$1
 order by ri.id asc
 	`,
-			eventId,
+			eventID,
 		)
 		if err != nil {
 			log.Error("error fetching car states", log.ErrorField(err))
@@ -90,8 +90,8 @@ order by ri.id asc
 
 			var recordStamp time.Time
 			var sessionTime float64
-			var rsId int
-			err = rows.Scan(&rsProtodata, &recordStamp, &sessionTime, &rsId)
+			var rsID int
+			err = rows.Scan(&rsProtodata, &recordStamp, &sessionTime, &rsID)
 			if err != nil {
 				log.Error("error scanning car states", log.ErrorField(err))
 				return err
@@ -104,19 +104,19 @@ order by ri.id asc
 			}
 			log.Debug("race state", log.Float64("sessionTime", sessionTime),
 				log.Uint32("sessionNum (rs)", racestate.Session.SessionNum),
-				log.Int("rsId", rsId),
+				log.Int("rsId", rsID),
 			)
 
 			if cmdTag, err := pool.Exec(context.Background(),
 				`update rs_info set session_num=$1 where id=$2`,
-				racestate.Session.SessionNum, rsId); err != nil {
+				racestate.Session.SessionNum, rsID); err != nil {
 				log.Error("error updating car state", log.ErrorField(err))
 			} else {
 				updated += cmdTag.RowsAffected()
 			}
 		}
 		log.Info("updated car states",
-			log.Uint32("eventId", eventId),
+			log.Uint32("eventId", eventID),
 			log.Int64("updated", updated))
 		return nil
 	})

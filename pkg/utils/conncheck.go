@@ -32,7 +32,7 @@ func WaitForTCP(addr string, timeout time.Duration) error {
 	return fmt.Errorf("%s could not be reached after %v", addr, timeout)
 }
 
-func WaitForHttpResponse(url string, timeout time.Duration) error {
+func WaitForHTTPResponse(url string, timeout time.Duration) error {
 	timeoutReached := time.Now().Add(timeout)
 	start := time.Now()
 	log.Debug("wait for http request",
@@ -55,7 +55,7 @@ func WaitForHttpResponse(url string, timeout time.Duration) error {
 	return fmt.Errorf("%s could not be reached after %v", url, timeout)
 }
 
-func ExtractFromWebsocketUrl(url string) (addr, proto string) {
+func ExtractFromWebsocketURL(url string) (addr, proto string) {
 	param := resolveRegex(
 		"^(?P<proto>ws|wss)://(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
 	if len(param) == 0 {
@@ -71,7 +71,7 @@ func ExtractFromWebsocketUrl(url string) (addr, proto string) {
 	}
 }
 
-func ExtractFromDBUrl(url string) string {
+func ExtractFromDBURL(url string) string {
 	param := resolveRegex(
 		"^postgresql://(.*@)(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
 	if len(param) == 0 {

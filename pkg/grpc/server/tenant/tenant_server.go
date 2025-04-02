@@ -109,7 +109,7 @@ func (s *tenantServer) CreateTenant(
 
 	var err error
 	var ret *model.Tenant
-	req.Msg.ApiKey = utils.HashApiKey(req.Msg.ApiKey)
+	req.Msg.ApiKey = utils.HashAPIKey(req.Msg.ApiKey)
 	ret, err = tenant.Create(ctx, s.pool, req.Msg)
 	if err != nil {
 		return nil, err
@@ -138,14 +138,14 @@ func (s *tenantServer) UpdateTenant(
 		return nil, err
 	}
 	if req.Msg.ApiKey != "" {
-		req.Msg.ApiKey = utils.HashApiKey(req.Msg.ApiKey)
+		req.Msg.ApiKey = utils.HashAPIKey(req.Msg.ApiKey)
 	}
-	ret, err = tenant.Update(ctx, s.pool, t.Id, req.Msg)
+	ret, err = tenant.Update(ctx, s.pool, t.ID, req.Msg)
 	if err != nil {
 		return nil, err
 	}
 	if s.cache != nil {
-		s.cache.Invalidate(ctx, ret.ApiKey)
+		s.cache.Invalidate(ctx, ret.APIKey)
 	}
 	return connect.NewResponse(&tenantv1.UpdateTenantResponse{
 		Tenant: ret.Tenant,
@@ -169,7 +169,7 @@ func (s *tenantServer) DeleteTenant(
 		return nil, err
 	}
 	var deleted int
-	deleted, err = tenant.DeleteById(ctx, s.pool, data.Id)
+	deleted, err = tenant.DeleteByID(ctx, s.pool, data.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *tenantServer) DeleteTenant(
 		return nil, connect.NewError(connect.CodeNotFound, ErrTenantNotFound)
 	}
 	if s.cache != nil {
-		s.cache.Invalidate(ctx, data.ApiKey)
+		s.cache.Invalidate(ctx, data.APIKey)
 	}
 	return connect.NewResponse(&tenantv1.DeleteTenantResponse{}), nil
 }

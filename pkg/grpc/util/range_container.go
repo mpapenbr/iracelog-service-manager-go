@@ -8,5 +8,5 @@ type RangeContainer[E any] struct {
 	Data            []*E
 	LastTimestamp   time.Time
 	LastSessionTime float32
-	LastRsInfoId    int
+	LastRsInfoID    int
 }

@@ -21,7 +21,10 @@ type (
 	pitPartOption   func(p *predictv1.PitPart)
 )
 
-func CreateStintPart(start, duration time.Duration, partStint *predictv1.Part_Stint) *predictv1.Part {
+func CreateStintPart(
+	start, duration time.Duration,
+	partStint *predictv1.Part_Stint,
+) *predictv1.Part {
 	return &predictv1.Part{
 		Start:    durationpb.New(start),
 		End:      durationpb.New(start + duration),
@@ -55,7 +58,10 @@ func createPartPit() *predictv1.Part_Pit {
 	return &predictv1.Part_Pit{Pit: &predictv1.PitPart{}}
 }
 
-func CopyPredictParam(p *predictv1.PredictParam, opts ...predictParamOption) *predictv1.PredictParam {
+func CopyPredictParam(
+	p *predictv1.PredictParam,
+	opts ...predictParamOption,
+) *predictv1.PredictParam {
 	ret := proto.Clone(p).(*predictv1.PredictParam)
 	for _, opt := range opts {
 		opt(ret)

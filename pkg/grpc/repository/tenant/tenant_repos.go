@@ -30,14 +30,14 @@ func Create(
 		`,
 		tenant.Name, tenant.ApiKey, tenant.IsActive,
 	)
-	var tenantId uint32
-	if err := row.Scan(&tenantId); err != nil {
+	var tenantID uint32
+	if err := row.Scan(&tenantID); err != nil {
 		return nil, err
 	}
-	return LoadById(ctx, conn, tenantId)
+	return LoadByID(ctx, conn, tenantID)
 }
 
-func LoadById(ctx context.Context, conn repository.Querier, id uint32) (
+func LoadByID(ctx context.Context, conn repository.Querier, id uint32) (
 	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where t.id=$1", selector), id)
@@ -45,16 +45,16 @@ func LoadById(ctx context.Context, conn repository.Querier, id uint32) (
 	return readData(row)
 }
 
-func LoadByExternalId(ctx context.Context, conn repository.Querier, externalId string) (
+func LoadByExternalID(ctx context.Context, conn repository.Querier, externalID string) (
 	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx,
-		fmt.Sprintf("%s where t.external_id=$1", selector), externalId)
+		fmt.Sprintf("%s where t.external_id=$1", selector), externalID)
 
 	return readData(row)
 }
 
-func LoadByApiKey(ctx context.Context, conn repository.Querier, apiKey string) (
+func LoadByAPIKey(ctx context.Context, conn repository.Querier, apiKey string) (
 	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx, fmt.Sprintf("%s where t.api_key=$1", selector), apiKey)
@@ -70,12 +70,12 @@ func LoadByName(ctx context.Context, conn repository.Querier, name string) (
 	return readData(row)
 }
 
-func LoadByEventId(ctx context.Context, conn repository.Querier, eventId int) (
+func LoadByEventID(ctx context.Context, conn repository.Querier, eventID int) (
 	*model.Tenant, error,
 ) {
 	row := conn.QueryRow(ctx,
 		fmt.Sprintf("%s where t.id=(select tenant_id from event where id=$1)", selector),
-		eventId)
+		eventID)
 	return readData(row)
 }
 
@@ -109,7 +109,7 @@ func LoadBySelector(
 
 	switch sel.Arg.(type) {
 	case *commonv1.TenantSelector_ExternalId:
-		data, err = LoadByExternalId(ctx, conn, sel.GetExternalId().GetId())
+		data, err = LoadByExternalID(ctx, conn, sel.GetExternalId().GetId())
 	case *commonv1.TenantSelector_Name:
 		data, err = LoadByName(ctx, conn, sel.GetName())
 	default:
@@ -143,11 +143,11 @@ func Update(
 	if cmdTag.RowsAffected() == 0 {
 		return nil, pgx.ErrNoRows
 	}
-	return LoadById(ctx, conn, id)
+	return LoadByID(ctx, conn, id)
 }
 
 // deletes an entry from the database, returns number of rows deleted.
-func DeleteById(ctx context.Context, conn repository.Querier, id uint32) (int, error) {
+func DeleteByID(ctx context.Context, conn repository.Querier, id uint32) (int, error) {
 	cmdTag, err := conn.Exec(ctx, "delete from tenant where id=$1", id)
 	if err != nil {
 		return 0, err
@@ -158,17 +158,17 @@ func DeleteById(ctx context.Context, conn repository.Querier, id uint32) (int, e
 func readData(row pgx.Row) (*model.Tenant, error) {
 	var item model.Tenant
 	var t tenantv1.Tenant
-	var extId string
+	var extID string
 	if err := row.Scan(
-		&item.Id,
-		&extId,
+		&item.ID,
+		&extID,
 		&t.Name,
-		&item.ApiKey,
+		&item.APIKey,
 		&t.IsActive,
 	); err != nil {
 		return nil, err
 	}
-	t.ExternalId = &commonv1.UUID{Id: extId}
+	t.ExternalId = &commonv1.UUID{Id: extID}
 	item.Tenant = &t
 	return &item, nil
 }

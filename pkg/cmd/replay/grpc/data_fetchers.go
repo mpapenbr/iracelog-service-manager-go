@@ -14,36 +14,52 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 )
 
-//nolint:lll // readablity
-func initDriverDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishDriverDataRequest] {
+//
+//nolint:lll,whitespace // readablity, editor/linter
+func initDriverDataFetcher(
+	pool *pgxpool.Pool,
+	eventID int,
+	lastTS time.Time,
+	limit int,
+) myFetcher[racestatev1.PublishDriverDataRequest] {
 	df := &commonFetcher[racestatev1.PublishDriverDataRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
-			return csRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
+			return csRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
 		},
 	}
 
 	return df
 }
 
-//nolint:lll // readablity
-func initStateDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishStateRequest] {
+//nolint:lll,whitespace // readablity, editor/linter
+func initStateDataFetcher(
+	pool *pgxpool.Pool,
+	eventID int,
+	lastTS time.Time,
+	limit int,
+) myFetcher[racestatev1.PublishStateRequest] {
 	df := &commonFetcher[racestatev1.PublishStateRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
-			return rsRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
+			return rsRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
 		},
 	}
 
 	return df
 }
 
-//nolint:lll // readablity
-func initSpeedmapDataFetcher(pool *pgxpool.Pool, eventId int, lastTS time.Time, limit int) myFetcher[racestatev1.PublishSpeedmapRequest] {
+//nolint:lll,whitespace // readablity, editor/linter
+func initSpeedmapDataFetcher(
+	pool *pgxpool.Pool,
+	eventID int,
+	lastTS time.Time,
+	limit int,
+) myFetcher[racestatev1.PublishSpeedmapRequest] {
 	df := &commonFetcher[racestatev1.PublishSpeedmapRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
-			return smRepo.LoadRange(context.Background(), pool, eventId, startTs, limit)
+			return smRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
 		},
 	}
 

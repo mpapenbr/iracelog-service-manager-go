@@ -19,7 +19,7 @@ import (
 func Create(
 	ctx context.Context,
 	conn repository.Querier,
-	rsInfoId int,
+	rsInfoID int,
 	speedmap *racestatev1.PublishSpeedmapRequest,
 ) error {
 	binaryMessage, err := proto.Marshal(speedmap)
@@ -32,7 +32,7 @@ func Create(
 	) values ($1,$2)
 	returning id
 		`,
-		rsInfoId, binaryMessage,
+		rsInfoID, binaryMessage,
 	)
 	id := 0
 	if err := row.Scan(&id); err != nil {
@@ -44,7 +44,7 @@ func Create(
 func LoadLatest(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (*racestatev1.PublishSpeedmapRequest, error) {
 	row := conn.QueryRow(ctx, `
 select p.protodata from speedmap_proto p
@@ -52,7 +52,7 @@ join rs_info ri on ri.id=p.rs_info_id
 where ri.event_id=$1
 order by ri.id desc limit 1
 		`,
-		eventId,
+		eventID,
 	)
 	var binaryMessage []byte
 	if err := row.Scan(&binaryMessage); err != nil {
@@ -72,7 +72,7 @@ order by ri.id desc limit 1
 func LoadRange(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	startTS time.Time,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
@@ -85,7 +85,7 @@ func LoadRange(
 		and ri.record_stamp >= $2
 		order by ri.id asc limit $3
 		`,
-			eventId, startTS, limit,
+			eventID, startTS, limit,
 		)
 	}
 	return loadRange(provider, limit)
@@ -95,7 +95,7 @@ func LoadRange(
 func LoadRangeBySessionTime(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionNum uint32,
 	sessionTime float64,
 	limit int,
@@ -110,7 +110,7 @@ and ri.session_num = $2
 and ri.session_time >= $3
 order by ri.id asc limit $4
 		`,
-			eventId, sessionNum, sessionTime, limit,
+			eventID, sessionNum, sessionTime, limit,
 		)
 	}
 	return loadRange(provider, limit)
@@ -118,11 +118,11 @@ order by ri.id asc limit $4
 
 // loads a range of entities starting at rsInfoId
 // sessionNum is ignored
-func LoadRangeById(
+func LoadRangeByID(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
-	rsInfoId int,
+	eventID int,
+	rsInfoID int,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
@@ -134,19 +134,19 @@ ri.event_id=$1
 and ri.id >= $2
 order by ri.id asc limit $3
 		`,
-			eventId, rsInfoId, limit,
+			eventID, rsInfoID, limit,
 		)
 	}
 	return loadRange(provider, limit)
 }
 
 // loads a range of entities starting at rsInfoId within a session
-func LoadRangeByIdWithinSession(
+func LoadRangeByIDWithinSession(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	sessionNum uint32,
-	rsInfoId int,
+	rsInfoID int,
 	limit int,
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	provider := func() (rows pgx.Rows, err error) {
@@ -159,7 +159,7 @@ and ri.session_num = $2
 and ri.id >= $3
 order by ri.id asc limit $4
 		`,
-			eventId, sessionNum, rsInfoId, limit,
+			eventID, sessionNum, rsInfoID, limit,
 		)
 	}
 	return loadRange(provider, limit)
@@ -186,7 +186,7 @@ func loadRange(
 		if err := row.Scan(&binaryMessage,
 			&ret.LastTimestamp,
 			&ret.LastSessionTime,
-			&ret.LastRsInfoId); err != nil {
+			&ret.LastRsInfoID); err != nil {
 			return nil, err
 		}
 		speedmap := &racestatev1.PublishSpeedmapRequest{}
@@ -203,14 +203,14 @@ func loadRange(
 func LoadSnapshots(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 	intervalSecs int,
 ) ([]*analysisv1.SnapshotData, error) {
-	rsId, startTs, err := findStartingPoint(ctx, conn, eventId)
+	rsID, startTS, err := findStartingPoint(ctx, conn, eventID)
 	if err != nil {
 		return nil, err
 	}
-	if startTs == nil {
+	if startTS == nil {
 		return []*analysisv1.SnapshotData{}, nil
 	}
 
@@ -230,7 +230,7 @@ WHERE rs.id IN (SELECT y.firstId
                 ORDER BY y.firstId)
 order by rs.record_stamp
 
-	`, eventId, fmt.Sprintf("'%d seconds'", intervalSecs), startTs.UnixMilli(), rsId)
+	`, eventID, fmt.Sprintf("'%d seconds'", intervalSecs), startTS.UnixMilli(), rsID)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ order by rs.record_stamp
 func findStartingPoint(
 	ctx context.Context,
 	conn repository.Querier,
-	eventId int,
+	eventID int,
 ) (int, *time.Time, error) {
 	row, err := conn.Query(ctx, `
 select rs.id, rs.record_stamp, sp.protodata
@@ -271,7 +271,7 @@ from rs_info rs join speedmap_proto sp on sp.rs_info_id=rs.id
 where rs.event_id=$1
 order by rs.record_stamp asc
 
-	`, eventId)
+	`, eventID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -304,9 +304,12 @@ order by rs.record_stamp asc
 // deletes an entry from the database, returns number of rows deleted.
 //
 //nolint:lll // readability
-func DeleteByEventId(ctx context.Context, conn repository.Querier, eventId int) (int, error) {
-	cmdTag, err := conn.Exec(ctx,
-		"delete from speedmap_proto where rs_info_id in (select id from rs_info where event_id=$1)", eventId)
+func DeleteByEventID(ctx context.Context, conn repository.Querier, eventID int) (int, error) {
+	cmdTag, err := conn.Exec(
+		ctx,
+		"delete from speedmap_proto where rs_info_id in (select id from rs_info where event_id=$1)",
+		eventID,
+	)
 	if err != nil {
 		return 0, err
 	}

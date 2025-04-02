@@ -83,7 +83,7 @@ type EventProcessingData struct {
 	LastAnalysisData    *analysisv1.Analysis
 	LastReplayInfo      *eventv1.ReplayInfo
 	RecordingMode       providerev1.RecordingMode
-	LastRsInfoId        int                        // holds the last rs_info_id for storing state data
+	LastRsInfoID        int                        // holds the last rs_info_id for storing state data
 	LastDataEvent       time.Time                  // holds the time of the last incoming data event
 	SnapshotData        []*analysisv1.SnapshotData // holds the snapshot data for current event
 	RaceSessions        []uint32                   // holds the ids of race sessions
@@ -144,16 +144,24 @@ func (e *EventLookup) AddEvent(
 			),
 		),
 
-		AnalysisBroadcast:   broadcast.NewBroadcastServer(event.Key, "analysis", analysisSource),
-		RacestateBroadcast:  broadcast.NewBroadcastServer(event.Key, "racestate", racestateSource),
-		DriverDataBroadcast: broadcast.NewBroadcastServer(event.Key, "driverdata", driverDataSource),
-		SpeedmapBroadcast:   broadcast.NewBroadcastServer(event.Key, "speedmap", speedmapSource),
-		ReplayInfoBroadcast: broadcast.NewBroadcastServer(event.Key, "replayInfo", replayInfoSource),
-		SnapshotBroadcast:   broadcast.NewBroadcastServer(event.Key, "snapshot", snapshotSource),
-		Mutex:               sync.Mutex{},
-		LastDataEvent:       time.Now(),
-		SnapshotData:        make([]*analysisv1.SnapshotData, 0),
-		RaceSessions:        raceSessions,
+		AnalysisBroadcast:  broadcast.NewBroadcastServer(event.Key, "analysis", analysisSource),
+		RacestateBroadcast: broadcast.NewBroadcastServer(event.Key, "racestate", racestateSource),
+		DriverDataBroadcast: broadcast.NewBroadcastServer(
+			event.Key,
+			"driverdata",
+			driverDataSource,
+		),
+		SpeedmapBroadcast: broadcast.NewBroadcastServer(event.Key, "speedmap", speedmapSource),
+		ReplayInfoBroadcast: broadcast.NewBroadcastServer(
+			event.Key,
+			"replayInfo",
+			replayInfoSource,
+		),
+		SnapshotBroadcast: broadcast.NewBroadcastServer(event.Key, "snapshot", snapshotSource),
+		Mutex:             sync.Mutex{},
+		LastDataEvent:     time.Now(),
+		SnapshotData:      make([]*analysisv1.SnapshotData, 0),
+		RaceSessions:      raceSessions,
 	}
 	epd.setupOwnListeners()
 	e.lookup[event.Key] = epd
