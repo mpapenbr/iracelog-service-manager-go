@@ -6,11 +6,11 @@ require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250220144045-1ae052574bdc.1
 	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.6-20250220144045-1ae052574bdc.1
 	connectrpc.com/connect v1.18.1
-	connectrpc.com/grpchealth v1.3.0
+	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/otelconnect v0.7.2
 	github.com/docker/go-connections v0.5.0
 	github.com/exaring/otelpgx v0.9.0
-	github.com/golang-migrate/migrate/v4 v4.18.2
+	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
@@ -24,7 +24,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
-	github.com/testcontainers/testcontainers-go v0.36.0
+	github.com/testcontainers/testcontainers-go v0.37.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.60.0
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.35.0
@@ -132,7 +132,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx-gofrs-uuid v0.0.0-20230224015001-1d428863c2e2
-	github.com/magiconair/properties v1.8.9 // indirect
+	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
