@@ -9,17 +9,17 @@ require (
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/otelconnect v0.7.2
 	github.com/docker/go-connections v0.5.0
-	github.com/exaring/otelpgx v0.9.0
+	github.com/exaring/otelpgx v0.9.1
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
-	github.com/nats-io/nats.go v1.41.2
-	github.com/ohler55/ojg v1.26.3
-	github.com/open-policy-agent/opa v1.3.0
+	github.com/nats-io/nats.go v1.42.0
+	github.com/ohler55/ojg v1.26.4
+	github.com/open-policy-agent/opa v1.4.2
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
-	github.com/samber/lo v1.49.1
+	github.com/samber/lo v1.50.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
@@ -121,7 +121,7 @@ require (
 	golang.org/x/sync v0.13.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
-	google.golang.org/grpc v1.71.0 // indirect
+	google.golang.org/grpc v1.71.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
