@@ -28,13 +28,13 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version-file: "./go.mod"
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
           # Must be specified without patch version: we always use the latest patch version.
-          version: v2.0
+          version: v2.1
 
           # Optional: golangci-lint command line arguments.
           # args: --issues-exit-code=0
