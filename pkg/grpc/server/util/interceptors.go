@@ -12,8 +12,8 @@ type configInjector struct {
 	config *config.Config
 }
 
-func NewAppContextInterceptor(config *config.Config) connect.Interceptor {
-	return &configInjector{config: config}
+func NewAppContextInterceptor(cfg *config.Config) connect.Interceptor {
+	return &configInjector{config: cfg}
 }
 
 //nolint:whitespace // better readability
