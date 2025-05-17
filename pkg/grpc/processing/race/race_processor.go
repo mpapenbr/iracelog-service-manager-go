@@ -132,15 +132,20 @@ func (p *RaceProcessor) processOverallRaceGraph(
 	}
 	for i := range payload.Cars {
 		carMsgEntry := payload.Cars[i]
-		gapInfo := &analysisv1.GapInfo{
-			CarNum: p.carProcessor.NumByIdx[uint32(carMsgEntry.CarIdx)],
-			LapNo:  carMsgEntry.Lc,
-			Pos:    carMsgEntry.Pos,
-			Gap:    carMsgEntry.Gap,
-			Pic:    carMsgEntry.Pic,
+		// do not consider non-racing cars in race graph
+		if !slices.Contains([]racestatev1.CarState{
+			racestatev1.CarState_CAR_STATE_INIT,
+			racestatev1.CarState_CAR_STATE_OUT,
+		}, carMsgEntry.State) {
+			gapInfo := &analysisv1.GapInfo{
+				CarNum: p.carProcessor.NumByIdx[uint32(carMsgEntry.CarIdx)],
+				LapNo:  carMsgEntry.Lc,
+				Pos:    carMsgEntry.Pos,
+				Gap:    carMsgEntry.Gap,
+				Pic:    carMsgEntry.Pic,
+			}
+			raceGraphLapEntry.Gaps = append(raceGraphLapEntry.Gaps, gapInfo)
 		}
-
-		raceGraphLapEntry.Gaps = append(raceGraphLapEntry.Gaps, gapInfo)
 	}
 	slices.SortStableFunc(raceGraphLapEntry.Gaps, func(a, b *analysisv1.GapInfo) int {
 		return int(a.Pos - b.Pos)
@@ -184,15 +189,21 @@ func (p *RaceProcessor) processClassRaceGraph(
 	}
 	for i := range carClassEntries {
 		carMsgEntry := carClassEntries[i]
-		gapInfo := &analysisv1.GapInfo{
-			CarNum: p.carProcessor.NumByIdx[uint32(carMsgEntry.CarIdx)],
-			LapNo:  carMsgEntry.Lc,
-			Pos:    carMsgEntry.Pos,
-			Gap:    carMsgEntry.Gap - carClassEntries[leaderEntry].Gap,
-			Pic:    carMsgEntry.Pic,
-		}
+		// do not consider non-racing cars in race graph
+		if !slices.Contains([]racestatev1.CarState{
+			racestatev1.CarState_CAR_STATE_INIT,
+			racestatev1.CarState_CAR_STATE_OUT,
+		}, carMsgEntry.State) {
+			gapInfo := &analysisv1.GapInfo{
+				CarNum: p.carProcessor.NumByIdx[uint32(carMsgEntry.CarIdx)],
+				LapNo:  carMsgEntry.Lc,
+				Pos:    carMsgEntry.Pos,
+				Gap:    carMsgEntry.Gap - carClassEntries[leaderEntry].Gap,
+				Pic:    carMsgEntry.Pic,
+			}
 
-		raceGraphLapEntry.Gaps = append(raceGraphLapEntry.Gaps, gapInfo)
+			raceGraphLapEntry.Gaps = append(raceGraphLapEntry.Gaps, gapInfo)
+		}
 	}
 	slices.SortStableFunc(raceGraphLapEntry.Gaps, func(a, b *analysisv1.GapInfo) int {
 		return int(a.Pos - b.Pos)
