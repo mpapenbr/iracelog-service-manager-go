@@ -9,13 +9,13 @@ require (
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/otelconnect v0.7.2
 	github.com/docker/go-connections v0.5.0
-	github.com/exaring/otelpgx v0.9.1
+	github.com/exaring/otelpgx v0.9.3
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/nats-io/nats.go v1.42.0
-	github.com/ohler55/ojg v1.26.4
+	github.com/ohler55/ojg v1.26.5
 	github.com/open-policy-agent/opa v1.4.2
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
