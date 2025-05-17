@@ -64,7 +64,6 @@ type (
 		auth Authentication
 	}
 	SimpleAuth struct {
-		Authentication
 		principal Principal
 		roles     []Role
 	}
@@ -102,6 +101,12 @@ func (s *TenantAuth) Roles() []Role {
 func (s *TenantAuth) GetID() uint32 {
 	return s.id
 }
+
+// compile time check if everything implements the interface
+var (
+	_ Authentication       = (*SimpleAuth)(nil)
+	_ TenantAuthentication = (*TenantAuth)(nil)
+)
 
 var anon = &SimpleAuth{principal: &SimplePrincipal{name: "anon"}, roles: []Role{}}
 
