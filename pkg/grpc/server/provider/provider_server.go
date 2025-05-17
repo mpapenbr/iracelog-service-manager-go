@@ -128,8 +128,8 @@ func (s *providerServer) RegisterEvent(
 				return err
 			}
 			if ta, ok := a.(auth.TenantAuthentication); ok {
-				s.log.Debug("tenant id", log.Uint32("id", ta.GetId()))
-				return eventrepos.Create(ctx, tx, req.Msg.Event, ta.GetId())
+				s.log.Debug("tenant id", log.Uint32("id", ta.GetID()))
+				return eventrepos.Create(ctx, tx, req.Msg.Event, ta.GetID())
 			}
 			return fmt.Errorf("no tenant id found in auth")
 		}); err != nil {
