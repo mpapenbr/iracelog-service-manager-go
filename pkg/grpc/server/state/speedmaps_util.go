@@ -23,7 +23,7 @@ type (
 func createSpeedmapContainer(
 	ctx context.Context,
 	conn repository.Querier,
-	req statesRequest,
+	req StatesRequest,
 ) (ret *speedmapContainer, err error) {
 	var sc *statesContainer
 	sc, err = createStatesContainer(ctx, conn, req)

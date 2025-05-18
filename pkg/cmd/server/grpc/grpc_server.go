@@ -431,10 +431,9 @@ func (s *grpcServer) registerAnalysisServer() {
 		analysis.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := analysisv1connect.NewAnalysisServiceHandler(
 		analysisService,
-		connect.WithInterceptors(s.otel,
-			auth.NewAuthInterceptor(auth.WithAuthToken(config.AdminToken)),
-		),
+		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
 	)
+
 	s.mux.Handle(path, handler)
 }
 

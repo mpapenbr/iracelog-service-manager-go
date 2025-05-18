@@ -13,7 +13,7 @@ import (
 )
 
 type (
-	statesRequest interface {
+	StatesRequest interface {
 		GetEvent() *commonv1.EventSelector
 		GetStart() *commonv1.StartSelector
 		GetNum() int32
@@ -22,7 +22,7 @@ type (
 		e            *eventv1.Event
 		ctx          context.Context
 		conn         repository.Querier
-		req          statesRequest
+		req          StatesRequest
 		remain       int
 		lastRsInfoID int
 	}
@@ -32,7 +32,7 @@ type (
 func createStatesContainer(
 	ctx context.Context,
 	conn repository.Querier,
-	req statesRequest,
+	req StatesRequest,
 ) (ret *statesContainer, err error) {
 	ret = &statesContainer{
 		ctx:    ctx,
