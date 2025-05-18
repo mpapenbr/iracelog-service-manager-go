@@ -20,10 +20,10 @@ type (
 )
 
 //nolint:whitespace // editor/linter issue
-func createRacestatesContainer(
+func CreateRacestatesContainer(
 	ctx context.Context,
 	conn repository.Querier,
-	req statesRequest,
+	req StatesRequest,
 ) (ret *racestatesContainer, err error) {
 	var sc *statesContainer
 	sc, err = createStatesContainer(ctx, conn, req)

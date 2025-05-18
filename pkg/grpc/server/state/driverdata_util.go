@@ -20,10 +20,10 @@ type (
 )
 
 //nolint:whitespace // editor/linter issue
-func createDriverDataContainer(
+func CreateDriverDataContainer(
 	ctx context.Context,
 	conn repository.Querier,
-	req statesRequest,
+	req StatesRequest,
 ) (ret *driverDataContainer, err error) {
 	var sc *statesContainer
 	sc, err = createStatesContainer(ctx, conn, req)

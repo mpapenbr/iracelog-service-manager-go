@@ -312,7 +312,7 @@ func (s *stateServer) GetDriverData(
 ) {
 	var sc *driverDataContainer
 	var err error
-	if sc, err = createDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
@@ -337,7 +337,7 @@ func (s *stateServer) GetDriverDataStream(
 	stream *connect.ServerStream[racestatev1.GetDriverDataStreamResponse],
 ) (err error) {
 	var sc *driverDataContainer
-	if sc, err = createDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
@@ -370,7 +370,7 @@ func (s *stateServer) GetStates(
 ) {
 	var sc *racestatesContainer
 	var err error
-	if sc, err = createRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
@@ -395,7 +395,7 @@ func (s *stateServer) GetStateStream(
 	stream *connect.ServerStream[racestatev1.GetStateStreamResponse],
 ) (err error) {
 	var sc *racestatesContainer
-	if sc, err = createRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishStateRequest]

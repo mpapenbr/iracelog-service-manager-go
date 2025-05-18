@@ -14,6 +14,8 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
 )
 
+// Processors is responsible for for processing incoming publish-messages.
+// It knows which components to call and which channels to publish to.
 type Processor struct {
 	carProcessor     *car.CarProcessor
 	raceProcessor    *race.RaceProcessor
@@ -73,7 +75,7 @@ func (p *Processor) ProcessState(payload *racestatev1.PublishStateRequest) {
 	p.carProcessor.ProcessStatePayload(payload)
 	p.raceProcessor.ProcessStatePayload(payload)
 	if p.analysisChan != nil {
-		p.analysisChan <- p.composeAnalysisData()
+		p.analysisChan <- p.ComposeAnalysisData()
 	}
 	if p.racestateChan != nil {
 		p.racestateChan <- payload
@@ -91,7 +93,7 @@ func (p *Processor) ProcessCarData(payload *racestatev1.PublishDriverDataRequest
 		p.driverDataChan <- payload
 	}
 	if p.analysisChan != nil {
-		p.analysisChan <- p.composeAnalysisData()
+		p.analysisChan <- p.ComposeAnalysisData()
 	}
 }
 
@@ -128,7 +130,7 @@ func (p *Processor) composeReplayInfo() *eventv1.ReplayInfo {
 	return ret.(*eventv1.ReplayInfo)
 }
 
-func (p *Processor) composeAnalysisData() *analysisv1.Analysis {
+func (p *Processor) ComposeAnalysisData() *analysisv1.Analysis {
 	raceOrder := p.raceProcessor.RaceOrder // to keep names shorter
 
 	classes := sortedMapKeys(p.raceProcessor.RaceGraph)
