@@ -62,6 +62,10 @@ var sampleEvent = &eventv1.Event{
 	},
 	Sessions:      []*eventv1.Session{{Num: 1, Name: "RACE"}},
 	NumCarClasses: 3,
+	TireInfos: []*eventv1.TireInfo{
+		{Index: 0, CompoundType: "Hard"},
+		{Index: 1, CompoundType: "Wet"},
+	},
 }
 var tenantID uint32
 
@@ -106,6 +110,28 @@ func TestCreate(t *testing.T) {
 			args: args{event: &eventv1.Event{
 				Name:              "other",
 				Key:               "otherEventKey",
+				Description:       "testdescription",
+				EventTime:         &timestamppb.Timestamp{Seconds: 1000},
+				RaceloggerVersion: "0.1.0",
+				TeamRacing:        true,
+				MultiClass:        true,
+				NumCarTypes:       2,
+				IrSessionId:       1,
+				TrackId:           1,
+				PitSpeed:          60,
+				Sessions:          []*eventv1.Session{{Num: 1, Name: "RACE"}},
+				NumCarClasses:     3,
+				TireInfos: []*eventv1.TireInfo{
+					{Index: 0, CompoundType: "Hard"},
+					{Index: 1, CompoundType: "Wet"},
+				},
+			}},
+		},
+		{
+			name: "new entry without tireInfos",
+			args: args{event: &eventv1.Event{
+				Name:              "other",
+				Key:               "otherEventKeyWithoutTireInfos",
 				Description:       "testdescription",
 				EventTime:         &timestamppb.Timestamp{Seconds: 1000},
 				RaceloggerVersion: "0.1.0",
