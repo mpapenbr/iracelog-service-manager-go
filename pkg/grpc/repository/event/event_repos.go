@@ -19,7 +19,7 @@ var selector = `select id, event_key, name, description, event_time,
 	racelogger_version,	team_racing, multi_class, num_car_types, num_car_classes,
 	ir_session_id, ir_sub_session_id, track_id, pit_speed,
 	replay_min_timestamp, replay_min_session_time, replay_max_session_time,
-	sessions from event`
+	sessions, tire_infos from event`
 
 func Create(
 	ctx context.Context,
@@ -34,15 +34,16 @@ func Create(
 			return event.ReplayInfo
 		}
 	}
+
 	row := conn.QueryRow(ctx, `
 	insert into event (
 		event_key, name, description, event_time, racelogger_version,
 		team_racing, multi_class, num_car_types, num_car_classes,ir_session_id,
 		ir_sub_session_id, track_id, pit_speed,
 		replay_min_timestamp, replay_min_session_time, replay_max_session_time,
-		sessions,
+		sessions, tire_infos,
 		tenant_id
-	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+	) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 	returning id
 		`,
 		event.Key, event.Name, event.Description, event.EventTime.AsTime(),
@@ -51,6 +52,7 @@ func Create(
 		event.PitSpeed, replayInfo().MinTimestamp.AsTime(), replayInfo().MinSessionTime,
 		replayInfo().MaxSessionTime,
 		event.Sessions,
+		event.TireInfos,
 		tenantID,
 	)
 	if err := row.Scan(&event.Id); err != nil {
@@ -184,6 +186,7 @@ func DeleteByID(ctx context.Context, conn repository.Querier, id int) (int, erro
 
 func readData(row pgx.Row) (*eventv1.Event, error) {
 	var sessions []eventv1.Session
+	var tireInfos []eventv1.TireInfo
 	var replayInfo eventv1.ReplayInfo
 	var item eventv1.Event
 	var eventTime time.Time
@@ -194,7 +197,7 @@ func readData(row pgx.Row) (*eventv1.Event, error) {
 		&item.TeamRacing, &item.MultiClass, &item.NumCarTypes, &item.NumCarClasses,
 		&item.IrSessionId, &item.IrSubSessionId, &item.TrackId, &item.PitSpeed,
 		&replayMinTimestamp, &replayInfo.MinSessionTime, &replayInfo.MaxSessionTime,
-		&sessions,
+		&sessions, &tireInfos,
 	); err != nil {
 		return nil, err
 	}
@@ -205,6 +208,10 @@ func readData(row pgx.Row) (*eventv1.Event, error) {
 	item.Sessions = make([]*eventv1.Session, len(sessions))
 	for i := range sessions {
 		item.Sessions[i] = &sessions[i]
+	}
+	item.TireInfos = make([]*eventv1.TireInfo, len(tireInfos))
+	for i := range tireInfos {
+		item.TireInfos[i] = &tireInfos[i]
 	}
 
 	return &item, nil

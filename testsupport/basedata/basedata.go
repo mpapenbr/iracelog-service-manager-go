@@ -67,6 +67,10 @@ func SampleEvent() *eventv1.Event {
 		PitSpeed:          60,
 		Sessions:          []*eventv1.Session{{Num: 1, Name: "RACE"}},
 		NumCarClasses:     3,
+		TireInfos: []*eventv1.TireInfo{
+			{Index: 0, CompoundType: "Hard"},
+			{Index: 1, CompoundType: "Wet"},
+		},
 	}
 }
 
