@@ -23,6 +23,7 @@ import (
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
+	"connectrpc.com/grpcreflect"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -304,6 +305,7 @@ func (s *grpcServer) SetupGrpcServices() {
 	s.registerPredictServer()
 	s.registerTenantServer()
 	s.registerHealthServer()
+	s.registerReflectionServer()
 }
 
 //nolint:funlen // by design
@@ -412,6 +414,20 @@ func (s *grpcServer) waitForRequiredServices() {
 func (s *grpcServer) registerHealthServer() {
 	checker := grpchealth.NewStaticChecker()
 	s.mux.Handle(grpchealth.NewHandler(checker))
+}
+
+func (s *grpcServer) registerReflectionServer() {
+	checker := grpcreflect.NewStaticReflector(
+		analysisv1connect.AnalysisServiceName,
+		eventv1connect.EventServiceName,
+		livedatav1connect.LiveDataServiceName,
+		predictv1connect.PredictServiceName,
+		providerv1connect.ProviderServiceName,
+		racestatev1connect.RaceStateServiceName,
+		trackv1connect.TrackServiceName,
+		tenantv1connect.TenantServiceName)
+	s.mux.Handle(grpcreflect.NewHandlerV1(checker))
+	s.mux.Handle(grpcreflect.NewHandlerV1Alpha(checker))
 }
 
 func (s *grpcServer) registerEventServer() {
