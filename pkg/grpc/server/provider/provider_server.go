@@ -248,11 +248,14 @@ func (s *providerServer) VersionCheck(
 	ctx context.Context,
 	req *connect.Request[providerv1.VersionCheckRequest],
 ) (*connect.Response[providerv1.VersionCheckResponse], error) {
+	a := auth.FromContext(&ctx)
+
 	return connect.NewResponse(&providerv1.VersionCheckResponse{
 		ProvidedRaceloggerVersion:  req.Msg.RaceloggerVersion,
 		SupportedRaceloggerVersion: util.RequiredClientVersion,
 		ServerVersion:              version.Version,
 		RaceloggerCompatible:       util.CheckRaceloggerVersion(req.Msg.RaceloggerVersion),
+		ValidCredentials:           s.pe.HasPermission(a, permission.PermissionPostRacedata),
 	}), nil
 }
 
