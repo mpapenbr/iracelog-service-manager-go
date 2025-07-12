@@ -15,3 +15,4 @@ zap:
     durationEncoder: "string"
 loggers:
   sql: info
+  permission.opa: info
