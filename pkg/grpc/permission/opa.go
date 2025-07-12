@@ -26,6 +26,9 @@ type EvalRequest struct {
 	ObjectOwner string      `json:"objectOwner,omitempty"`
 }
 
+// check interface compliance
+var _ PermissionEvaluator = (*OpaPermissionEvaluator)(nil)
+
 //go:embed policy.rego
 var policy []byte
 
@@ -52,17 +55,12 @@ func NewOpaPermissionEvaluator() (*OpaPermissionEvaluator, error) {
 	}
 }
 
-func (x *OpaPermissionEvaluator) HasRole(a auth.Authentication, role auth.Role) bool {
-	x.l.Info("HasRole", log.String("role", string(role)))
-	return false
-}
-
 //nolint:whitespace // editor/linter issue
-func (x *OpaPermissionEvaluator) HasPermission(
+func (ope *OpaPermissionEvaluator) HasPermission(
 	a auth.Authentication,
 	perm Permission,
 ) bool {
-	x.l.Debug("HasPermission",
+	ope.l.Debug("HasPermission",
 		log.String("name", a.Principal().Name()),
 		log.Any("roles", a.Roles()),
 		log.String("perm", string(perm)))
@@ -71,22 +69,22 @@ func (x *OpaPermissionEvaluator) HasPermission(
 		Roles:  a.Roles(),
 		Action: perm,
 	}
-	if rs, err := x.query.Eval(context.Background(), rego.EvalInput(req)); err != nil {
-		log.Default().Error("HasPermission", log.ErrorField(err))
+	if rs, err := ope.query.Eval(context.Background(), rego.EvalInput(req)); err != nil {
+		ope.l.Error("HasPermission", log.ErrorField(err))
 		return false
 	} else {
-		log.Default().Debug("res", log.Any("res", rs))
+		ope.l.Debug("res", log.Any("res", rs))
 		return rs.Allowed()
 	}
 }
 
 //nolint:whitespace // editor/linter issue
-func (x *OpaPermissionEvaluator) HasObjectPermission(
+func (ope *OpaPermissionEvaluator) HasObjectPermission(
 	a auth.Authentication,
 	perm Permission,
 	objectOwner string,
 ) bool {
-	x.l.Debug("HasObjectPermission",
+	ope.l.Debug("HasObjectPermission",
 		log.String("name", a.Principal().Name()),
 		log.Any("roles", a.Roles()),
 		log.String("perm", string(perm)),
@@ -97,11 +95,11 @@ func (x *OpaPermissionEvaluator) HasObjectPermission(
 		Action:      perm,
 		ObjectOwner: objectOwner,
 	}
-	if rs, err := x.query.Eval(context.Background(), rego.EvalInput(req)); err != nil {
-		x.l.Error("HasObjectPermission", log.ErrorField(err))
+	if rs, err := ope.query.Eval(context.Background(), rego.EvalInput(req)); err != nil {
+		ope.l.Error("HasObjectPermission", log.ErrorField(err))
 		return false
 	} else {
-		x.l.Debug("res", log.Any("res", rs))
+		ope.l.Debug("res", log.Any("res", rs))
 		return rs.Allowed()
 	}
 }

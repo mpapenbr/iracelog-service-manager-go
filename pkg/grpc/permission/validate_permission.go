@@ -34,8 +34,6 @@ const (
 )
 
 type PermissionEvaluator interface {
-	// deprecated
-	HasRole(auth auth.Authentication, role auth.Role) bool
 	HasPermission(auth auth.Authentication, perm Permission) bool
 	HasObjectPermission(auth auth.Authentication, perm Permission, objectOwner string) bool
 }
