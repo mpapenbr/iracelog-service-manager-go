@@ -16,3 +16,5 @@ zap:
 loggers:
   sql: info
   permission.opa: info
+  bcst: info
+  # bcst.racestate: debug
