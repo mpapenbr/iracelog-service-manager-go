@@ -33,12 +33,12 @@ jobs:
         run: git fetch --prune --unshallow
 
       - name: Download grpc health check artifacts (amd64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: grpc-amd64
           path: ext/healthcheck
       - name: Download grpc health check artifacts (arm64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: grpc-arm64
           path: ext/healthcheck
