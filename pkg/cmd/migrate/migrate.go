@@ -3,7 +3,6 @@ package migrate
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -35,22 +34,7 @@ func NewMigrateCmd() *cobra.Command {
 	return cmd
 }
 
-func parseLogLevel(l string, defaultVal log.Level) log.Level {
-	level, err := log.ParseLevel(l)
-	if err != nil {
-		return defaultVal
-	}
-	return level
-}
-
 func startMigration() error {
-	logger := log.DevLogger(
-		os.Stderr,
-		parseLogLevel(config.LogLevel, log.DebugLevel),
-		log.WithCaller(true),
-		log.AddCallerSkip(1))
-	log.ResetDefault(logger)
-
 	// wait for database
 	timeout, err := time.ParseDuration(config.WaitForServices)
 	if err != nil {

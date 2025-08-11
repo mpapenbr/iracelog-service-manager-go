@@ -8,13 +8,15 @@ import (
 
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
+	"github.com/stephenafamo/bob"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -49,7 +51,9 @@ func checkCarStates(ctx context.Context, eventArg string) {
 	}
 	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	sourceEvent, err := eventrepo.LoadByID(ctx, pool, eventID)
+	db := bob.NewDB(stdlib.OpenDBFromPool(pool))
+	eRepo := eventrepo.NewEventRepository(db)
+	sourceEvent, err := eRepo.LoadByID(ctx, eventID)
 	if err != nil {
 		log.Error("event not found", log.ErrorField(err))
 		return

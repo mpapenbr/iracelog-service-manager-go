@@ -12,16 +12,11 @@ import (
 	predictv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/predict/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
-	aRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
-	carRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
-	eventRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
-	rsRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
-	trackRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -55,7 +50,7 @@ var (
 //nolint:whitespace,funlen // readability
 func GetPredictParam(
 	ctx context.Context,
-	pool *pgxpool.Pool,
+	repos api.Repositories,
 	eventID int,
 	sessionTime time.Duration,
 	carNum string,
@@ -67,24 +62,23 @@ func GetPredictParam(
 	var analysis *analysisv1.Analysis
 	var carInfo *racestatev1.PublishDriverDataRequest
 
-	if event, err = eventRepo.LoadByID(ctx, pool, eventID); err != nil {
+	if event, err = repos.Event().LoadByID(ctx, eventID); err != nil {
 		return nil, err
 	}
-	if track, err = trackRepo.LoadByID(ctx, pool, int(event.TrackId)); err != nil {
+	if track, err = repos.Track().LoadByID(ctx, int(event.TrackId)); err != nil {
 		return nil, err
 	}
 
-	if analysis, err = aRepo.LoadByEventID(ctx, pool, eventID); err != nil {
+	if analysis, err = repos.Analysis().LoadByEventID(ctx, eventID); err != nil {
 		return nil, err
 	}
-	if carInfo, err = carRepo.LoadLatest(ctx, pool, eventID); err != nil {
+	if carInfo, err = repos.CarProto().LoadLatest(ctx, eventID); err != nil {
 		return nil, err
 	}
 
 	var states *util.RangeContainer[racestatev1.PublishStateRequest]
-	if states, err = rsRepo.LoadRangeBySessionTime(
+	if states, err = repos.Racestate().LoadRangeBySessionTime(
 		ctx,
-		pool,
 		eventID,
 		utils.CollectRaceSessions(event)[0],
 		sessionTime.Seconds(),

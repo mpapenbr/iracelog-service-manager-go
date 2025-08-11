@@ -14,7 +14,8 @@ func NewCheckCmd() *cobra.Command {
 
 	cmd.AddCommand(NewCheckDataFetcherCmd())
 	cmd.AddCommand(NewCheckCarStatesCmd())
-	cmd.AddCommand(NewCheckSnapshotsCmd())
+	cmd.AddCommand(NewCheckSnapshotsBobCmd())
+	cmd.AddCommand(NewCheckSnapshotsBobLegacyCmd())
 	cmd.AddCommand(NewCheckStateInoutlapCmd())
 	cmd.AddCommand(NewDisplayLapsCmd())
 

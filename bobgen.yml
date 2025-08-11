@@ -1,0 +1,54 @@
+types:
+  mytypes.EventSessionSlice:
+    imports:
+      [
+        'mytypes "github.com/mpapenbr/iracelog-service-manager-go/pkg/db/mytypes"',
+      ]
+    random_expr: |
+      return "mytypes.EventSession{}"
+  "mytypes.SectorSlice":
+    imports:
+      [
+        'mytypes "github.com/mpapenbr/iracelog-service-manager-go/pkg/db/mytypes"',
+      ]
+    random_expr: |
+      return "mytypes.Sector{}"
+  "mytypes.TireInfoSlice":
+    imports:
+      [
+        'mytypes "github.com/mpapenbr/iracelog-service-manager-go/pkg/db/mytypes"',
+      ]
+    random_expr: |
+      return "mytypes.TireInfo{}"
+  "mytypes.CustomExtraInfo":
+    imports:
+      [
+        'mytypes "github.com/mpapenbr/iracelog-service-manager-go/pkg/db/mytypes"',
+      ]
+    random_expr: |
+      return "mytypes.CustomExtraInfo{}"
+
+replacements:
+  - tables: ["event"]
+    match:
+      name: "sessions"
+    replace: "mytypes.EventSessionSlice"
+  - tables: ["event"]
+    match:
+      name: "tire_infos"
+    replace: "mytypes.TireInfoSlice"
+  - tables: ["event_ext"]
+    match:
+      name: "extra_info"
+    replace: "mytypes.CustomExtraInfo"
+  - tables: ["track"]
+    match:
+      name: "sectors"
+    replace: "mytypes.SectorSlice"
+
+no_tests: true
+no_factory: true
+psql:
+  dsn: "postgres://docker:docker@localhost:5432/iracelog_grpc?sslmode=disable"
+  driver_name: github.com/jackc/pgx/v5
+  output: pkg/db/models

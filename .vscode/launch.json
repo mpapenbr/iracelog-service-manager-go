@@ -16,11 +16,14 @@
         "--log-level",
         "debug",
         "--enable-telemetry",
-        "--enable-tenants",
+        "--enable-tenants=false",
+        "--enable-nats=false",
+        "--nats-url",
+        "nats://localhost:4222",
         "--admin-token",
         "admin",
         "--stale-duration",
-        "10m"
+        "10s"
       ]
     },
     {
@@ -45,6 +48,36 @@
         "--db",
         "postgresql://docker:docker@localhost:5432/iracelog_grpc"
         // "--do-not-persist"
+      ]
+    },
+    {
+      "name": "check snapshot bob",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "snapshot-bob",
+        "9",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_grpc"
+      ]
+    },
+    {
+      "name": "check snapshot bob-legacy",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "check",
+        "snapshot-bob-legacy",
+        "9",
+        "--db",
+        "postgresql://docker:docker@localhost:5432/iracelog_grpc"
       ]
     },
     {

@@ -7,14 +7,11 @@ import (
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
-	aProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
-	smProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 )
 
@@ -30,9 +27,15 @@ func NewServer(opts ...Option) *analysisServer {
 
 type Option func(*analysisServer)
 
-func WithPool(p *pgxpool.Pool) Option {
+func WithRepositories(r api.Repositories) Option {
 	return func(srv *analysisServer) {
-		srv.pool = p
+		srv.repos = r
+	}
+}
+
+func WithTransactionManager(txMgr api.TransactionManager) Option {
+	return func(srv *analysisServer) {
+		srv.txMgr = txMgr
 	}
 }
 
@@ -44,9 +47,11 @@ func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 
 type analysisServer struct {
 	x.UnimplementedAnalysisServiceHandler
-	pe   permission.PermissionEvaluator
-	pool *pgxpool.Pool
-	log  *log.Logger
+	pe    permission.PermissionEvaluator
+	repos api.Repositories
+	txMgr api.TransactionManager
+
+	log *log.Logger
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -61,18 +66,18 @@ func (s *analysisServer) GetAnalysis(
 	var err error
 	var e *eventv1.Event
 
-	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
 	if err != nil {
 		s.log.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
 		return nil, err
 	}
-	analysisData, err = aProto.LoadByEventID(ctx, s.pool, int(e.GetId()))
+	analysisData, err = s.repos.Analysis().LoadByEventID(ctx, int(e.GetId()))
 	if err != nil {
 		return nil, err
 	}
-	snapshots, err = smProto.LoadSnapshots(ctx, s.pool, int(e.GetId()), 300)
+	snapshots, err = s.repos.Speedmap().LoadSnapshots(ctx, int(e.GetId()), 300)
 	if err != nil {
 		return nil, err
 	}
@@ -98,21 +103,21 @@ func (s *analysisServer) ComputeAnalysis(
 	var err error
 	var e *eventv1.Event
 
-	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
 	if err != nil {
 		s.log.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
 		return nil, err
 	}
-	analysisData, err = aProto.LoadByEventID(ctx, s.pool, int(e.GetId()))
+	analysisData, err = s.repos.Analysis().LoadByEventID(ctx, int(e.GetId()))
 	if err != nil {
 		return nil, err
 	}
 	var recompAnalysisData *analysisv1.Analysis
-	recompAnalysisData, err = RecomputeAnalysis(ctx, s.pool, e)
+	recompAnalysisData, err = RecomputeAnalysis(ctx, s.repos, e)
 	if err != nil {
-		s.log.Error("error recomputeing analysis",
+		s.log.Error("error recomputing analysis",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
 		return nil, err
@@ -148,10 +153,9 @@ func (s *analysisServer) storeAnalysisData(
 ) {
 	if err := s.storeData(
 		context.Background(),
-		func(ctx context.Context, tx pgx.Tx) error {
-			return aProto.Upsert(
+		func(ctx context.Context) error {
+			return s.repos.Analysis().Upsert(
 				context.Background(),
-				s.pool,
 				eventID,
 				data)
 		}); err != nil {
@@ -165,12 +169,9 @@ func (s *analysisServer) storeAnalysisData(
 //nolint:whitespace // can't make both editor and linter happy
 func (s *analysisServer) storeData(
 	ctx context.Context,
-	storeFunc func(ctx context.Context, tx pgx.Tx) error,
+	storeFunc func(ctx context.Context) error,
 ) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := storeFunc(ctx, tx); err != nil {
-			return err
-		}
-		return nil
+	return s.txMgr.RunInTx(ctx, func(ctx context.Context) error {
+		return storeFunc(ctx)
 	})
 }

@@ -7,14 +7,13 @@ import (
 	"time"
 
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-	csRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
-	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
+	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -57,13 +56,15 @@ func checkDriverDataFetcher(eventArg string) {
 	}
 	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	sourceEvent, err := eventrepo.LoadByID(ctx, pool, eventID)
+	repos := bobRepos.NewRepositoriesFromPool(pool)
+
+	sourceEvent, err := repos.Event().LoadByID(ctx, eventID)
 	if err != nil {
 		log.Error("event not found", log.ErrorField(err))
 		return
 	}
 	log.Info("event found", log.String("event", sourceEvent.Key))
-	df := initDriverDataFetcher(pool, eventID, time.Time{}, 50)
+	df := initDriverDataFetcher(repos, eventID, time.Time{}, 50)
 	i := 0
 	for {
 		data := df.next()
@@ -79,7 +80,7 @@ func checkDriverDataFetcher(eventArg string) {
 //
 //nolint:lll,whitespace // readablity
 func initDriverDataFetcher(
-	pool *pgxpool.Pool,
+	repos api.Repositories,
 	eventID int,
 	lastTS time.Time,
 	limit int,
@@ -87,7 +88,7 @@ func initDriverDataFetcher(
 	df := &commonFetcher[racestatev1.PublishDriverDataRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
-			return csRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
+			return repos.CarProto().LoadRange(context.Background(), eventID, startTs, limit)
 		},
 	}
 

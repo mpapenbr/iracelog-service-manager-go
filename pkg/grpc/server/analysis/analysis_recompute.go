@@ -11,7 +11,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/car"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/processing/race"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -20,7 +20,7 @@ type (
 	computeRace struct {
 		ctx       context.Context
 		eventData *eventv1.Event
-		q         repository.Querier
+		repos     api.Repositories
 		p         *processing.Processor
 	}
 	dataProviderImpl struct {
@@ -40,13 +40,13 @@ var (
 //nolint:whitespace // editor/linter issue
 func RecomputeAnalysis(
 	ctx context.Context,
-	q repository.Querier,
+	repos api.Repositories,
 	eventData *eventv1.Event,
 ) (*analysisv1.Analysis, error) {
 	work := &computeRace{
 		eventData: eventData,
 		ctx:       ctx,
-		q:         q,
+		repos:     repos,
 	}
 	return work.recomputeEvent()
 }
@@ -101,7 +101,7 @@ func (s *myStateSelector) GetNum() int32 {
 func (c *computeRace) newDataProviderImpl() (*dataProviderImpl, error) {
 	dContainer, err := state.CreateDriverDataContainer(
 		c.ctx,
-		c.q,
+		c.repos,
 		&myStateSelector{event: c.eventData},
 	)
 	if err != nil {
@@ -120,7 +120,7 @@ func (c *computeRace) newDataProviderImpl() (*dataProviderImpl, error) {
 	}
 	sContainer, err := state.CreateRacestatesContainer(
 		c.ctx,
-		c.q,
+		c.repos,
 		&myStateSelector{event: c.eventData},
 	)
 	if err != nil {

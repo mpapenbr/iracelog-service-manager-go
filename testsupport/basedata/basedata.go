@@ -10,13 +10,10 @@ import (
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stephenafamo/bob"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
-	tenantrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
-	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 )
 
 func TestTime() *timestamppb.Timestamp {
@@ -74,7 +71,7 @@ func SampleEvent() *eventv1.Event {
 	}
 }
 
-func SamplePublishSateRequest() *racestatev1.PublishStateRequest {
+func SamplePublishStateRequest() *racestatev1.PublishStateRequest {
 	return &racestatev1.PublishStateRequest{
 		Session: &racestatev1.Session{
 			SessionTime:   1000,
@@ -93,16 +90,19 @@ func SamplePublishSateRequest() *racestatev1.PublishStateRequest {
 	}
 }
 
-func CreateSampleEvent(db *pgxpool.Pool) *eventv1.Event {
+func CreateSampleEvent(db bob.DB) *eventv1.Event {
 	ctx := context.Background()
 	sampleTrack := SampleTrack()
 	sampleEvent := SampleEvent()
-	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
-		if err := trackrepos.Create(ctx, tx, sampleTrack); err != nil {
+	tx := bobRepos.NewBobTransaction(&db)
+	r := bobRepos.NewRepositories(db)
+	_ = tx
+	err := tx.RunInTx(ctx, func(ctx context.Context) error {
+		if err := r.Track().Create(ctx, sampleTrack); err != nil {
 			return err
 		}
 		var tenantID uint32
-		if tenant, err := tenantrepos.Create(ctx, tx, &tenantv1.CreateTenantRequest{
+		if tenant, err := r.Tenant().Create(ctx, &tenantv1.CreateTenantRequest{
 			Name:     "testtenant",
 			ApiKey:   "testapikey",
 			IsActive: true,
@@ -111,7 +111,7 @@ func CreateSampleEvent(db *pgxpool.Pool) *eventv1.Event {
 		} else {
 			tenantID = tenant.ID
 		}
-		err := eventrepos.Create(ctx, tx, sampleEvent, tenantID)
+		err := r.Event().Create(ctx, sampleEvent, tenantID)
 		return err
 	})
 	if err != nil {

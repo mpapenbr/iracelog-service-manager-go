@@ -11,16 +11,12 @@ import (
 	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
-	aProtoRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
-	eventrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
-	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	serverUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
@@ -38,9 +34,15 @@ func NewServer(opts ...Option) *providerServer {
 
 type Option func(*providerServer)
 
-func WithPersistence(p *pgxpool.Pool) Option {
+func WithRepositories(arg api.Repositories) Option {
 	return func(srv *providerServer) {
-		srv.pool = p
+		srv.repos = arg
+	}
+}
+
+func WithTxManager(txMgr api.TransactionManager) Option {
+	return func(srv *providerServer) {
+		srv.txMgr = txMgr
 	}
 }
 
@@ -67,7 +69,8 @@ var ErrEventAlreadyRegistered = errors.New("event already registered")
 type providerServer struct {
 	x.UnimplementedProviderServiceHandler
 	dataProxy proxy.DataProxy
-	pool      *pgxpool.Pool
+	repos     api.Repositories
+	txMgr     api.TransactionManager
 	pe        permission.PermissionEvaluator
 	lookup    *utils.EventLookup
 	log       *log.Logger
@@ -78,7 +81,7 @@ func (s *providerServer) ListLiveEvents(
 	ctx context.Context,
 	req *connect.Request[providerv1.ListLiveEventsRequest],
 ) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
-	t, err := serverUtil.ResolveTenant(ctx, s.pool, req.Msg.TenantSelector)
+	t, err := serverUtil.ResolveTenant(ctx, s.repos.Tenant(), req.Msg.TenantSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -123,13 +126,13 @@ func (s *providerServer) RegisterEvent(
 	if err := s.storeData(
 		ctx,
 		req.Msg.RecordingMode,
-		func(ctx context.Context, tx pgx.Tx) error {
-			if err := trackrepos.EnsureTrack(ctx, tx, req.Msg.Track); err != nil {
+		func(ctx context.Context) error {
+			if err := s.repos.Track().EnsureTrack(ctx, req.Msg.Track); err != nil {
 				return err
 			}
 			if ta, ok := a.(auth.TenantAuthentication); ok {
 				s.log.Debug("tenant id", log.Uint32("id", ta.GetID()))
-				return eventrepos.Create(ctx, tx, req.Msg.Event, ta.GetID())
+				return s.repos.Event().Create(ctx, req.Msg.Event, ta.GetID())
 			}
 			return fmt.Errorf("no tenant id found in auth")
 		}); err != nil {
@@ -137,7 +140,7 @@ func (s *providerServer) RegisterEvent(
 		return nil, err
 	}
 	// read track from db to include pit stop info if already there
-	dbTrack, err := trackrepos.LoadByID(ctx, s.pool, int(req.Msg.Event.TrackId))
+	dbTrack, err := s.repos.Track().LoadByID(ctx, int(req.Msg.Event.TrackId))
 	if err != nil {
 		s.log.Error("error loading track", log.ErrorField(err))
 		dbTrack = req.Msg.Track
@@ -275,11 +278,13 @@ func (s *providerServer) storeAnalysisDataWorker(
 			//nolint:errcheck // by design
 			if time.Since(lastPersist) > 15*time.Second {
 				lastPersist = time.Now()
-				if err := aProtoRepos.Upsert(
-					context.Background(),
-					s.pool,
-					int(epd.Event.Id),
-					data); err != nil {
+				if err := s.txMgr.RunInTx(context.Background(),
+					func(ctx context.Context) error {
+						return s.repos.Analysis().Upsert(
+							ctx,
+							int(epd.Event.Id),
+							data)
+					}); err != nil {
 					s.log.Error("error storing analysis data", log.ErrorField(err))
 				}
 			}
@@ -303,11 +308,13 @@ func (s *providerServer) storeReplayInfoWorker(
 			//nolint:errcheck // by design
 			if time.Since(lastPersist) > 5*time.Second {
 				lastPersist = time.Now()
-				if err := eventrepos.UpdateReplayInfo(
-					context.Background(),
-					s.pool,
-					int(epd.Event.Id),
-					data); err != nil {
+				if err := s.txMgr.RunInTx(context.Background(),
+					func(ctx context.Context) error {
+						return s.repos.Event().UpdateReplayInfo(
+							ctx,
+							int(epd.Event.Id),
+							data)
+					}); err != nil {
 					s.log.Error("error storing replay info data", log.ErrorField(err))
 				}
 			}
@@ -322,10 +329,9 @@ func (s *providerServer) storeAnalysisData(
 	if err := s.storeData(
 		context.Background(),
 		epd.RecordingMode,
-		func(ctx context.Context, tx pgx.Tx) error {
-			return aProtoRepos.Upsert(
-				context.Background(),
-				s.pool,
+		func(ctx context.Context) error {
+			return s.repos.Analysis().Upsert(
+				ctx,
 				int(epd.Event.Id),
 				epd.LastAnalysisData)
 		}); err != nil {
@@ -340,10 +346,9 @@ func (s *providerServer) storeReplayInfo(
 	if err := s.storeData(
 		context.Background(),
 		epd.RecordingMode,
-		func(ctx context.Context, tx pgx.Tx) error {
-			return eventrepos.UpdateReplayInfo(
-				context.Background(),
-				s.pool,
+		func(ctx context.Context) error {
+			return s.repos.Event().UpdateReplayInfo(
+				ctx,
 				int(epd.Event.Id),
 				epd.LastReplayInfo)
 		}); err != nil {
@@ -358,13 +363,13 @@ func (s *providerServer) storeReplayInfo(
 func (s *providerServer) storeData(
 	ctx context.Context,
 	recordingMode providerv1.RecordingMode,
-	storeFunc func(ctx context.Context, tx pgx.Tx) error,
+	storeFunc func(ctx context.Context) error,
 ) error {
 	if recordingMode == providerv1.RecordingMode_RECORDING_MODE_DO_NOT_PERSIST {
 		return nil
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := storeFunc(ctx, tx); err != nil {
+	return s.txMgr.RunInTx(ctx, func(ctx context.Context) error {
+		if err := storeFunc(ctx); err != nil {
 			return err
 		}
 		return nil

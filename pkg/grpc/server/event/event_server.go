@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
@@ -11,19 +12,11 @@ import (
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
-	aProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
-	cProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
-	rProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
-	smProto "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	eventservice "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/service/event"
 )
@@ -38,12 +31,25 @@ func NewServer(opts ...Option) *eventsServer {
 	return ret
 }
 
-type Option func(*eventsServer)
+type (
+	Option func(*eventsServer)
+)
 
-func WithPool(p *pgxpool.Pool) Option {
+func WithRepositories(r api.Repositories) Option {
 	return func(srv *eventsServer) {
-		srv.pool = p
-		srv.service = eventservice.NewEventService(p)
+		srv.repos = r
+	}
+}
+
+func WithTxManager(txMgr api.TransactionManager) Option {
+	return func(srv *eventsServer) {
+		srv.txMgr = txMgr
+	}
+}
+
+func WithEventService(s *eventservice.EventService) Option {
+	return func(srv *eventsServer) {
+		srv.service = s
 	}
 }
 
@@ -57,8 +63,9 @@ type eventsServer struct {
 	x.UnimplementedEventServiceHandler
 	service *eventservice.EventService
 	pe      permission.PermissionEvaluator
-	pool    *pgxpool.Pool
 	log     *log.Logger
+	repos   api.Repositories
+	txMgr   api.TransactionManager
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -70,7 +77,7 @@ func (s *eventsServer) GetEvents(
 	var tenantID *uint32 = nil
 	if t, err := util.ResolveTenant(
 		ctx,
-		s.pool,
+		s.repos.Tenant(),
 		req.Msg.TenantSelector); err == nil {
 		if t != nil {
 			tenantID = &t.ID
@@ -78,7 +85,7 @@ func (s *eventsServer) GetEvents(
 	} else {
 		return err
 	}
-	data, err := event.LoadAll(context.Background(), s.pool, tenantID)
+	data, err := s.repos.Event().LoadAll(ctx, tenantID)
 	if err != nil {
 		return err
 	}
@@ -100,7 +107,7 @@ func (s *eventsServer) GetLatestEvents(
 	var tenantID *uint32 = nil
 	if t, err := util.ResolveTenant(
 		ctx,
-		s.pool,
+		s.repos.Tenant(),
 		req.Msg.TenantSelector); err == nil {
 		if t != nil {
 			tenantID = &t.ID
@@ -108,7 +115,7 @@ func (s *eventsServer) GetLatestEvents(
 	} else {
 		return nil, err
 	}
-	data, err := event.LoadAll(context.Background(), s.pool, tenantID)
+	data, err := s.repos.Event().LoadAll(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +134,7 @@ func (s *eventsServer) GetEvent(
 	var a *analysisv1.Analysis
 
 	var err error
-	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
 	if err != nil {
 		s.log.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
@@ -135,7 +142,7 @@ func (s *eventsServer) GetEvent(
 		return nil, err
 	}
 
-	a, err = aProto.LoadByEventID(ctx, s.pool, int(e.Id))
+	a, err = s.repos.Analysis().LoadByEventID(ctx, int(e.Id))
 	if err != nil {
 		s.log.Error("error loading event",
 			log.Uint32("eventId", e.Id),
@@ -143,7 +150,7 @@ func (s *eventsServer) GetEvent(
 		return nil, err
 	}
 
-	t, err := track.LoadByID(ctx, s.pool, int(e.TrackId))
+	t, err := s.repos.Track().LoadByID(ctx, int(e.TrackId))
 	if err != nil {
 		s.log.Error("error loading track",
 			log.Uint32("eventId", e.Id),
@@ -151,21 +158,21 @@ func (s *eventsServer) GetEvent(
 			log.ErrorField(err))
 		return nil, err
 	}
-	cd, err := cProto.LoadLatest(ctx, s.pool, int(e.Id))
+	cd, err := s.repos.CarProto().LoadLatest(ctx, int(e.Id))
 	if err != nil {
 		s.log.Error("error loading car proto data",
 			log.Uint32("eventId", e.Id),
 			log.ErrorField(err))
 		return nil, err
 	}
-	sd, err := rProto.LoadLatest(ctx, s.pool, int(e.Id))
+	sd, err := s.repos.Racestate().LoadLatest(ctx, int(e.Id))
 	if err != nil {
 		s.log.Error("error loading race proto data",
 			log.Uint32("eventId", e.Id),
 			log.ErrorField(err))
 		return nil, err
 	}
-	m, err := rProto.CollectMessages(ctx, s.pool, int(e.Id))
+	m, err := s.repos.Racestate().CollectMessages(ctx, int(e.Id))
 	if err != nil {
 		s.log.Error("error collecting messages",
 			log.Uint32("eventId", e.Id),
@@ -173,9 +180,9 @@ func (s *eventsServer) GetEvent(
 		return nil, err
 	}
 	s.log.Debug("message collected", log.Int("num", len(m)))
-	sm, err := smProto.LoadLatest(ctx, s.pool, int(e.Id))
+	sm, err := s.repos.Speedmap().LoadLatest(ctx, int(e.Id))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			sm = &racestatev1.PublishSpeedmapRequest{}
 		} else {
 			s.log.Error("error loading speedmap proto data",
@@ -185,7 +192,7 @@ func (s *eventsServer) GetEvent(
 		}
 	}
 
-	snapshots, err := smProto.LoadSnapshots(ctx, s.pool, int(e.Id), 120)
+	snapshots, err := s.repos.Speedmap().LoadSnapshots(ctx, int(e.Id), 120)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +261,7 @@ func (s *eventsServer) validateEventAccess(
 	a auth.Authentication, eventSel *commonv1.EventSelector,
 ) (*eventv1.Event, error) {
 	// get the event
-	data, err := util.ResolveEvent(ctx, s.pool, eventSel)
+	data, err := util.ResolveEvent(ctx, s.repos.Event(), eventSel)
 	if err != nil {
 		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
 			return nil, connect.NewError(
@@ -264,7 +271,7 @@ func (s *eventsServer) validateEventAccess(
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
 	}
-	t, err := tenant.LoadByEventID(ctx, s.pool, int(data.Id))
+	t, err := s.repos.Tenant().LoadByEventID(ctx, int(data.Id))
 	if err != nil {
 		return nil, err
 	}

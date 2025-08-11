@@ -7,8 +7,7 @@ import (
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
-	carrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	mainUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 )
@@ -22,11 +21,11 @@ type (
 //nolint:whitespace // editor/linter issue
 func CreateDriverDataContainer(
 	ctx context.Context,
-	conn repository.Querier,
+	repos api.Repositories,
 	req StatesRequest,
 ) (ret *driverDataContainer, err error) {
 	var sc *statesContainer
-	sc, err = createStatesContainer(ctx, conn, req)
+	sc, err = createStatesContainer(ctx, repos, req)
 	if err != nil {
 		return nil, err
 	}
@@ -41,32 +40,28 @@ func (s *driverDataContainer) InitialRequest() (
 ) {
 	switch s.req.GetStart().Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
-		ret, err = carrepos.LoadRange(
+		ret, err = s.repos.CarProto().LoadRange(
 			s.ctx,
-			s.conn,
 			int(s.e.Id),
 			s.req.GetStart().GetRecordStamp().AsTime(),
 			s.toFetchEntries())
 	case *commonv1.StartSelector_SessionTime:
-		ret, err = carrepos.LoadRangeBySessionTime(
+		ret, err = s.repos.CarProto().LoadRangeBySessionTime(
 			s.ctx,
-			s.conn,
 			int(s.e.Id),
 			s.getDefaultSessionNum(),
 			float64(s.req.GetStart().GetSessionTime()),
 			s.toFetchEntries())
 	case *commonv1.StartSelector_SessionTimeSelector:
-		ret, err = carrepos.LoadRangeBySessionTime(
+		ret, err = s.repos.CarProto().LoadRangeBySessionTime(
 			s.ctx,
-			s.conn,
 			int(s.e.Id),
 			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
 			s.req.GetStart().GetSessionTimeSelector().GetDuration().AsDuration().Seconds(),
 			s.toFetchEntries())
 	case *commonv1.StartSelector_Id:
-		ret, err = carrepos.LoadRangeByID(
+		ret, err = s.repos.CarProto().LoadRangeByID(
 			s.ctx,
-			s.conn,
 			int(s.e.Id),
 			int(s.req.GetStart().GetId()),
 			s.toFetchEntries())
@@ -90,17 +85,15 @@ func (s *driverDataContainer) NextRequest() (
 ) {
 	switch s.req.GetStart().Arg.(type) {
 	case *commonv1.StartSelector_SessionTimeSelector:
-		ret, err = carrepos.LoadRangeByIDWithinSession(
+		ret, err = s.repos.CarProto().LoadRangeByIDWithinSession(
 			s.ctx,
-			s.conn,
 			int(s.e.Id),
 			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
 			s.lastRsInfoID+1,
 			s.toFetchEntries())
 	default:
-		ret, err = carrepos.LoadRangeByID(
+		ret, err = s.repos.CarProto().LoadRangeByID(
 			s.ctx,
-			s.conn,
 			int(s.e.Id),
 			s.lastRsInfoID+1,
 			s.toFetchEntries())

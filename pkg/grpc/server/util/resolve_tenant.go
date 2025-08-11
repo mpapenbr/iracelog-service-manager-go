@@ -2,27 +2,24 @@ package util
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 )
 
 var ErrTenantSelectorRequired = errors.New("tenant selector is required")
 
-// returns the tenant for the given selector if tenants are supported
-// if tenants are supported a selector must be provided
-//
 //nolint:whitespace // can't make both editor and linter happy
 func ResolveTenant(
 	ctx context.Context,
-	conn repository.Querier,
+	r api.TenantRepository,
 	sel *commonv1.TenantSelector,
 ) (*model.Tenant, error) {
 	var data *model.Tenant
@@ -42,14 +39,14 @@ func ResolveTenant(
 	}
 	switch sel.Arg.(type) {
 	case *commonv1.TenantSelector_ExternalId:
-		data, err = tenant.LoadByExternalID(ctx, conn, sel.GetExternalId().GetId())
+		data, err = r.LoadByExternalID(ctx, sel.GetExternalId().GetId())
 	case *commonv1.TenantSelector_Name:
-		data, err = tenant.LoadByName(ctx, conn, sel.GetName())
+		data, err = r.LoadByName(ctx, sel.GetName())
 	default:
 		return nil, nil
 	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, connect.NewError(connect.CodeNotFound, repository.ErrNoData)
 		}
 		return nil, err

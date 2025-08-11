@@ -5,19 +5,16 @@ import (
 	"time"
 
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
-	csRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
-	rsRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
-	smRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 )
 
 //
 //nolint:lll,whitespace // readablity, editor/linter
 func initDriverDataFetcher(
-	pool *pgxpool.Pool,
+	repos api.Repositories,
 	eventID int,
 	lastTS time.Time,
 	limit int,
@@ -25,7 +22,7 @@ func initDriverDataFetcher(
 	df := &commonFetcher[racestatev1.PublishDriverDataRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
-			return csRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
+			return repos.CarProto().LoadRange(context.Background(), eventID, startTs, limit)
 		},
 	}
 
@@ -34,7 +31,7 @@ func initDriverDataFetcher(
 
 //nolint:lll,whitespace // readablity, editor/linter
 func initStateDataFetcher(
-	pool *pgxpool.Pool,
+	repos api.Repositories,
 	eventID int,
 	lastTS time.Time,
 	limit int,
@@ -42,7 +39,7 @@ func initStateDataFetcher(
 	df := &commonFetcher[racestatev1.PublishStateRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
-			return rsRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
+			return repos.Racestate().LoadRange(context.Background(), eventID, startTs, limit)
 		},
 	}
 
@@ -51,7 +48,7 @@ func initStateDataFetcher(
 
 //nolint:lll,whitespace // readablity, editor/linter
 func initSpeedmapDataFetcher(
-	pool *pgxpool.Pool,
+	repos api.Repositories,
 	eventID int,
 	lastTS time.Time,
 	limit int,
@@ -59,7 +56,7 @@ func initSpeedmapDataFetcher(
 	df := &commonFetcher[racestatev1.PublishSpeedmapRequest]{
 		lastTS: lastTS,
 		loader: func(startTs time.Time) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
-			return smRepo.LoadRange(context.Background(), pool, eventID, startTs, limit)
+			return repos.Speedmap().LoadRange(context.Background(), eventID, startTs, limit)
 		},
 	}
 

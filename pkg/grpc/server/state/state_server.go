@@ -10,19 +10,12 @@ import (
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
-	carrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car"
-	carprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/car/proto"
-	eventextrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event/ext"
-	racestaterepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
-	speedmapprotorepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/speedmap/proto"
-	trackrepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	mainUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -42,9 +35,15 @@ func NewServer(opts ...Option) *stateServer {
 
 type Option func(*stateServer)
 
-func WithPool(p *pgxpool.Pool) Option {
+func WithRepositories(r api.Repositories) Option {
 	return func(srv *stateServer) {
-		srv.pool = p
+		srv.repos = r
+	}
+}
+
+func WithTxManager(txMgr api.TransactionManager) Option {
+	return func(srv *stateServer) {
+		srv.txMgr = txMgr
 	}
 }
 
@@ -74,7 +73,8 @@ func WithDataProxy(pd proxy.DataProxy) Option {
 
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
-	pool      *pgxpool.Pool
+	repos     api.Repositories
+	txMgr     api.TransactionManager
 	pe        permission.PermissionEvaluator
 	dataProxy proxy.DataProxy
 	lookup    *utils.EventLookup
@@ -104,13 +104,15 @@ func (s *stateServer) PublishState(
 		s.log.Error("error publishing state", log.ErrorField(err))
 	}
 	if s.isRaceSession(epd, req.Msg) {
-		if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
-			id, err := racestaterepos.CreateRaceState(ctx, tx, int(epd.Event.Id), req.Msg)
-			if err == nil {
-				epd.LastRsInfoID = id
-			}
-			return err
-		}); err != nil {
+		if err := s.storeData(ctx, epd,
+			func(ctx context.Context) error {
+				id, err := s.repos.Racestate().CreateRacestate(
+					ctx, int(epd.Event.Id), req.Msg)
+				if err == nil {
+					epd.LastRsInfoID = id
+				}
+				return err
+			}); err != nil {
 			s.log.Error("error storing state", log.ErrorField(err))
 		}
 	}
@@ -158,8 +160,8 @@ func (s *stateServer) PublishSpeedmap(
 	if err := s.dataProxy.PublishSpeedmapData(req.Msg); err != nil {
 		s.log.Error("error publishing speedmap", log.ErrorField(err))
 	}
-	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
-		return speedmapprotorepos.Create(ctx, tx, epd.LastRsInfoID, req.Msg)
+	if err := s.storeData(ctx, epd, func(ctx context.Context) error {
+		return s.repos.Speedmap().Create(ctx, epd.LastRsInfoID, req.Msg)
 	}); err != nil {
 		s.log.Error("error storing speedmap", log.ErrorField(err))
 	}
@@ -189,16 +191,16 @@ func (s *stateServer) PublishDriverData(
 	if err := s.dataProxy.PublishDriverData(req.Msg); err != nil {
 		s.log.Error("error publishing state", log.ErrorField(err))
 	}
-	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
+	if err := s.storeData(ctx, epd, func(ctx context.Context) error {
 		// Note: carrepos uses eventId, carprotorepos rsInfoId
-		if err := carrepos.Create(ctx, tx, int(epd.Event.Id), req.Msg); err != nil {
+		if err := s.repos.Car().Create(ctx, int(epd.Event.Id), req.Msg); err != nil {
 			s.log.Error("error storing car data", log.ErrorField(err))
 		}
 		rsInfoID := epd.LastRsInfoID
 		if epd.LastRsInfoID == 0 {
 			var rsErr error
-			rsInfoID, rsErr = racestaterepos.CreateDummyRaceStateInfo(
-				ctx, tx, int(epd.Event.Id), req.Msg.Timestamp.AsTime(),
+			rsInfoID, rsErr = s.repos.Racestate().CreateDummyRacestateInfo(
+				ctx, int(epd.Event.Id), req.Msg.Timestamp.AsTime(),
 				req.Msg.SessionTime, req.Msg.SessionNum,
 			)
 			if rsErr != nil {
@@ -206,7 +208,7 @@ func (s *stateServer) PublishDriverData(
 				return rsErr
 			}
 		}
-		return carprotorepos.Create(ctx, tx, rsInfoID, req.Msg)
+		return s.repos.CarProto().Create(ctx, rsInfoID, req.Msg)
 	}); err != nil {
 		s.log.Error("error storing car state", log.ErrorField(err))
 	}
@@ -259,10 +261,10 @@ func (s *stateServer) PublishEventExtraInfo(
 		s.wireLog.Debug("PublishEventExtraInfo called", log.String("event", epd.Event.Key))
 	}
 
-	if err := s.storeData(ctx, epd, func(ctx context.Context, tx pgx.Tx) error {
-		s.handlePitInfoUpdate(ctx, tx, int(epd.Event.TrackId), req.Msg.ExtraInfo.PitInfo)
+	if err := s.storeData(ctx, epd, func(ctx context.Context) error {
+		s.handlePitInfoUpdate(ctx, int(epd.Event.TrackId), req.Msg.ExtraInfo.PitInfo)
 
-		return eventextrepos.Upsert(ctx, tx, int(epd.Event.Id), req.Msg.ExtraInfo)
+		return s.repos.EventExt().Upsert(ctx, int(epd.Event.Id), req.Msg.ExtraInfo)
 	}); err != nil {
 		s.log.Error("error storing event extra info", log.ErrorField(err))
 	}
@@ -273,7 +275,6 @@ func (s *stateServer) PublishEventExtraInfo(
 //nolint:whitespace // can't make both editor and linter happy
 func (s *stateServer) handlePitInfoUpdate(
 	ctx context.Context,
-	tx pgx.Tx,
 	trackID int,
 	pitInfo *trackv1.PitInfo,
 ) {
@@ -284,7 +285,7 @@ func (s *stateServer) handlePitInfoUpdate(
 		return
 	}
 	//nolint:nestif // by design
-	if t, err := trackrepos.LoadByID(ctx, tx, trackID); err != nil {
+	if t, err := s.repos.Track().LoadByID(ctx, trackID); err != nil {
 		s.log.Error("error loading track", log.ErrorField(err))
 		return
 	} else {
@@ -297,7 +298,7 @@ func (s *stateServer) handlePitInfoUpdate(
 		t.PitInfo.Entry = pitInfo.Entry
 		t.PitInfo.Exit = pitInfo.Exit
 		t.PitInfo.LaneLength = pitInfo.LaneLength
-		_, err := trackrepos.UpdatePitInfo(ctx, tx, trackID, t.PitInfo)
+		_, err := s.repos.Track().UpdatePitInfo(ctx, trackID, t.PitInfo)
 		if err != nil {
 			s.log.Error("error updating pit info", log.ErrorField(err))
 		}
@@ -312,7 +313,7 @@ func (s *stateServer) GetDriverData(
 ) {
 	var sc *driverDataContainer
 	var err error
-	if sc, err = CreateDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateDriverDataContainer(ctx, s.repos, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
@@ -337,7 +338,7 @@ func (s *stateServer) GetDriverDataStream(
 	stream *connect.ServerStream[racestatev1.GetDriverDataStreamResponse],
 ) (err error) {
 	var sc *driverDataContainer
-	if sc, err = CreateDriverDataContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateDriverDataContainer(ctx, s.repos, req.Msg); err != nil {
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
@@ -370,7 +371,7 @@ func (s *stateServer) GetStates(
 ) {
 	var sc *racestatesContainer
 	var err error
-	if sc, err = CreateRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateRacestatesContainer(ctx, s.repos, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
@@ -395,7 +396,7 @@ func (s *stateServer) GetStateStream(
 	stream *connect.ServerStream[racestatev1.GetStateStreamResponse],
 ) (err error) {
 	var sc *racestatesContainer
-	if sc, err = CreateRacestatesContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = CreateRacestatesContainer(ctx, s.repos, req.Msg); err != nil {
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
@@ -427,7 +428,7 @@ func (s *stateServer) GetSpeedmaps(
 ) {
 	var sc *speedmapContainer
 	var err error
-	if sc, err = createSpeedmapContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = createSpeedmapContainer(ctx, s.repos, req.Msg); err != nil {
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
@@ -452,7 +453,7 @@ func (s *stateServer) GetSpeedmapStream(
 	stream *connect.ServerStream[racestatev1.GetSpeedmapStreamResponse],
 ) (err error) {
 	var sc *speedmapContainer
-	if sc, err = createSpeedmapContainer(ctx, s.pool, req.Msg); err != nil {
+	if sc, err = createSpeedmapContainer(ctx, s.repos, req.Msg); err != nil {
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
@@ -483,13 +484,13 @@ func (s *stateServer) GetSpeedmapStream(
 func (s *stateServer) storeData(
 	ctx context.Context,
 	epd *utils.EventProcessingData,
-	storeFunc func(ctx context.Context, tx pgx.Tx) error,
+	storeFunc func(ctx context.Context) error,
 ) error {
 	if epd.RecordingMode == providerv1.RecordingMode_RECORDING_MODE_DO_NOT_PERSIST {
 		return nil
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := storeFunc(ctx, tx); err != nil {
+	return s.txMgr.RunInTx(ctx, func(ctx context.Context) error {
+		if err := storeFunc(ctx); err != nil {
 			return err
 		}
 		return nil
