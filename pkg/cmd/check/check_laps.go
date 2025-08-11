@@ -10,7 +10,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-	aRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/analysis/proto"
+	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -48,7 +48,8 @@ func displayLaps(ctx context.Context, eventArg string) {
 	}
 	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	data, err := aRepo.LoadByEventID(ctx, pool, eventID)
+	repos := bobRepos.NewRepositoriesFromPool(pool)
+	data, err := repos.Analysis().LoadByEventID(ctx, eventID)
 	if err != nil {
 		logger.Fatal("error loading data", log.ErrorField(err))
 	}

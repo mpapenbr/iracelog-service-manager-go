@@ -41,6 +41,8 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
+	reposApi "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
+	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/analysis"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/livedata"
@@ -53,6 +55,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/local"
 	ownNats "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/nats"
+	eventService "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/service/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	utilsCache "github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
@@ -162,6 +165,8 @@ type grpcServer struct {
 	authInterceptor   connect.Interceptor
 	configInterceptor connect.Interceptor
 	tenantCache       utilsCache.Cache[string, model.Tenant]
+	repos             reposApi.Repositories
+	txManager         reposApi.TransactionManager
 }
 
 //nolint:funlen,cyclop // by design
@@ -176,10 +181,12 @@ func startServer(ctx context.Context) error {
 	srv.SetupProfiling()
 	srv.SetupTelemetry()
 	srv.SetupDB()
-	srv.SetupCaches()
 	srv.SetupFeatures()
 	srv.SetupConfigInterceptor()
 	srv.SetupAuthInterceptor()
+	srv.SetupTransactionManager()
+	srv.SetupRepositories()
+	srv.SetupCaches()
 	srv.SetupGrpcServices()
 	return srv.Start()
 }
@@ -245,7 +252,7 @@ func (s *grpcServer) SetupFeatures() {
 }
 
 func (s *grpcServer) SetupCaches() {
-	s.tenantCache = cache.NewTenantCache(s.pool)
+	s.tenantCache = cache.NewTenantCache(s.repos.Tenant())
 }
 
 func (s *grpcServer) SetupAuthInterceptor() {
@@ -257,6 +264,14 @@ func (s *grpcServer) SetupAuthInterceptor() {
 
 func (s *grpcServer) SetupConfigInterceptor() {
 	s.configInterceptor = serverUtil.NewAppContextInterceptor(&appConfig)
+}
+
+func (s *grpcServer) SetupRepositories() {
+	s.repos = bobRepos.NewRepositoriesFromPool(s.pool)
+}
+
+func (s *grpcServer) SetupTransactionManager() {
+	s.txManager = bobRepos.NewBobTransactionFromPool(s.pool)
 }
 
 func (s *grpcServer) SetupGrpcServices() {
@@ -431,11 +446,15 @@ func (s *grpcServer) registerReflectionServer() {
 }
 
 func (s *grpcServer) registerEventServer() {
-	eventService := event.NewServer(
-		event.WithPool(s.pool),
+	eventServerImpl := event.NewServer(
+		event.WithRepositories(s.repos),
+		event.WithTxManager(s.txManager),
+		event.WithEventService(eventService.NewEventService(
+			s.repos,
+			s.txManager)),
 		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := eventv1connect.NewEventServiceHandler(
-		eventService,
+		eventServerImpl,
 		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
@@ -443,7 +462,8 @@ func (s *grpcServer) registerEventServer() {
 
 func (s *grpcServer) registerAnalysisServer() {
 	analysisService := analysis.NewServer(
-		analysis.WithPool(s.pool),
+		analysis.WithRepositories(s.repos),
+		analysis.WithTransactionManager(s.txManager),
 		analysis.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := analysisv1connect.NewAnalysisServiceHandler(
 		analysisService,
@@ -455,7 +475,8 @@ func (s *grpcServer) registerAnalysisServer() {
 
 func (s *grpcServer) registerProviderServer() {
 	providerService := provider.NewServer(
-		provider.WithPersistence(s.pool),
+		provider.WithRepositories(s.repos),
+		provider.WithTxManager(s.txManager),
 		provider.WithEventLookup(s.eventLookup),
 		provider.WithDataProxy(s.dataProxy),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
@@ -468,7 +489,8 @@ func (s *grpcServer) registerProviderServer() {
 
 func (s *grpcServer) registerStateServer() {
 	stateService := state.NewServer(
-		state.WithPool(s.pool),
+		state.WithRepositories(s.repos),
+		state.WithTxManager(s.txManager),
 		state.WithEventLookup(s.eventLookup), // to be removed?
 		state.WithDataProxy(s.dataProxy),
 		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
@@ -493,7 +515,7 @@ func (s *grpcServer) registerLiveDataServer() {
 
 func (s *grpcServer) registerTrackServer() {
 	trackService := track.NewServer(
-		track.WithPool(s.pool),
+		track.WithTrackRepository(s.repos.Track()),
 		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := trackv1connect.NewTrackServiceHandler(
 		trackService,
@@ -504,7 +526,7 @@ func (s *grpcServer) registerTrackServer() {
 
 func (s *grpcServer) registerTenantServer() {
 	tenantService := tenant.NewServer(
-		tenant.WithPool(s.pool),
+		tenant.WithRepository(s.repos.Tenant()),
 		tenant.WithTenantCache(s.tenantCache),
 		tenant.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := tenantv1connect.NewTenantServiceHandler(
@@ -516,7 +538,7 @@ func (s *grpcServer) registerTenantServer() {
 
 func (s *grpcServer) registerPredictServer() {
 	predictService := predict.NewServer(
-		predict.WithPool(s.pool),
+		predict.WithRepositories(s.repos),
 		predict.WithEventLookup(s.eventLookup), // to be removed?
 	)
 	path, handler := predictv1connect.NewPredictServiceHandler(

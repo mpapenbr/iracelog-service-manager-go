@@ -7,13 +7,12 @@ import (
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/tenant/v1/tenantv1connect"
 	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/tenant"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 )
@@ -30,9 +29,9 @@ func NewServer(opts ...Option) *tenantServer {
 
 type Option func(*tenantServer)
 
-func WithPool(p *pgxpool.Pool) Option {
+func WithRepository(repo api.TenantRepository) Option {
 	return func(srv *tenantServer) {
-		srv.pool = p
+		srv.tenantRepos = repo
 	}
 }
 
@@ -53,10 +52,11 @@ var ErrTenantNotFound = errors.New("tenant not found")
 type tenantServer struct {
 	x.UnimplementedTenantServiceHandler
 
-	pe    permission.PermissionEvaluator
-	pool  *pgxpool.Pool
-	log   *log.Logger
-	cache cache.Cache[string, model.Tenant]
+	pe permission.PermissionEvaluator
+
+	log         *log.Logger
+	cache       cache.Cache[string, model.Tenant]
+	tenantRepos api.TenantRepository
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -68,7 +68,7 @@ func (s *tenantServer) GetTenants(
 	if !s.pe.HasPermission(a, permission.PermissionReadTenant) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	data, err := tenant.LoadAll(context.Background(), s.pool)
+	data, err := s.tenantRepos.LoadAll(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (s *tenantServer) GetTenant(
 	if !s.pe.HasPermission(a, permission.PermissionReadTenant) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	data, err := tenant.LoadBySelector(context.Background(), s.pool, req.Msg.Tenant)
+	data, err := s.tenantRepos.LoadBySelector(ctx, req.Msg.Tenant)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (s *tenantServer) CreateTenant(
 	var err error
 	var ret *model.Tenant
 	req.Msg.ApiKey = utils.HashAPIKey(req.Msg.ApiKey)
-	ret, err = tenant.Create(ctx, s.pool, req.Msg)
+	ret, err = s.tenantRepos.Create(ctx, req.Msg)
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +133,14 @@ func (s *tenantServer) UpdateTenant(
 	var err error
 	var ret *model.Tenant
 	var t *model.Tenant
-	t, err = tenant.LoadBySelector(ctx, s.pool, req.Msg.Tenant)
+	t, err = s.tenantRepos.LoadBySelector(ctx, req.Msg.Tenant)
 	if err != nil {
 		return nil, err
 	}
 	if req.Msg.ApiKey != "" {
 		req.Msg.ApiKey = utils.HashAPIKey(req.Msg.ApiKey)
 	}
-	ret, err = tenant.Update(ctx, s.pool, t.ID, req.Msg)
+	ret, err = s.tenantRepos.Update(ctx, t.ID, req.Msg)
 	if err != nil {
 		return nil, err
 	}
@@ -164,12 +164,12 @@ func (s *tenantServer) DeleteTenant(
 		log.Any("arg", req.Msg))
 
 	var err error
-	data, err := tenant.LoadBySelector(context.Background(), s.pool, req.Msg.Tenant)
+	data, err := s.tenantRepos.LoadBySelector(ctx, req.Msg.Tenant)
 	if err != nil {
 		return nil, err
 	}
 	var deleted int
-	deleted, err = tenant.DeleteByID(ctx, s.pool, data.ID)
+	deleted, err = s.tenantRepos.DeleteByID(ctx, data.ID)
 	if err != nil {
 		return nil, err
 	}

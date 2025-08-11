@@ -10,7 +10,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-	stateRepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/racestate"
+	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -47,7 +47,8 @@ func checkStateInoutMarker(ctx context.Context, eventArg string) {
 	}
 	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-	states, _ := stateRepo.LoadRange(ctx, pool, eventID, time.Time{}, 1500)
+	repos := bobRepos.NewRepositoriesFromPool(pool)
+	states, _ := repos.Racestate().LoadRange(ctx, eventID, time.Time{}, 1500)
 	logger.Info("got racestates: ", log.Int("count", len(states.Data)))
 	for i, d := range states.Data {
 		for _, c := range d.Cars {

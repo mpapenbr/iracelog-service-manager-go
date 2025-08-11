@@ -9,10 +9,10 @@ import (
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	predictv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/predict/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/racestints"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -29,9 +29,9 @@ func NewServer(opts ...Option) *predictServer {
 
 type Option func(*predictServer)
 
-func WithPool(p *pgxpool.Pool) Option {
+func WithRepositories(r api.Repositories) Option {
 	return func(srv *predictServer) {
-		srv.pool = p
+		srv.repos = r
 	}
 }
 
@@ -44,9 +44,9 @@ func WithEventLookup(lookup *utils.EventLookup) Option {
 type predictServer struct {
 	x.UnimplementedPredictServiceHandler
 	lookup *utils.EventLookup
+	repos  api.Repositories
 
-	pool *pgxpool.Pool
-	log  *log.Logger
+	log *log.Logger
 }
 
 //nolint:whitespace // by design
@@ -60,7 +60,7 @@ func (s *predictServer) GetPredictParam(
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var e *eventv1.Event
 	var err error
-	e, err = util.ResolveEvent(ctx, s.pool, req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
 	if err != nil {
 		s.log.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
@@ -79,7 +79,7 @@ func (s *predictServer) GetPredictParam(
 	case *commonv1.StartSelector_SessionTime:
 		param, err = GetPredictParam(
 			ctx,
-			s.pool,
+			s.repos,
 			int(e.Id),
 			time.Duration(req.Msg.StartSelector.GetSessionTime()*float32(time.Second)),
 			req.Msg.CarNum,

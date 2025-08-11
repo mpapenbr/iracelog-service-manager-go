@@ -7,7 +7,7 @@ import (
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
@@ -21,7 +21,7 @@ type (
 	statesContainer struct {
 		e            *eventv1.Event
 		ctx          context.Context
-		conn         repository.Querier
+		repos        api.Repositories
 		req          StatesRequest
 		remain       int
 		lastRsInfoID int
@@ -31,16 +31,16 @@ type (
 //nolint:whitespace // editor/linter issue
 func createStatesContainer(
 	ctx context.Context,
-	conn repository.Querier,
+	repos api.Repositories,
 	req StatesRequest,
 ) (ret *statesContainer, err error) {
 	ret = &statesContainer{
 		ctx:    ctx,
-		conn:   conn,
+		repos:  repos,
 		req:    req,
 		remain: math.MaxInt32,
 	}
-	ret.e, err = util.ResolveEvent(ctx, conn, req.GetEvent())
+	ret.e, err = util.ResolveEvent(ctx, repos.Event(), req.GetEvent())
 	if err != nil {
 		return nil, err
 	}

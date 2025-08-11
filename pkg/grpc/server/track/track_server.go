@@ -6,13 +6,11 @@ import (
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
-	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 )
 
 func NewServer(opts ...Option) *trackServer {
@@ -22,16 +20,11 @@ func NewServer(opts ...Option) *trackServer {
 	for _, opt := range opts {
 		opt(ret)
 	}
+
 	return ret
 }
 
 type Option func(*trackServer)
-
-func WithPool(p *pgxpool.Pool) Option {
-	return func(srv *trackServer) {
-		srv.pool = p
-	}
-}
 
 func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	return func(srv *trackServer) {
@@ -39,12 +32,24 @@ func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	}
 }
 
+func WithTrackRepository(repo api.TrackRepository) Option {
+	return func(srv *trackServer) {
+		srv.trackRepos = repo
+	}
+}
+
+func WithTxManager(repo api.TransactionManager) Option {
+	return func(srv *trackServer) {
+		srv.txManager = repo
+	}
+}
+
 type trackServer struct {
 	x.UnimplementedTrackServiceHandler
-
-	pe   permission.PermissionEvaluator
-	pool *pgxpool.Pool
-	log  *log.Logger
+	pe         permission.PermissionEvaluator
+	log        *log.Logger
+	trackRepos api.TrackRepository
+	txManager  api.TransactionManager
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -53,7 +58,7 @@ func (s *trackServer) GetTracks(
 	req *connect.Request[trackv1.GetTracksRequest],
 	stream *connect.ServerStream[trackv1.GetTracksResponse],
 ) error {
-	data, err := track.LoadAll(context.Background(), s.pool)
+	data, err := s.trackRepos.LoadAll(ctx)
 	if err != nil {
 		return err
 	}
@@ -72,7 +77,7 @@ func (s *trackServer) GetTrack(
 	ctx context.Context,
 	req *connect.Request[trackv1.GetTrackRequest],
 ) (*connect.Response[trackv1.GetTrackResponse], error) {
-	data, err := track.LoadByID(context.Background(), s.pool, int(req.Msg.Id))
+	data, err := s.trackRepos.LoadByID(context.Background(), int(req.Msg.Id))
 	if err != nil {
 		return nil, err
 	}
@@ -88,8 +93,8 @@ func (s *trackServer) EnsureTrack(
 	if !s.pe.HasPermission(a, permission.PermissionCreateTrack) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
-	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		return track.EnsureTrack(ctx, tx, req.Msg.Track)
+	if err := s.txManager.RunInTx(ctx, func(ctx context.Context) error {
+		return s.trackRepos.EnsureTrack(ctx, req.Msg.Track)
 	}); err != nil {
 		return nil, err
 	}
@@ -106,16 +111,11 @@ func (s *trackServer) UpdatePitInfo(
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
-	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		_, updErr := track.UpdatePitInfo(
-			context.Background(),
-			s.pool,
-			int(req.Msg.Id),
-			req.Msg.PitInfo)
+	if err := s.txManager.RunInTx(ctx, func(ctx context.Context) error {
+		_, updErr := s.trackRepos.UpdatePitInfo(ctx, int(req.Msg.Id), req.Msg.PitInfo)
 		return updErr
 	}); err != nil {
 		return nil, err
 	}
-
 	return connect.NewResponse(&trackv1.UpdatePitInfoResponse{}), nil
 }

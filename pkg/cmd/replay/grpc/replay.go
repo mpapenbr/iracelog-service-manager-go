@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"os"
 	"strconv"
 	"time"
 
@@ -19,8 +18,7 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/cmd/replay/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
-	trackrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/track"
+	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -45,13 +43,6 @@ Note: This is only for debugging purposes and should not be used in production.
 }
 
 func startReplay(eventArg string) error {
-	logger := log.DevLogger(
-		os.Stderr,
-		util.ParseLogLevel(util.LogLevel, log.DebugLevel),
-		log.WithCaller(true),
-		log.AddCallerSkip(1))
-	log.ResetDefault(logger)
-
 	// wait for database
 	timeout, err := time.ParseDuration(config.WaitForServices)
 	if err != nil {
@@ -86,7 +77,7 @@ func startReplay(eventArg string) error {
 
 type grpcReplayTask struct {
 	util.ReplayDataProvider
-	pool        *pgxpool.Pool
+
 	eventID     int
 	sourceEvent *eventv1.Event
 	sourceTrack *trackv1.Track
@@ -99,21 +90,22 @@ type grpcReplayTask struct {
 
 func newGrpcReplayTask(pool *pgxpool.Pool, eventID int) (*grpcReplayTask, error) {
 	var err error
-	ret := &grpcReplayTask{pool: pool, eventID: eventID}
+	ctx := context.Background()
+	repos := bobRepos.NewRepositoriesFromPool(pool)
+	ret := &grpcReplayTask{eventID: eventID}
 
-	ret.sourceEvent, err = eventrepo.LoadByID(context.Background(), pool, eventID)
+	ret.sourceEvent, err = repos.Event().LoadByID(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}
-	ret.sourceTrack, err = trackrepo.LoadByID(context.Background(), pool,
-		int(ret.sourceEvent.TrackId))
+	ret.sourceTrack, err = repos.Track().LoadByID(ctx, int(ret.sourceEvent.TrackId))
 	if err != nil {
 		return nil, err
 	}
 
-	ret.driverDataFetcher = initDriverDataFetcher(pool, eventID, time.Time{}, 50)
-	ret.stateFetcher = initStateDataFetcher(pool, eventID, time.Time{}, 100)
-	ret.speedmapFetcher = initSpeedmapDataFetcher(pool, eventID, time.Time{}, 100)
+	ret.driverDataFetcher = initDriverDataFetcher(repos, eventID, time.Time{}, 50)
+	ret.stateFetcher = initStateDataFetcher(repos, eventID, time.Time{}, 100)
+	ret.speedmapFetcher = initSpeedmapDataFetcher(repos, eventID, time.Time{}, 100)
 
 	return ret, nil
 }

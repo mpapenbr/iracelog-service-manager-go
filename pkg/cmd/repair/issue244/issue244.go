@@ -10,13 +10,15 @@ import (
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
+	"github.com/stephenafamo/bob"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
-	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/event"
+	eventrepo "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 )
 
@@ -49,8 +51,9 @@ func copySessionNums(ctx context.Context) {
 	}
 	pool := postgres.InitWithURL(config.DB)
 	defer pool.Close()
-
-	if events, err := eventrepo.LoadAll(ctx, pool, nil); err == nil {
+	db := bob.NewDB(stdlib.OpenDBFromPool(pool))
+	eRepo := eventrepo.NewEventRepository(db)
+	if events, err := eRepo.LoadAll(ctx, nil); err == nil {
 		for _, event := range events {
 			doMigrateRaceStateSessionNums(pool, event.Id)
 		}

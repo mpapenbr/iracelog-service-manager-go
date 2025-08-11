@@ -136,3 +136,9 @@ release-tag:
 update-bufbuild:
 	go get buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go@$(id)
 	go get buf.build/gen/go/mpapenbr/iracelog/connectrpc/go@$(id)
+
+.PHONY: generate bob files
+## `bob`: Generate bob files from database
+bob:
+	echo "  >  Generating bob files from database"
+	go run github.com/stephenafamo/bob/gen/bobgen-psql@latest -c ./bobgen.yml
