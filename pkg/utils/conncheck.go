@@ -17,8 +17,9 @@ func WaitForTCP(addr string, timeout time.Duration) error {
 	log.Debug("wait for tcp connection",
 		log.String("addr", addr),
 		log.String("timeout", timeout.String()))
+	var d net.Dialer
 	for time.Now().Before(timeoutReached) {
-		conn, err := net.Dial("tcp", addr)
+		conn, err := d.DialContext(context.Background(), "tcp", addr)
 		if err == nil {
 			conn.Close()
 
