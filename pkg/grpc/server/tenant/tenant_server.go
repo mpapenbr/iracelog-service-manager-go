@@ -7,6 +7,8 @@ import (
 	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/tenant/v1/tenantv1connect"
 	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
@@ -23,6 +25,9 @@ func NewServer(opts ...Option) *tenantServer {
 	}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	if ret.tracer == nil {
+		ret.tracer = otel.Tracer("ism")
 	}
 	return ret
 }
@@ -47,6 +52,12 @@ func WithTenantCache(arg cache.Cache[string, model.Tenant]) Option {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) Option {
+	return func(srv *tenantServer) {
+		srv.tracer = tracer
+	}
+}
+
 var ErrTenantNotFound = errors.New("tenant not found")
 
 type tenantServer struct {
@@ -57,6 +68,7 @@ type tenantServer struct {
 	log         *log.Logger
 	cache       cache.Cache[string, model.Tenant]
 	tenantRepos api.TenantRepository
+	tracer      trace.Tracer
 }
 
 //nolint:whitespace // can't make both editor and linter happy

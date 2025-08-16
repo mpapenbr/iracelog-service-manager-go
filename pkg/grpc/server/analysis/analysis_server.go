@@ -7,6 +7,8 @@ import (
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
@@ -21,6 +23,9 @@ func NewServer(opts ...Option) *analysisServer {
 	}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	if ret.tracer == nil {
+		ret.tracer = otel.Tracer("ism")
 	}
 	return ret
 }
@@ -45,13 +50,19 @@ func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) Option {
+	return func(srv *analysisServer) {
+		srv.tracer = tracer
+	}
+}
+
 type analysisServer struct {
 	x.UnimplementedAnalysisServiceHandler
-	pe    permission.PermissionEvaluator
-	repos api.Repositories
-	txMgr api.TransactionManager
-
-	log *log.Logger
+	pe     permission.PermissionEvaluator
+	repos  api.Repositories
+	txMgr  api.TransactionManager
+	log    *log.Logger
+	tracer trace.Tracer
 }
 
 //nolint:whitespace // can't make both editor and linter happy

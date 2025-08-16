@@ -11,6 +11,10 @@ import (
 	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -28,6 +32,9 @@ func NewServer(opts ...Option) *providerServer {
 	ret := &providerServer{log: log.Default().Named("grpc.provider")}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	if ret.tracer == nil {
+		ret.tracer = otel.Tracer("ism")
 	}
 	return ret
 }
@@ -64,6 +71,12 @@ func WithPermissionEvaluator(pe permission.PermissionEvaluator) Option {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) Option {
+	return func(srv *providerServer) {
+		srv.tracer = tracer
+	}
+}
+
 var ErrEventAlreadyRegistered = errors.New("event already registered")
 
 type providerServer struct {
@@ -74,6 +87,7 @@ type providerServer struct {
 	pe        permission.PermissionEvaluator
 	lookup    *utils.EventLookup
 	log       *log.Logger
+	tracer    trace.Tracer
 }
 
 //nolint:whitespace // can't make both editor and linter happy
@@ -81,19 +95,36 @@ func (s *providerServer) ListLiveEvents(
 	ctx context.Context,
 	req *connect.Request[providerv1.ListLiveEventsRequest],
 ) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
+	mainSpan := trace.SpanFromContext(ctx)
 	t, err := serverUtil.ResolveTenant(ctx, s.repos.Tenant(), req.Msg.TenantSelector)
 	if err != nil {
+		mainSpan.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
+	attrs := []attribute.KeyValue{}
+	if t != nil {
+		attrs = append(attrs, attribute.String("tenant_name", t.Tenant.Name))
+	}
+	events := s.dataProxy.LiveEvents()
+	attrs = append(attrs, attribute.Int("total_events", len(events)))
+
 	s.log.Debug("ListLiveEvents called")
+
+	spanCtx, span := s.tracer.Start(ctx, "ListLiveEvents", trace.WithAttributes(attrs...))
+	defer span.End()
+	_ = spanCtx
+	span.SetAttributes()
+
 	ec := []*providerv1.LiveEventContainer{}
-	for _, v := range s.dataProxy.LiveEvents() {
+	for _, v := range events {
 		if t == nil {
 			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 		} else if t.Tenant.Name == v.Owner {
 			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 		}
 	}
+
+	mainSpan.SetStatus(codes.Ok, "success")
 	return connect.NewResponse(&providerv1.ListLiveEventsResponse{Events: ec}), nil
 }
 
