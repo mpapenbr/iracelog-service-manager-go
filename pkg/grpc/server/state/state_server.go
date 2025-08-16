@@ -10,6 +10,8 @@ import (
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -29,6 +31,9 @@ func NewServer(opts ...Option) *stateServer {
 	}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	if ret.tracer == nil {
+		ret.tracer = otel.Tracer("ism")
 	}
 	return ret
 }
@@ -71,6 +76,12 @@ func WithDataProxy(pd proxy.DataProxy) Option {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) Option {
+	return func(srv *stateServer) {
+		srv.tracer = tracer
+	}
+}
+
 type stateServer struct {
 	x.UnimplementedRaceStateServiceHandler
 	repos     api.Repositories
@@ -81,6 +92,7 @@ type stateServer struct {
 	log       *log.Logger
 	wireLog   *log.Logger
 	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
+	tracer    trace.Tracer
 }
 
 //nolint:whitespace // can't make both editor and linter happy

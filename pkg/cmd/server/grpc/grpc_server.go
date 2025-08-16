@@ -31,6 +31,8 @@ import (
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -153,20 +155,22 @@ func NewServerCmd() *cobra.Command {
 }
 
 type grpcServer struct {
-	ctx               context.Context
-	log               *log.Logger
-	pool              *pgxpool.Pool
-	mux               *http.ServeMux
-	telemetry         *config.Telemetry
-	otel              *otelconnect.Interceptor
-	eventLookup       *utils.EventLookup
-	tlsConfig         *tls.Config
-	dataProxy         proxy.DataProxy
-	authInterceptor   connect.Interceptor
-	configInterceptor connect.Interceptor
-	tenantCache       utilsCache.Cache[string, model.Tenant]
-	repos             reposApi.Repositories
-	txManager         reposApi.TransactionManager
+	ctx                context.Context
+	log                *log.Logger
+	pool               *pgxpool.Pool
+	mux                *http.ServeMux
+	telemetry          *config.Telemetry
+	otel               *otelconnect.Interceptor
+	eventLookup        *utils.EventLookup
+	tlsConfig          *tls.Config
+	dataProxy          proxy.DataProxy
+	authInterceptor    connect.Interceptor
+	configInterceptor  connect.Interceptor
+	traceIDInterceptor connect.Interceptor
+	tenantCache        utilsCache.Cache[string, model.Tenant]
+	repos              reposApi.Repositories
+	txManager          reposApi.TransactionManager
+	tracer             trace.Tracer
 }
 
 //nolint:funlen,cyclop // by design
@@ -175,6 +179,7 @@ func startServer(ctx context.Context) error {
 		ctx:       ctx,
 		tlsConfig: NewTLSConfigProvider(ctx),
 	}
+	srv.tracer = otel.Tracer("ism")
 	srv.SetupLogger()
 	srv.waitForRequiredServices()
 	srv.log.Info("Starting iRaclog backend", log.String("version", version.FullVersion))
@@ -184,6 +189,7 @@ func startServer(ctx context.Context) error {
 	srv.SetupFeatures()
 	srv.SetupConfigInterceptor()
 	srv.SetupAuthInterceptor()
+	srv.SetupTraceIDInterceptor()
 	srv.SetupTransactionManager()
 	srv.SetupRepositories()
 	srv.SetupCaches()
@@ -264,6 +270,10 @@ func (s *grpcServer) SetupAuthInterceptor() {
 
 func (s *grpcServer) SetupConfigInterceptor() {
 	s.configInterceptor = serverUtil.NewAppContextInterceptor(&appConfig)
+}
+
+func (s *grpcServer) SetupTraceIDInterceptor() {
+	s.traceIDInterceptor = serverUtil.NewTraceIDInterceptor()
 }
 
 func (s *grpcServer) SetupRepositories() {
@@ -351,9 +361,11 @@ func (s *grpcServer) Start() error {
 			server := &http.Server{
 				Addr:      config.TLSServerAddr,
 				TLSConfig: s.tlsConfig,
-				Handler: h2c.NewHandler(newCORS().Handler(s.mux), &http2.Server{
-					MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
-				}),
+				Handler: h2c.NewHandler(
+					newCORS().Handler(s.mux),
+					&http2.Server{
+						MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
+					}),
 			}
 
 			// don't need to pass cert and key here, already done by TLSConfig above
@@ -369,9 +381,11 @@ func (s *grpcServer) Start() error {
 		//nolint:gosec // by design
 		server := &http.Server{
 			Addr: config.GrpcServerAddr,
-			Handler: h2c.NewHandler(newCORS().Handler(s.mux), &http2.Server{
-				MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
-			}),
+			Handler: h2c.NewHandler(
+				newCORS().Handler(s.mux),
+				&http2.Server{
+					MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
+				}),
 		}
 
 		err := server.ListenAndServe()
@@ -452,10 +466,13 @@ func (s *grpcServer) registerEventServer() {
 		event.WithEventService(eventService.NewEventService(
 			s.repos,
 			s.txManager)),
-		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
+		event.WithTracer(s.tracer), // Added
+	)
 	path, handler := eventv1connect.NewEventServiceHandler(
 		eventServerImpl,
-		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
+		connect.WithInterceptors(
+			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -464,10 +481,13 @@ func (s *grpcServer) registerAnalysisServer() {
 	analysisService := analysis.NewServer(
 		analysis.WithRepositories(s.repos),
 		analysis.WithTransactionManager(s.txManager),
-		analysis.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+		analysis.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
+		analysis.WithTracer(s.tracer), // Added
+	)
 	path, handler := analysisv1connect.NewAnalysisServiceHandler(
 		analysisService,
-		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
+		connect.WithInterceptors(
+			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor),
 	)
 
 	s.mux.Handle(path, handler)
@@ -479,10 +499,12 @@ func (s *grpcServer) registerProviderServer() {
 		provider.WithTxManager(s.txManager),
 		provider.WithEventLookup(s.eventLookup),
 		provider.WithDataProxy(s.dataProxy),
+		provider.WithTracer(s.tracer),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
-		connect.WithInterceptors(s.otel, s.configInterceptor, s.authInterceptor),
+		connect.WithInterceptors(
+			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -493,10 +515,12 @@ func (s *grpcServer) registerStateServer() {
 		state.WithTxManager(s.txManager),
 		state.WithEventLookup(s.eventLookup), // to be removed?
 		state.WithDataProxy(s.dataProxy),
-		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
+		state.WithTracer(s.tracer), // Added
+	)
 	path, handler := racestatev1connect.NewRaceStateServiceHandler(
 		stateService,
-		connect.WithInterceptors(s.otel, s.authInterceptor),
+		connect.WithInterceptors(s.otel, s.traceIDInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -508,7 +532,7 @@ func (s *grpcServer) registerLiveDataServer() {
 	)
 	path, handler := livedatav1connect.NewLiveDataServiceHandler(
 		liveDataService,
-		connect.WithInterceptors(s.otel),
+		connect.WithInterceptors(s.otel, s.traceIDInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -516,10 +540,12 @@ func (s *grpcServer) registerLiveDataServer() {
 func (s *grpcServer) registerTrackServer() {
 	trackService := track.NewServer(
 		track.WithTrackRepository(s.repos.Track()),
-		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
+		track.WithTracer(s.tracer), // Added
+	)
 	path, handler := trackv1connect.NewTrackServiceHandler(
 		trackService,
-		connect.WithInterceptors(s.otel, s.authInterceptor),
+		connect.WithInterceptors(s.otel, s.traceIDInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -528,10 +554,12 @@ func (s *grpcServer) registerTenantServer() {
 	tenantService := tenant.NewServer(
 		tenant.WithRepository(s.repos.Tenant()),
 		tenant.WithTenantCache(s.tenantCache),
-		tenant.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+		tenant.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
+		tenant.WithTracer(s.tracer), // Added
+	)
 	path, handler := tenantv1connect.NewTenantServiceHandler(
 		tenantService,
-		connect.WithInterceptors(s.otel, s.authInterceptor),
+		connect.WithInterceptors(s.otel, s.traceIDInterceptor, s.authInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -540,10 +568,11 @@ func (s *grpcServer) registerPredictServer() {
 	predictService := predict.NewServer(
 		predict.WithRepositories(s.repos),
 		predict.WithEventLookup(s.eventLookup), // to be removed?
+		predict.WithTracer(s.tracer),           // Added
 	)
 	path, handler := predictv1connect.NewPredictServiceHandler(
 		predictService,
-		connect.WithInterceptors(s.otel),
+		connect.WithInterceptors(s.otel, s.traceIDInterceptor),
 	)
 	s.mux.Handle(path, handler)
 }

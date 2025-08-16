@@ -9,6 +9,8 @@ import (
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	predictv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/predict/v1"
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/racestints"
@@ -23,6 +25,9 @@ func NewServer(opts ...Option) *predictServer {
 	}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	if ret.tracer == nil {
+		ret.tracer = otel.Tracer("ism")
 	}
 	return ret
 }
@@ -41,12 +46,19 @@ func WithEventLookup(lookup *utils.EventLookup) Option {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) Option {
+	return func(srv *predictServer) {
+		srv.tracer = tracer
+	}
+}
+
 type predictServer struct {
 	x.UnimplementedPredictServiceHandler
 	lookup *utils.EventLookup
 	repos  api.Repositories
 
-	log *log.Logger
+	log    *log.Logger
+	tracer trace.Tracer
 }
 
 //nolint:whitespace // by design

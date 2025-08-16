@@ -10,6 +10,8 @@ import (
 	livedatav1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/livedata/v1"
 	speedmapv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/speedmap/v1"
 	"connectrpc.com/connect"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -25,6 +27,9 @@ func NewServer(opts ...Option) *liveDataServer {
 	}
 	for _, opt := range opts {
 		opt(ret)
+	}
+	if ret.tracer == nil {
+		ret.tracer = otel.Tracer("ism")
 	}
 	return ret
 }
@@ -49,6 +54,12 @@ func WithDebugWire(arg bool) Option {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) Option {
+	return func(srv *liveDataServer) {
+		srv.tracer = tracer
+	}
+}
+
 type liveDataServer struct {
 	livedatav1connect.UnimplementedLiveDataServiceHandler
 
@@ -57,6 +68,7 @@ type liveDataServer struct {
 	log       *log.Logger
 	wireLog   *log.Logger
 	debugWire bool // if true, debug events affecting "wire" actions (send/receive)
+	tracer    trace.Tracer
 }
 
 //nolint:whitespace // can't make both editor and linter happy
