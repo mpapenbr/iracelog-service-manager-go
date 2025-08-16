@@ -6,6 +6,7 @@ import (
 	"log"
 	"testing"
 
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	tenantv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/tenant/v1"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
@@ -58,7 +59,21 @@ var sampleEvent = &eventv1.Event{
 	ReplayInfo: &eventv1.ReplayInfo{
 		MinTimestamp: &timestamppb.Timestamp{Seconds: 1000},
 	},
-	Sessions:      []*eventv1.Session{{Num: 1, Name: "RACE"}},
+	Sessions: []*eventv1.Session{
+		{
+			Num:         0,
+			Name:        "QUALIFY",
+			SessionTime: 80,
+			Laps:        2,
+			Type:        commonv1.SessionType_SESSION_TYPE_LONE_QUALIFY,
+		},
+		{
+			Num:         1,
+			Name:        "RACE",
+			SessionTime: 3600,
+			Type:        commonv1.SessionType_SESSION_TYPE_RACE,
+		},
+	},
 	NumCarClasses: 3,
 	TireInfos: []*eventv1.TireInfo{
 		{Index: 0, CompoundType: "Hard"},

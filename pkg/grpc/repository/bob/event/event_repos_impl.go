@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 
+	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"github.com/aarondl/opt/omit"
 	"github.com/aarondl/opt/omitnull"
@@ -45,6 +46,7 @@ func (r *repo) Create(
 			Name:        item.Name,
 			Laps:        int(item.Laps),
 			SessionTime: int(item.SessionTime),
+			Type:        int(item.Type),
 		})
 	}
 	tireInfos := mytypes.TireInfoSlice{}
@@ -217,6 +219,7 @@ func (r *repo) addReplayInfo(
 	}
 }
 
+//nolint:funlen // by design
 func (r *repo) toPBMessage(dbEvent *models.Event) (*eventv1.Event, error) {
 	var item eventv1.Event
 
@@ -247,6 +250,8 @@ func (r *repo) toPBMessage(dbEvent *models.Event) (*eventv1.Event, error) {
 				Num:         uint32(dbEvent.Sessions[i].Num),
 				Name:        dbEvent.Sessions[i].Name,
 				SessionTime: int32(dbEvent.Sessions[i].SessionTime),
+				Laps:        int32(dbEvent.Sessions[i].Laps),
+				Type:        commonv1.SessionType(dbEvent.Sessions[i].Type),
 			}
 		}
 		item.Sessions = sessions
