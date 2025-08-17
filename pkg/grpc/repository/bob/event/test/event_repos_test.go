@@ -34,6 +34,11 @@ var sampleTrack = &trackv1.Track{
 
 	Sectors: []*trackv1.Sector{
 		{
+			Num:      0,
+			StartPct: 0,
+		},
+
+		{
 			Num:      1,
 			StartPct: 0.5,
 		},

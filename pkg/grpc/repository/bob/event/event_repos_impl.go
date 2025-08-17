@@ -3,7 +3,6 @@ package event
 import (
 	"context"
 
-	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"github.com/aarondl/opt/omit"
 	"github.com/aarondl/opt/omitnull"
@@ -39,24 +38,6 @@ func (r *repo) Create(
 	event *eventv1.Event,
 	tenantID uint32,
 ) error {
-	sessions := mytypes.EventSessionSlice{}
-	for _, item := range event.Sessions {
-		sessions = append(sessions, mytypes.EventSession{
-			Num:         int(item.Num),
-			Name:        item.Name,
-			Laps:        int(item.Laps),
-			SessionTime: int(item.SessionTime),
-			Type:        int(item.Type),
-		})
-	}
-	tireInfos := mytypes.TireInfoSlice{}
-	for _, item := range event.TireInfos {
-		tireInfos = append(tireInfos, mytypes.TireInfo{
-			Index:        int(item.Index),
-			CompoundType: item.CompoundType,
-		})
-	}
-
 	setter := &models.EventSetter{
 		Name:              omit.From(event.Name),
 		EventKey:          omit.From(event.Key),
@@ -72,8 +53,8 @@ func (r *repo) Create(
 		IrSessionID:       omitnull.From(event.IrSessionId),
 		IrSubSessionID:    omit.From(event.IrSubSessionId),
 		PitSpeed:          omit.From(decimal.NewFromFloat32(event.PitSpeed)),
-		Sessions:          omit.From(sessions),
-		TireInfos:         omitnull.From(tireInfos),
+		Sessions:          omit.From(mytypes.EventSessionSlice(event.Sessions)),
+		TireInfos:         omitnull.From(mytypes.TireInfoSlice(event.TireInfos)),
 	}
 	if event.ReplayInfo != nil {
 		setter.ReplayMinTimestamp = omit.From(event.ReplayInfo.MinTimestamp.AsTime())
@@ -244,28 +225,11 @@ func (r *repo) toPBMessage(dbEvent *models.Event) (*eventv1.Event, error) {
 	}
 
 	if dbEvent.Sessions != nil {
-		sessions := make([]*eventv1.Session, len(dbEvent.Sessions))
-		for i := range dbEvent.Sessions {
-			sessions[i] = &eventv1.Session{
-				Num:         uint32(dbEvent.Sessions[i].Num),
-				Name:        dbEvent.Sessions[i].Name,
-				SessionTime: int32(dbEvent.Sessions[i].SessionTime),
-				Laps:        int32(dbEvent.Sessions[i].Laps),
-				Type:        commonv1.SessionType(dbEvent.Sessions[i].Type),
-			}
-		}
-		item.Sessions = sessions
+		item.Sessions = dbEvent.Sessions
 	}
 	// note: TireInfos is optional, so we check if value is present
 	if dbEvent.TireInfos.IsValue() {
-		tireInfos := make([]*eventv1.TireInfo, len(dbEvent.TireInfos.GetOrZero()))
-		for i, tireInfo := range dbEvent.TireInfos.GetOrZero() {
-			tireInfos[i] = &eventv1.TireInfo{
-				Index:        uint32(tireInfo.Index),
-				CompoundType: tireInfo.CompoundType,
-			}
-		}
-		item.TireInfos = tireInfos
+		item.TireInfos = dbEvent.TireInfos.GetOrZero()
 	}
 
 	return &item, nil
