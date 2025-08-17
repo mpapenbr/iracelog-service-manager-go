@@ -50,7 +50,7 @@ func TestCustom(t *testing.T) {
 
 	_ = rsInfoID
 
-	rs := models.RSInfoColumns.AliasedAs("rs")
+	rs := models.RSInfos.Columns.AliasedAs("rs")
 	rsWhere := models.SelectWhere.RSInfos.AliasedAs("rs")
 	type myTmp struct {
 		ID          int32
@@ -64,7 +64,7 @@ func TestCustom(t *testing.T) {
 			rs.RecordStamp,
 			psql.F("to_timestamp", psql.Arg(time.Now().UnixMilli()))().As("dings"),
 		),
-		sm.From(models.TableNames.RSInfos).As("rs"),
+		sm.From(models.RSInfos.Name()).As("rs"),
 		rsWhere.EventID.EQ(int32(event.Id)),
 	)
 	dbg := bob.Debug(db)

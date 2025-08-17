@@ -121,7 +121,7 @@ func (r *repo) LoadAll(ctx context.Context, tenantID *uint32) (
 	[]*eventv1.Event, error,
 ) {
 	sqlMods := make(bob.Mods[*dialect.SelectQuery], 0)
-	sqlMods = append(sqlMods, sm.OrderBy(models.EventColumns.EventTime).Desc())
+	sqlMods = append(sqlMods, sm.OrderBy(models.Events.Columns.EventTime).Desc())
 	if tenantID != nil {
 		tmp := int32(*tenantID)
 		sqlMods = append(sqlMods, models.SelectWhere.Events.TenantID.EQ(tmp))

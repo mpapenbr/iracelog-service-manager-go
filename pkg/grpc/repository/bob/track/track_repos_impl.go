@@ -80,7 +80,7 @@ func (r *repo) LoadAll(ctx context.Context) (
 	[]*trackv1.Track, error,
 ) {
 	query := models.Tracks.Query(
-		sm.OrderBy(models.TrackColumns.ID).Asc(),
+		sm.OrderBy(models.Tracks.Columns.ID).Asc(),
 	)
 	data, err := query.All(ctx, r.getExecutor(ctx))
 	if err != nil {

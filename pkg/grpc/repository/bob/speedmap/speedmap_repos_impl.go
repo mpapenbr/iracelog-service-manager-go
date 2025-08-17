@@ -83,16 +83,16 @@ func (r *repo) LoadLatest(
 ) (*racestatev1.PublishSpeedmapRequest, error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		sm.Limit(1),
-		sm.OrderBy(models.RSInfoColumns.ID).Desc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Desc(),
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
@@ -117,17 +117,17 @@ func (r *repo) LoadRange(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.RecordStamp.GTE(startTS),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -142,18 +142,18 @@ func (r *repo) LoadRangeBySessionTime(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.SessionNum.EQ(int32(sessionNum)),
 		models.SelectWhere.RSInfos.SessionTime.GTE(decimal.NewFromFloat(sessionTime)),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -168,17 +168,17 @@ func (r *repo) LoadRangeByID(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.ID.GTE(int32(rsInfoID)),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -193,18 +193,18 @@ func (r *repo) LoadRangeByIDWithinSession(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.ID.GTE(int32(rsInfoID)),
 		models.SelectWhere.RSInfos.SessionNum.EQ(int32(sessionNum)),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -231,14 +231,14 @@ func (r *repo) LoadSnapshots(
 	// collects rsInfo of the speedmaps
 	subRS := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.RecordStamp,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.RecordStamp,
 			psql.F("to_timestamp", psql.Arg(startTS.UnixMilli()))().As("race_start")),
-		sm.From(models.TableNames.RSInfos),
+		sm.From(models.RSInfos.Name()),
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.RecordStamp.GTE(*startTS),
 		models.SelectJoins.RSInfos.InnerJoin.SpeedmapProtos,
-		sm.OrderBy(models.RSInfoColumns.RecordStamp).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.RecordStamp).Asc(),
 	)
 
 	// creates date_bins of above subquery subRS.
@@ -265,20 +265,20 @@ func (r *repo) LoadSnapshots(
 	// this will produce the same query as in LoadSnapshotsLegacy
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.RSInfoColumns.TimeOfDay,
-			models.RSInfoColumns.AirTemp,
-			models.RSInfoColumns.TrackTemp,
-			models.RSInfoColumns.TrackWetness,
-			models.RSInfoColumns.Precipitation,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.RSInfos.Columns.TimeOfDay,
+			models.RSInfos.Columns.AirTemp,
+			models.RSInfos.Columns.TrackTemp,
+			models.RSInfos.Columns.TrackWetness,
+			models.RSInfos.Columns.Precipitation,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
-		sm.Where(models.SpeedmapProtoColumns.RSInfoID.In(startBins)),
+		sm.Where(models.SpeedmapProtos.Columns.RSInfoID.In(startBins)),
 
-		sm.OrderBy(models.RSInfoColumns.RecordStamp).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.RecordStamp).Asc(),
 	)
 	res, err := bob.All(ctx, r.getExecutor(ctx), q, scan.StructMapper[snapRaw]())
 	if err != nil {
@@ -405,15 +405,15 @@ func (r *repo) findStartingPoint(
 ) (int, *time.Time, error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.SpeedmapProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.SpeedmapProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.SpeedmapProtos),
+		sm.From(models.SpeedmapProtos.Name()),
 		models.SelectJoins.SpeedmapProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
-		sm.OrderBy(models.RSInfoColumns.RecordStamp).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.RecordStamp).Asc(),
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
@@ -440,13 +440,13 @@ func (r *repo) findStartingPoint(
 // deletes all entries for an event from the database, returns number of rows deleted.
 func (r *repo) DeleteByEventID(ctx context.Context, eventID int) (ret int, err error) {
 	subQuery := psql.Select(
-		sm.Columns(models.RSInfoColumns.ID),
-		sm.From(models.TableNames.RSInfos),
+		sm.Columns(models.RSInfos.Columns.ID),
+		sm.From(models.RSInfos.Name()),
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 	)
 	var num int64
 	num, err = models.SpeedmapProtos.Delete(
-		dm.Where(models.SpeedmapProtoColumns.RSInfoID.In(subQuery)),
+		dm.Where(models.SpeedmapProtos.Columns.RSInfoID.In(subQuery)),
 	).Exec(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return 0, err

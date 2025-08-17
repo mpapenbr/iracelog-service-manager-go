@@ -14,6 +14,7 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql/dm"
 	"github.com/stephenafamo/bob/dialect/psql/sm"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/dbinfo"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/models"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	bobCtx "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob/context"
@@ -289,19 +290,19 @@ func (r *repo) DeleteByEventID(ctx context.Context, eventID int) (int, error) {
 	var num int64
 
 	subQuery := psql.Select(
-		sm.Columns(models.CCarEntryColumns.ID),
-		sm.From(models.TableNames.CCarEntries),
+		sm.Columns(dbinfo.CCarEntries.Columns.ID.Name),
+		sm.From(dbinfo.CCarEntries.Name),
 		models.SelectWhere.CCarEntries.EventID.EQ(int32(eventID)),
 	)
 
 	_, err = models.CCarTeams.Delete(
-		dm.Where(models.CCarTeamColumns.CCarEntryID.In(subQuery))).
+		dm.Where(models.CCarTeams.Columns.CCarEntryID.In(subQuery))).
 		Exec(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return 0, err
 	}
 	_, err = models.CCarDrivers.Delete(
-		dm.Where(models.CCarDriverColumns.CCarEntryID.In(subQuery))).
+		dm.Where(models.CCarDrivers.Columns.CCarEntryID.In(subQuery))).
 		Exec(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return 0, err
