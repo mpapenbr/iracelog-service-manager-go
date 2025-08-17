@@ -13,6 +13,7 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql/sm"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/dbinfo"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/models"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	bobCtx "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob/context"
@@ -47,11 +48,11 @@ func (r *repo) Upsert(
 		RecordStamp: omit.From(time.Now()),
 	}
 	_, err = models.AnalysisProtos.Insert(setter,
-		im.OnConflict(models.ColumnNames.AnalysisProtos.EventID).DoUpdate(
-			im.SetCol(models.ColumnNames.AnalysisProtos.Protodata).To(
+		im.OnConflict(dbinfo.AnalysisProtos.Columns.EventID.Name).DoUpdate(
+			im.SetCol(dbinfo.AnalysisProtos.Columns.Protodata.Name).To(
 				psql.Arg(binaryMessage),
 			),
-			im.SetCol(models.ColumnNames.AnalysisProtos.RecordStamp).To(
+			im.SetCol(dbinfo.AnalysisProtos.Columns.RecordStamp.Name).To(
 				psql.Arg(time.Now()),
 			),
 		)).One(ctx, r.getExecutor(ctx))
@@ -84,14 +85,16 @@ func (r *repo) LoadByEventKey(
 	eventKey string,
 ) (*analysisv1.Analysis, error) {
 	subQuery := psql.Select(
-		sm.Columns(models.ColumnNames.Events.ID),
-		sm.From(models.TableNames.Events),
+
+		sm.Columns(dbinfo.Events.Columns.ID.Name),
+		sm.From(dbinfo.Events.Name),
 		models.SelectWhere.Events.EventKey.EQ(eventKey),
 	)
 	res, err := models.AnalysisProtos.Query(
-		sm.Where(models.AnalysisProtoColumns.EventID.EQ(
-			subQuery,
-		)),
+		// sm.Where(models.AnalysisProtoColumns.EventID.EQ(
+		// 	subQuery,
+		// )),
+		sm.Where(models.AnalysisProtos.Columns.EventID.EQ(subQuery)),
 	).One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err

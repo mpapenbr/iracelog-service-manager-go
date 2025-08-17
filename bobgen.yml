@@ -47,7 +47,34 @@ replacements:
     replace: "mytypes.SectorSlice"
 
 no_tests: true
-no_factory: true
+plugins_preset: default
+plugins:
+  dbinfo:
+    disabled: false
+    pkgname: "dbinfo"
+    destination: "pkg/db/dbinfo"
+  enums:
+    disabled: false
+    pkgname: "enums"
+    destination: "pkg/db/enums"
+  models:
+    disabled: false
+    pkgname: "models"
+    destination: "pkg/db/models"
+  factory:
+    disabled: true
+    pkgname: "factory"
+    destination: "pkg/db/factory"
+  dberrors:
+    disabled: false
+    pkgname: "dberrors"
+    destination: "pkg/db/dberrors"
+  where:
+    disabled: false
+  loaders:
+    disabled: false
+  joins:
+    disabled: false
 psql:
   dsn: "postgres://docker:docker@localhost:5432/iracelog_grpc?sslmode=disable"
   driver_name: github.com/jackc/pgx/v5

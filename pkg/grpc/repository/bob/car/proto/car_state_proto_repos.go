@@ -67,16 +67,16 @@ func (r *repo) LoadLatest(
 ) (*racestatev1.PublishDriverDataRequest, error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.CarStateProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.CarStateProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.CarStateProtos),
+		sm.From(models.CarStateProtos.Name()),
 		models.SelectJoins.CarStateProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		sm.Limit(1),
-		sm.OrderBy(models.RSInfoColumns.ID).Desc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Desc(),
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
@@ -101,17 +101,17 @@ func (r *repo) LoadRange(
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.CarStateProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.CarStateProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.CarStateProtos),
+		sm.From(models.CarStateProtos.Name()),
 		models.SelectJoins.CarStateProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.RecordStamp.GTE(startTS),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -126,18 +126,18 @@ func (r *repo) LoadRangeBySessionTime(
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.CarStateProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.CarStateProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.CarStateProtos),
+		sm.From(models.CarStateProtos.Name()),
 		models.SelectJoins.CarStateProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.SessionNum.EQ(int32(sessionNum)),
 		models.SelectWhere.RSInfos.SessionTime.GTE(decimal.NewFromFloat(sessionTime)),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -152,18 +152,18 @@ func (r *repo) LoadRangeByID(
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.CarStateProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.CarStateProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.CarStateProtos),
+		sm.From(models.CarStateProtos.Name()),
 		models.SelectJoins.CarStateProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.ID.GTE(int32(rsInfoID)),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
-		sm.OrderBy(models.RSInfoColumns.RecordStamp).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.RecordStamp).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -178,19 +178,19 @@ func (r *repo) LoadRangeByIDWithinSession(
 ) (*util.RangeContainer[racestatev1.PublishDriverDataRequest], error) {
 	q := psql.Select(
 		sm.Columns(
-			models.RSInfoColumns.ID,
-			models.RSInfoColumns.SessionTime,
-			models.RSInfoColumns.RecordStamp,
-			models.CarStateProtoColumns.Protodata,
+			models.RSInfos.Columns.ID,
+			models.RSInfos.Columns.SessionTime,
+			models.RSInfos.Columns.RecordStamp,
+			models.CarStateProtos.Columns.Protodata,
 		),
-		sm.From(models.TableNames.CarStateProtos),
+		sm.From(models.CarStateProtos.Name()),
 		models.SelectJoins.CarStateProtos.InnerJoin.RSInfo,
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.ID.GTE(int32(rsInfoID)),
 		models.SelectWhere.RSInfos.SessionNum.EQ(int32(sessionNum)),
 		sm.Limit(limit),
-		sm.OrderBy(models.RSInfoColumns.ID).Asc(),
-		sm.OrderBy(models.RSInfoColumns.RecordStamp).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.ID).Asc(),
+		sm.OrderBy(models.RSInfos.Columns.RecordStamp).Asc(),
 	)
 	return r.loadRange(ctx, q, limit)
 }
@@ -231,12 +231,12 @@ func (r *repo) loadRange(
 // deletes all car state related entries of an event from the database
 func (r *repo) DeleteByEventID(ctx context.Context, eventID int) (int, error) {
 	subQuery := psql.Select(
-		sm.Columns(models.RSInfoColumns.ID),
-		sm.From(models.TableNames.RSInfos),
+		sm.Columns(models.RSInfos.Columns.ID),
+		sm.From(models.RSInfos.Name()),
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 	)
 	ret, err := models.CarStateProtos.Delete(
-		dm.Where(models.CarStateProtoColumns.RSInfoID.In(subQuery)),
+		dm.Where(models.CarStateProtos.Columns.RSInfoID.In(subQuery)),
 	).Exec(ctx, r.getExecutor(ctx))
 	return int(ret), err
 }

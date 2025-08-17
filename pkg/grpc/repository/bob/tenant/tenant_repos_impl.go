@@ -13,6 +13,7 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql"
 	"github.com/stephenafamo/bob/dialect/psql/sm"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/dbinfo"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/models"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
 	api "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
@@ -111,13 +112,13 @@ func (r *repo) LoadByEventID(ctx context.Context, eventID int) (
 	*model.Tenant, error,
 ) {
 	subQuery := psql.Select(
-		sm.Columns(models.EventColumns.TenantID),
-		sm.From(models.TableNames.Events),
+		sm.Columns(dbinfo.Events.Columns.TenantID),
+		sm.From(dbinfo.Events),
 		models.SelectWhere.Events.ID.EQ(int32(eventID)),
 	)
 
 	ret, err := models.Tenants.Query(
-		sm.Where(models.TenantColumns.ID.EQ(subQuery)),
+		sm.Where(models.Tenants.Columns.ID.EQ(subQuery)),
 	).One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err
@@ -144,7 +145,7 @@ func (r *repo) LoadAll(ctx context.Context) (
 	[]*model.Tenant, error,
 ) {
 	query := models.Tenants.Query(
-		sm.OrderBy(models.TenantColumns.ID).Asc(),
+		sm.OrderBy(models.Tenants.Columns.ID).Asc(),
 	)
 	data, err := query.All(ctx, r.getExecutor(ctx))
 	if err != nil {

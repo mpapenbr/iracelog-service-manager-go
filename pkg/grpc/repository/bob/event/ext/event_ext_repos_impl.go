@@ -10,6 +10,7 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql"
 	"github.com/stephenafamo/bob/dialect/psql/im"
 
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/dbinfo"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/models"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/mytypes"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
@@ -44,8 +45,8 @@ func (r *repo) Upsert(
 		}),
 	}
 	_, err = models.EventExts.Insert(setter,
-		im.OnConflict(models.ColumnNames.EventExts.EventID).DoUpdate(
-			im.SetCol(models.ColumnNames.EventExts.ExtraInfo).To(
+		im.OnConflict(dbinfo.EventExts.Columns.EventID.Name).DoUpdate(
+			im.SetCol(dbinfo.EventExts.Columns.ExtraInfo.Name).To(
 				psql.Arg(extra),
 			),
 		)).One(ctx, r.getExecutor(ctx))

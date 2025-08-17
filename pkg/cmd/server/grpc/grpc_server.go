@@ -188,11 +188,11 @@ func startServer(ctx context.Context) error {
 	srv.SetupDB()
 	srv.SetupFeatures()
 	srv.SetupConfigInterceptor()
-	srv.SetupAuthInterceptor()
 	srv.SetupTraceIDInterceptor()
 	srv.SetupTransactionManager()
 	srv.SetupRepositories()
 	srv.SetupCaches()
+	srv.SetupAuthInterceptor() // needs to be after repos + caches
 	srv.SetupGrpcServices()
 	return srv.Start()
 }
