@@ -38,13 +38,6 @@ func (r *repo) Create(ctx context.Context, track *trackv1.Track) error {
 	if track.PitInfo == nil {
 		workPitInfo = &trackv1.PitInfo{}
 	}
-	sectors := mytypes.SectorSlice{}
-	for _, sector := range track.Sectors {
-		sectors = append(sectors, mytypes.Sector{
-			Num:      int(sector.Num),
-			StartPct: float64(sector.StartPct),
-		})
-	}
 
 	setter := &models.TrackSetter{
 		ID:            omit.From(int32(track.Id)),
@@ -52,7 +45,7 @@ func (r *repo) Create(ctx context.Context, track *trackv1.Track) error {
 		ShortName:     omit.From(track.ShortName),
 		Config:        omit.From(track.Config),
 		TrackLength:   omit.From(decimal.NewFromFloat32(track.Length)),
-		Sectors:       omit.From(sectors),
+		Sectors:       omit.From(mytypes.SectorSlice(track.Sectors)),
 		PitSpeed:      omit.From(decimal.NewFromFloat32(track.PitSpeed)),
 		PitEntry:      omit.From(decimal.NewFromFloat32(workPitInfo.Entry)),
 		PitExit:       omit.From(decimal.NewFromFloat32(workPitInfo.Exit)),
@@ -144,7 +137,6 @@ func (r *repo) DeleteByID(ctx context.Context, id int) (int, error) {
 
 func (r *repo) toPBMessage(dbTrack *models.Track) (*trackv1.Track, error) {
 	var item trackv1.Track
-	var sectors []*trackv1.Sector
 
 	item.Id = uint32(dbTrack.ID)
 	item.Name = dbTrack.Name
@@ -158,14 +150,7 @@ func (r *repo) toPBMessage(dbTrack *models.Track) (*trackv1.Track, error) {
 		LaneLength: float32(dbTrack.PitLaneLength.InexactFloat64()),
 	}
 	if dbTrack.Sectors != nil {
-		sectors = make([]*trackv1.Sector, len(dbTrack.Sectors))
-		for i, sector := range dbTrack.Sectors {
-			sectors[i] = &trackv1.Sector{
-				Num:      uint32(sector.Num),
-				StartPct: float32(sector.StartPct),
-			}
-		}
-		item.Sectors = sectors
+		item.Sectors = dbTrack.Sectors
 	}
 
 	return &item, nil
