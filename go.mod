@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.18.1-20250705185745-385bdc10baf0.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.7-20250705185745-385bdc10baf0.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.8-20250705185745-385bdc10baf0.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/grpcreflect v1.3.0
@@ -18,8 +18,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/lib/pq v1.10.9
-	github.com/nats-io/nats.go v1.44.0
-	github.com/ohler55/ojg v1.26.8
+	github.com/nats-io/nats.go v1.45.0
+	github.com/ohler55/ojg v1.26.9
 	github.com/open-policy-agent/opa v1.7.1
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
@@ -41,10 +41,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.37.0
 	go.opentelemetry.io/otel/sdk v1.37.0
 	go.opentelemetry.io/otel/sdk/metric v1.37.0
+	go.opentelemetry.io/otel/trace v1.37.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.27.0
 	golang.org/x/net v0.43.0
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.8
 	gotest.tools/v3 v3.5.2
 	moul.io/zapfilter v1.7.0
 )
@@ -126,7 +127,6 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.37.0 // indirect
-	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/sync v0.16.0 // indirect
