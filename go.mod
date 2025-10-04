@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.0-20250705185745-385bdc10baf0.1
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.9-20250705185745-385bdc10baf0.1
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.10-20250705185745-385bdc10baf0.1
 	connectrpc.com/connect v1.19.0
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/grpcreflect v1.3.0
@@ -18,7 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/lib/pq v1.10.9
-	github.com/nats-io/nats.go v1.46.0
+	github.com/nats-io/nats.go v1.46.1
 	github.com/ohler55/ojg v1.26.10
 	github.com/open-policy-agent/opa v1.9.0
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
@@ -45,7 +45,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.28.0
 	golang.org/x/net v0.44.0
-	google.golang.org/protobuf v1.36.9
+	google.golang.org/protobuf v1.36.10
 	gotest.tools/v3 v3.5.2
 	moul.io/zapfilter v1.7.0
 )
