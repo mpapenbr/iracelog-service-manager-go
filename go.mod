@@ -3,7 +3,7 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.25.0
 
 require (
-	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.1-20250705185745-385bdc10baf0.1
+	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.1-20250705185745-385bdc10baf0.2
 	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.10-20250705185745-385bdc10baf0.1
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/grpchealth v1.4.0
@@ -18,7 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/lib/pq v1.10.9
-	github.com/nats-io/nats.go v1.46.1
+	github.com/nats-io/nats.go v1.47.0
 	github.com/ohler55/ojg v1.26.10
 	github.com/open-policy-agent/opa v1.9.0
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
