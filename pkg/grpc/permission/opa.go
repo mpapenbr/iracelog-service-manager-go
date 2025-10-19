@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"fmt"
 
 	"github.com/open-policy-agent/opa/v1/rego"
 	"github.com/open-policy-agent/opa/v1/storage/inmem"
+	"github.com/samber/lo"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
@@ -20,10 +22,10 @@ type OpaPermissionEvaluator struct {
 }
 
 type EvalRequest struct {
-	Tenant      string      `json:"tenant"`
-	Roles       []auth.Role `json:"roles"`
-	Action      Permission  `json:"action"`
-	ObjectOwner string      `json:"objectOwner,omitempty"`
+	Roles       []auth.Role            `json:"roles"`
+	Scoped      map[auth.Role][]string `json:"scoped,omitempty"`
+	Action      Permission             `json:"action"`
+	ObjectOwner string                 `json:"objectOwner,omitempty"`
 }
 
 // check interface compliance
@@ -65,8 +67,8 @@ func (ope *OpaPermissionEvaluator) HasPermission(
 		log.Any("roles", a.Roles()),
 		log.String("perm", string(perm)))
 	req := EvalRequest{
-		Tenant: a.Principal().Name(),
-		Roles:  a.Roles(),
+		Roles: a.Roles(),
+		// Scoped: [],
 		Action: perm,
 	}
 	if rs, err := ope.query.Eval(context.Background(), rego.EvalInput(req)); err != nil {
@@ -87,11 +89,17 @@ func (ope *OpaPermissionEvaluator) HasObjectPermission(
 	ope.l.Debug("HasObjectPermission",
 		log.String("name", a.Principal().Name()),
 		log.Any("roles", a.Roles()),
+		log.Any("scopedRoles", a.ScopedRoles()),
 		log.String("perm", string(perm)),
 		log.String("objectOwner", objectOwner))
+
+	scoped := lo.Associate(a.ScopedRoles(),
+		func(sr auth.ScopedRole) (auth.Role, []string) {
+			return sr.Role, sr.Scopes
+		})
 	req := EvalRequest{
-		Tenant:      a.Principal().Name(),
-		Roles:       a.Roles(),
+		Roles:       a.Roles(), // needed for admin check
+		Scoped:      scoped,
 		Action:      perm,
 		ObjectOwner: objectOwner,
 	}
@@ -102,4 +110,14 @@ func (ope *OpaPermissionEvaluator) HasObjectPermission(
 		ope.l.Debug("res", log.Any("res", rs))
 		return rs.Allowed()
 	}
+}
+
+//nolint:whitespace // editor/linter issue
+func (ope *OpaPermissionEvaluator) HasTenantPermission(
+	a auth.Authentication,
+	perm Permission,
+	tenantID uint32,
+) bool {
+	objectOwner := fmt.Sprintf("%d", tenantID)
+	return ope.HasObjectPermission(a, perm, objectOwner)
 }

@@ -12,6 +12,7 @@ type TestAuth struct {
 	auth.Authentication
 	p auth.Principal
 	r []auth.Role
+	s []auth.ScopedRole
 }
 type TestPrincipal struct {
 	auth.Principal
@@ -30,6 +31,10 @@ func (s *TestAuth) Roles() []auth.Role {
 	return s.r
 }
 
+func (s *TestAuth) ScopedRoles() []auth.ScopedRole {
+	return s.s
+}
+
 var (
 	admin = TestAuth{
 		p: &TestPrincipal{name: "admin"},
@@ -37,7 +42,17 @@ var (
 	}
 	provider = TestAuth{
 		p: &TestPrincipal{name: "someprovider"},
-		r: []auth.Role{auth.RoleRaceDataProvider},
+		r: []auth.Role{},
+		s: []auth.ScopedRole{
+			{Role: auth.RoleRaceDataProvider, Scopes: []string{"someprovider"}},
+		},
+	}
+	editor = TestAuth{
+		p: &TestPrincipal{name: "someeditor"},
+		r: []auth.Role{},
+		s: []auth.ScopedRole{
+			{Role: auth.RoleEditor, Scopes: []string{"someeditor"}},
+		},
 	}
 	tenantMgr = TestAuth{
 		p: &TestPrincipal{name: "tenantManager"},
@@ -48,6 +63,53 @@ var (
 		r: []auth.Role{auth.RoleTrackManager},
 	}
 )
+
+func TestOpa_HasPermission_Admin(t *testing.T) {
+	type args struct {
+		perm Permission
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		// Note: we use one permission for each role
+		{
+			name: "register event",
+			args: args{perm: PermissionRegisterEvent},
+			want: true,
+		},
+		{
+			name: "create tenant",
+			args: args{perm: PermissionCreateTenant},
+			want: true,
+		},
+		{
+			name: "create track",
+			args: args{perm: PermissionCreateTrack},
+			want: true,
+		},
+		{
+			name: "unregister all events",
+			args: args{perm: PermissionAdminUnregisterAllEvents},
+			want: true,
+		},
+	}
+	opaPE, err := NewOpaPermissionEvaluator()
+	if err != nil {
+		t.Errorf("NewOpaPermissionEvaluator() error = %v", err)
+		return
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := opaPE.HasPermission(
+				&admin,
+				tt.args.perm); got != tt.want {
+				t.Errorf("opaPE.HasPermission() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestOpa_HasPermission_Tenant(t *testing.T) {
 	type args struct {
@@ -142,11 +204,15 @@ func TestOpa_HasObjectPermission_Provider(t *testing.T) {
 		args args
 		want bool
 	}{
-		// Note: if we omit the objOwner, the result should be the same as hasPermission
 		{
 			name: "register event",
-			args: args{perm: PermissionRegisterEvent},
+			args: args{perm: PermissionRegisterEvent, objOwner: provider.Principal().Name()},
 			want: true,
+		},
+		{
+			name: "register event not owner",
+			args: args{perm: PermissionRegisterEvent, objOwner: "other"},
+			want: false,
 		},
 		{
 			name: "unregister event",
@@ -184,12 +250,28 @@ func TestOpa_HasObjectPermission_Provider(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "update event not owner",
+			args: args{
+				perm:     PermissionUpdateEvent,
+				objOwner: "other",
+			},
+			want: false,
+		},
+		{
 			name: "delete event",
 			args: args{
 				perm:     PermissionDeleteEvent,
 				objOwner: provider.Principal().Name(),
 			},
 			want: true,
+		},
+		{
+			name: "delete event not owner",
+			args: args{
+				perm:     PermissionDeleteEvent,
+				objOwner: "other",
+			},
+			want: false,
 		},
 	}
 	opaPE, err := NewOpaPermissionEvaluator()
@@ -209,34 +291,115 @@ func TestOpa_HasObjectPermission_Provider(t *testing.T) {
 	}
 }
 
-func TestOpa_HasPermission_Admin(t *testing.T) {
+func TestOpa_HasObjectPermission_Editor(t *testing.T) {
 	type args struct {
-		perm Permission
+		perm     Permission
+		objOwner string
 	}
 	tests := []struct {
 		name string
 		args args
 		want bool
 	}{
-		// Note: we use one permission for each role
 		{
-			name: "register event",
-			args: args{perm: PermissionRegisterEvent},
+			name: "update event",
+			args: args{
+				perm:     PermissionUpdateEvent,
+				objOwner: editor.Principal().Name(),
+			},
 			want: true,
 		},
 		{
-			name: "create tenant",
-			args: args{perm: PermissionCreateTenant},
+			name: "update event not owner",
+			args: args{
+				perm:     PermissionUpdateEvent,
+				objOwner: "other",
+			},
+			want: false,
+		},
+		{
+			name: "delete event",
+			args: args{
+				perm:     PermissionDeleteEvent,
+				objOwner: editor.Principal().Name(),
+			},
 			want: true,
 		},
 		{
-			name: "create track",
-			args: args{perm: PermissionCreateTrack},
-			want: true,
+			name: "delete event not owner",
+			args: args{
+				perm:     PermissionDeleteEvent,
+				objOwner: "other",
+			},
+			want: false,
 		},
 		{
-			name: "unregister all events",
-			args: args{perm: PermissionAdminUnregisterAllEvents},
+			name: "register event not allowed",
+			args: args{
+				perm:     PermissionRegisterEvent,
+				objOwner: editor.Principal().Name(),
+			},
+			want: false,
+		},
+	}
+	opaPE, err := NewOpaPermissionEvaluator()
+	if err != nil {
+		t.Errorf("NewOpaPermissionEvaluator() error = %v", err)
+		return
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := opaPE.HasObjectPermission(
+				&editor,
+				tt.args.perm,
+				tt.args.objOwner); got != tt.want {
+				t.Errorf("opaPE.HasObjectPermission() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOpa_HasObjectPermission_Mixed(t *testing.T) {
+	type args struct {
+		testAuth TestAuth
+		perm     Permission
+		objOwner string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "register event not allowed",
+			args: args{
+				testAuth: TestAuth{
+					p: &TestPrincipal{name: "mixed"}, // name does not matter here
+					r: []auth.Role{},
+					s: []auth.ScopedRole{
+						{Role: auth.RoleEditor, Scopes: []string{"A"}},
+						{Role: auth.RoleRaceDataProvider, Scopes: []string{"B"}},
+					},
+				},
+				perm:     PermissionRegisterEvent,
+				objOwner: "A",
+			},
+			want: false,
+		},
+		{
+			name: "update event allowed",
+			args: args{
+				testAuth: TestAuth{
+					p: &TestPrincipal{name: "mixed"}, // name does not matter here
+					r: []auth.Role{},
+					s: []auth.ScopedRole{
+						{Role: auth.RoleEditor, Scopes: []string{"A"}},
+						{Role: auth.RoleRaceDataProvider, Scopes: []string{"B"}},
+					},
+				},
+				perm:     PermissionUpdateEvent,
+				objOwner: "A",
+			},
 			want: true,
 		},
 	}
@@ -247,10 +410,11 @@ func TestOpa_HasPermission_Admin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := opaPE.HasPermission(
-				&admin,
-				tt.args.perm); got != tt.want {
-				t.Errorf("opaPE.HasPermission() = %v, want %v", got, tt.want)
+			if got := opaPE.HasObjectPermission(
+				&tt.args.testAuth,
+				tt.args.perm,
+				tt.args.objOwner); got != tt.want {
+				t.Errorf("opaPE.HasObjectPermission() = %v, want %v", got, tt.want)
 			}
 		})
 	}
