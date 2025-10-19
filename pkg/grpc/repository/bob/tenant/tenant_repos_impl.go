@@ -112,8 +112,8 @@ func (r *repo) LoadByEventID(ctx context.Context, eventID int) (
 	*model.Tenant, error,
 ) {
 	subQuery := psql.Select(
-		sm.Columns(dbinfo.Events.Columns.TenantID),
-		sm.From(dbinfo.Events),
+		sm.Columns(dbinfo.Events.Columns.TenantID.Name),
+		sm.From(dbinfo.Events.Name),
 		models.SelectWhere.Events.ID.EQ(int32(eventID)),
 	)
 

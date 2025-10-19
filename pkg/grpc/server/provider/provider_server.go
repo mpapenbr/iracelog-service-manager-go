@@ -135,7 +135,13 @@ func (s *providerServer) RegisterEvent(
 ) (*connect.Response[providerv1.RegisterEventResponse], error) {
 	s.log.Debug("RegisterEvent called", log.Any("header", req.Header()))
 	a := auth.FromContext(&ctx)
-	if !s.pe.HasPermission(a, permission.PermissionRegisterEvent) {
+	ta, ok := a.(auth.TenantAuthentication)
+	if !ok {
+		s.log.Debug("no tenant auth found")
+		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+	}
+
+	if !s.pe.HasTenantPermission(a, permission.PermissionRegisterEvent, ta.GetTenantID()) {
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
@@ -161,11 +167,9 @@ func (s *providerServer) RegisterEvent(
 			if err := s.repos.Track().EnsureTrack(ctx, req.Msg.Track); err != nil {
 				return err
 			}
-			if ta, ok := a.(auth.TenantAuthentication); ok {
-				s.log.Debug("tenant id", log.Uint32("id", ta.GetID()))
-				return s.repos.Event().Create(ctx, req.Msg.Event, ta.GetID())
-			}
-			return fmt.Errorf("no tenant id found in auth")
+
+			s.log.Debug("tenant id", log.Uint32("id", ta.GetTenantID()))
+			return s.repos.Event().Create(ctx, req.Msg.Event, ta.GetTenantID())
 		}); err != nil {
 		s.log.Error("error creating data", log.ErrorField(err))
 		return nil, err
@@ -180,7 +184,8 @@ func (s *providerServer) RegisterEvent(
 		req.Msg.Event,
 		dbTrack,
 		req.Msg.RecordingMode,
-		a.Principal().Name())
+		fmt.Sprintf("%d", ta.GetTenantID()),
+	)
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
 	if err = s.dataProxy.PublishEventRegistered(epd); err != nil {
@@ -228,13 +233,15 @@ func (s *providerServer) validateEventAccess(
 	// get the ed
 	ed, err := s.dataProxy.GetEvent(eventSel)
 	if err != nil {
-		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
-			return nil, connect.NewError(
-				connect.CodePermissionDenied,
-				auth.ErrPermissionDenied)
-		} else {
+		ta, ok := a.(auth.TenantAuthentication)
+		if ok && s.pe.HasTenantPermission(
+			a, permission.PermissionPostRacedata, ta.GetTenantID()) {
+
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied)
 	}
 	if !s.pe.HasObjectPermission(a,
 		permission.PermissionPostRacedata,
@@ -283,13 +290,20 @@ func (s *providerServer) VersionCheck(
 	req *connect.Request[providerv1.VersionCheckRequest],
 ) (*connect.Response[providerv1.VersionCheckResponse], error) {
 	a := auth.FromContext(&ctx)
-
+	tenantID := uint32(0)
+	ta, ok := a.(auth.TenantAuthentication)
+	if ok {
+		tenantID = ta.GetTenantID()
+	}
 	return connect.NewResponse(&providerv1.VersionCheckResponse{
 		ProvidedRaceloggerVersion:  req.Msg.RaceloggerVersion,
 		SupportedRaceloggerVersion: util.RequiredClientVersion,
 		ServerVersion:              version.Version,
 		RaceloggerCompatible:       util.CheckRaceloggerVersion(req.Msg.RaceloggerVersion),
-		ValidCredentials:           s.pe.HasPermission(a, permission.PermissionPostRacedata),
+		ValidCredentials: s.pe.HasTenantPermission(
+			a,
+			permission.PermissionPostRacedata,
+			tenantID),
 	}), nil
 }
 

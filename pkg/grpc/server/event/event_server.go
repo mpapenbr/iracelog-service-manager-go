@@ -237,7 +237,11 @@ func (s *eventsServer) DeleteEvent(
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 
-	data, err := s.validateEventAccess(ctx, a, req.Msg.EventSelector)
+	data, err := s.validateEventAccess(
+		ctx,
+		a,
+		permission.PermissionDeleteEvent,
+		req.Msg.EventSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +261,11 @@ func (s *eventsServer) UpdateEvent(
 	s.log.Debug("UpdateEvent called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
-	data, err := s.validateEventAccess(ctx, a, req.Msg.EventSelector)
+	data, err := s.validateEventAccess(
+		ctx,
+		a,
+		permission.PermissionUpdateEvent,
+		req.Msg.EventSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -270,26 +278,29 @@ func (s *eventsServer) UpdateEvent(
 
 func (s *eventsServer) validateEventAccess(
 	ctx context.Context,
-	a auth.Authentication, eventSel *commonv1.EventSelector,
+	a auth.Authentication,
+	perm permission.Permission,
+	eventSel *commonv1.EventSelector,
 ) (*eventv1.Event, error) {
 	// get the event
 	data, err := util.ResolveEvent(ctx, s.repos.Event(), eventSel)
 	if err != nil {
-		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
+		ta, ok := a.(auth.TenantAuthentication)
+		if ok && s.pe.HasTenantPermission(a, perm, ta.GetTenantID()) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		} else {
 			return nil, connect.NewError(
 				connect.CodePermissionDenied,
 				auth.ErrPermissionDenied)
-		} else {
-			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
 	}
 	t, err := s.repos.Tenant().LoadByEventID(ctx, int(data.Id))
 	if err != nil {
 		return nil, err
 	}
-	if !s.pe.HasObjectPermission(a,
-		permission.PermissionPostRacedata,
-		t.Tenant.Name) {
+	if !s.pe.HasTenantPermission(a,
+		perm,
+		t.ID) {
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,

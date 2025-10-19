@@ -142,3 +142,12 @@ update-bufbuild:
 bob:
 	echo "  >  Generating bob files from database"
 	go run github.com/stephenafamo/bob/gen/bobgen-psql@latest -c ./bobgen.yml
+
+.PHONY: create local release
+## `local-release`: Create a local release
+local-release:
+	echo "  >  Creating local release..."
+	mkdir -p ./ext/healthcheck/linux/amd64
+	curl -L https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.41/grpc_health_probe-linux-amd64 -o ./ext/healthcheck/linux/amd64/grpc_health_probe
+	chmod +x ./ext/healthcheck/linux/amd64/grpc_health_probe
+	goreleaser release --config ./.goreleaser-local.yml --clean --snapshot --skip sbom

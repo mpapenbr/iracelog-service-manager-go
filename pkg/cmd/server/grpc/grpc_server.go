@@ -14,13 +14,16 @@ import (
 	"time"
 
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/analysis/v1/analysisv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/auth/v1/authv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/predict/v1/predictv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/settings/v1/settingsv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/tenant/v1/tenantv1connect"
 	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/user/v1/userv1connect"
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
 	"connectrpc.com/grpcreflect"
@@ -40,24 +43,36 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/db/postgres"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
+	authImpl "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth/impl"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/oidc"
+	oidcFactory "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/oidc/factory"
+	oidcNatsImpl "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/oidc/impl/nats"
+	oidcSimplImpl "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/oidc/impl/simple"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/permission"
 	reposApi "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	bobRepos "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/bob"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/analysis"
+	authServer "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/auth"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/event"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/livedata"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/predict"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/provider"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/settings"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/state"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/tenant"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/track"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/user"
 	serverUtil "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/local"
 	ownNats "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/server/util/proxy/nats"
 	eventService "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/service/event"
+	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session"
+	sessionFactory "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session/factory"
+	sessionImpl "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session/impl"
+	oauth2SessConfig "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session/impl/oauth2"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	utilsCache "github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
@@ -65,7 +80,7 @@ import (
 
 var appConfig config.Config // holds processed config values
 
-//nolint:funlen // by design
+//nolint:funlen,lll // by design
 func NewServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "grpc",
@@ -131,10 +146,7 @@ func NewServerCmd() *cobra.Command {
 		"admin-token",
 		"",
 		"admin token value")
-	cmd.Flags().StringVar(&config.ProviderToken,
-		"provider-token",
-		"",
-		"provider token value")
+
 	cmd.Flags().StringVar(&config.StaleDuration,
 		"stale-duration",
 		"1m",
@@ -146,31 +158,64 @@ func NewServerCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&config.EnableNats,
 		"enable-nats",
 		false,
-		"use NATS as middleware for live data")
+		"Use NATS as middleware for live data")
 	cmd.Flags().StringVar(&config.NatsURL,
 		"nats-url",
 		"nats://localhost:4222",
-		"url of the NATS server")
+		"URL of the NATS server")
+	cmd.Flags().BoolVar(&appConfig.SupportIDP,
+		"enable-idp",
+		false,
+		"use IDP to authenticate users")
+	cmd.Flags().StringVar(&config.IDPClientID,
+		"idp-client-id",
+		"",
+		"IDP client ID")
+	cmd.Flags().StringVar(&config.IDPClientSecret,
+		"idp-client-secret",
+		"",
+		"IDP client secret")
+	cmd.Flags().StringVar(&config.IDPIssuerURL,
+		"idp-issuer-url",
+		"",
+		"Issuer URL is used to resolve entry points (for example: http://localhost:8080/realms/demo)")
+	cmd.Flags().StringVar(&config.IDPCallbackURL,
+		"idp-callback-url",
+		"",
+		"Callback URL is used to redirect users after authentication")
+	cmd.Flags().DurationVar(&config.IDPTokenRefreshThreshold,
+		"idp-token-refresh-threshold",
+		10*time.Second,
+		"refresh a token this time before it expires")
+	cmd.Flags().DurationVar(&config.SessionTimeout,
+		"session-timeout",
+		5*time.Minute,
+		"Idle time after which a session is removed")
+
 	return cmd
 }
 
 type grpcServer struct {
-	ctx                context.Context
-	log                *log.Logger
-	pool               *pgxpool.Pool
-	mux                *http.ServeMux
-	telemetry          *config.Telemetry
-	otel               *otelconnect.Interceptor
-	eventLookup        *utils.EventLookup
-	tlsConfig          *tls.Config
-	dataProxy          proxy.DataProxy
-	authInterceptor    connect.Interceptor
-	configInterceptor  connect.Interceptor
-	traceIDInterceptor connect.Interceptor
-	tenantCache        utilsCache.Cache[string, model.Tenant]
-	repos              reposApi.Repositories
-	txManager          reposApi.TransactionManager
-	tracer             trace.Tracer
+	ctx                   context.Context
+	log                   *log.Logger
+	pool                  *pgxpool.Pool
+	mux                   *http.ServeMux
+	telemetry             *config.Telemetry
+	otel                  *otelconnect.Interceptor
+	eventLookup           *utils.EventLookup
+	tlsConfig             *tls.Config
+	dataProxy             proxy.DataProxy
+	oidcParam             *oidc.OIDCParam
+	authInterceptor       connect.Interceptor
+	sessionInterceptor    connect.Interceptor
+	configInterceptor     connect.Interceptor
+	traceIDInterceptor    connect.Interceptor
+	tenantCache           utilsCache.Cache[string, model.Tenant]
+	sessionStore          session.SessionStore
+	pendingAuthStateCache oidc.PendingAuthStateCache
+	repos                 reposApi.Repositories
+	txManager             reposApi.TransactionManager
+	tracer                trace.Tracer
 }
 
 //nolint:funlen,cyclop // by design
@@ -187,12 +232,16 @@ func startServer(ctx context.Context) error {
 	srv.SetupTelemetry()
 	srv.SetupDB()
 	srv.SetupFeatures()
+	srv.SetupIDPParam()
 	srv.SetupConfigInterceptor()
 	srv.SetupTraceIDInterceptor()
 	srv.SetupTransactionManager()
 	srv.SetupRepositories()
 	srv.SetupCaches()
+	srv.SetupSessionStore()
+	srv.SetupPendingAuthStateCache()
 	srv.SetupAuthInterceptor() // needs to be after repos + caches
+	srv.SetupSessionInterceptor()
 	srv.SetupGrpcServices()
 	return srv.Start()
 }
@@ -255,17 +304,102 @@ func (s *grpcServer) SetupFeatures() {
 	if appConfig.SupportTenants {
 		s.log.Info("Tenant support enabled")
 	}
+	if appConfig.SupportIDP {
+		s.log.Info("Identity provider support enabled")
+	}
 }
 
 func (s *grpcServer) SetupCaches() {
 	s.tenantCache = cache.NewTenantCache(s.repos.Tenant())
 }
 
+func (s *grpcServer) SetupIDPParam() {
+	if !appConfig.SupportIDP {
+		s.log.Info("IDP based authentication disabled")
+		return
+	}
+
+	s.oidcParam = &oidc.OIDCParam{
+		IssuerURL:    config.IDPIssuerURL,
+		ClientID:     config.IDPClientID,
+		ClientSecret: config.IDPClientSecret,
+		CallbackURL:  config.IDPCallbackURL,
+	}
+}
+
+//nolint:lll // readability
+func (s *grpcServer) SetupSessionStore() {
+	var err error
+	extraStoreOptions := []oauth2SessConfig.Option{
+		oauth2SessConfig.WithRefreshThreshold(config.IDPTokenRefreshThreshold),
+	}
+	if appConfig.SupportIDP {
+		extraStoreOptions = append(extraStoreOptions,
+			oauth2SessConfig.WithOIDCParams(s.oidcParam))
+	}
+	if config.EnableNats {
+		s.log.Info("Using NATS for session store")
+		nc, nErr := nats.Connect(config.NatsURL)
+		if nErr != nil {
+			s.log.Fatal("Could not connect to NATS", log.ErrorField(nErr))
+		}
+		extraStoreOptions = append(extraStoreOptions,
+			oauth2SessConfig.WithNATS(nc))
+	}
+	s.sessionStore, err = sessionFactory.New[session.SessionStore, oauth2SessConfig.Option](
+		oauth2SessConfig.SessionTypeOAuth2,
+		[]session.Option{session.WithTimeout(config.SessionTimeout)},
+		extraStoreOptions,
+	)
+	if err != nil {
+		s.log.Fatal("Could not create session store", log.ErrorField(err))
+	}
+}
+
+//nolint:lll // readability
+func (s *grpcServer) SetupPendingAuthStateCache() {
+	var err error
+	extraStoreOptions := []oidcNatsImpl.Option{}
+
+	commonOpts := []oidc.Option{oidc.WithTimeout(time.Second * 30)}
+	//nolint:nestif // error handling
+	if config.EnableNats {
+		s.log.Info("Using NATS for pending logins")
+		nc, nErr := nats.Connect(config.NatsURL)
+		if nErr != nil {
+			s.log.Fatal("Could not connect to NATS", log.ErrorField(nErr))
+		}
+		extraStoreOptions = append(extraStoreOptions,
+			oidcNatsImpl.WithNATS(nc))
+		s.pendingAuthStateCache, err = oidcFactory.New[oidc.PendingAuthStateCache, oidcNatsImpl.Option](
+			oidcNatsImpl.PendingAuthStateCacheTypeNats,
+			commonOpts,
+			extraStoreOptions,
+		)
+		if err != nil {
+			s.log.Fatal("Could not create pending auth state cache", log.ErrorField(err))
+		}
+	} else {
+		s.pendingAuthStateCache, err = oidcFactory.New[oidc.PendingAuthStateCache, oidcSimplImpl.Option](
+			oidcSimplImpl.PendingAuthStateCacheTypeSimple,
+			commonOpts,
+			nil,
+		)
+		if err != nil {
+			s.log.Fatal("Could not create pending auth state cache", log.ErrorField(err))
+		}
+	}
+}
+
 func (s *grpcServer) SetupAuthInterceptor() {
-	s.authInterceptor = auth.NewAuthInterceptor(
-		auth.WithAuthToken(config.AdminToken),
+	s.authInterceptor = authImpl.NewAuthInterceptor(
+		auth.WithAdminToken(config.AdminToken),
 		auth.WithTenantCache(s.tenantCache),
 	)
+}
+
+func (s *grpcServer) SetupSessionInterceptor() {
+	s.sessionInterceptor = sessionImpl.NewSessionInterceptor(s.sessionStore)
 }
 
 func (s *grpcServer) SetupConfigInterceptor() {
@@ -284,6 +418,7 @@ func (s *grpcServer) SetupTransactionManager() {
 	s.txManager = bobRepos.NewBobTransactionFromPool(s.pool)
 }
 
+//nolint:funlen // by design
 func (s *grpcServer) SetupGrpcServices() {
 	s.mux = http.NewServeMux()
 	s.otel, _ = otelconnect.NewInterceptor(
@@ -321,6 +456,9 @@ func (s *grpcServer) SetupGrpcServices() {
 				log.ErrorField(err))
 		}
 	}
+	s.registerSettingsServer()
+	s.registerAuthServer()
+	s.registerUserServer()
 	s.registerEventServer()
 	s.registerAnalysisServer()
 	s.registerProviderServer()
@@ -459,6 +597,81 @@ func (s *grpcServer) registerReflectionServer() {
 	s.mux.Handle(grpcreflect.NewHandlerV1Alpha(checker))
 }
 
+func (s *grpcServer) registerAuthServer() {
+	if !appConfig.SupportIDP {
+		s.log.Debug("IDP based authentication disabled")
+		return
+	}
+	if config.IDPClientID == "" ||
+		config.IDPClientSecret == "" ||
+		config.IDPIssuerURL == "" ||
+		config.IDPCallbackURL == "" {
+
+		s.log.Error("Missing IDP configuration. Cannot start auth service")
+		return
+	}
+
+	authServerImpl := authServer.NewServer(
+		authServer.WithTracer(s.tracer),
+		authServer.WithSessionStore(s.sessionStore),
+		authServer.WithOIDCParams(s.oidcParam),
+		authServer.WithPendingAuthStateCache(s.pendingAuthStateCache),
+	)
+	path, handler := authv1connect.NewAuthServiceHandler(
+		authServerImpl,
+		connect.WithInterceptors(
+			s.otel,
+			s.traceIDInterceptor,
+			s.configInterceptor,
+			s.sessionInterceptor,
+			s.authInterceptor,
+		),
+	)
+	s.mux.Handle(path, handler)
+	callbackURL, callbackHandler := authServerImpl.CallbackHandler()
+	s.mux.Handle(callbackURL, callbackHandler)
+}
+
+func (s *grpcServer) registerUserServer() {
+	// only used when IDP is enabled
+	if !appConfig.SupportIDP {
+		return
+	}
+	userService := user.NewServer(
+		user.WithSessionStore(s.sessionStore),
+		user.WithTracer(s.tracer), // Added
+	)
+	path, handler := userv1connect.NewUserServiceHandler(
+		userService,
+		connect.WithInterceptors(
+			s.otel,
+			s.traceIDInterceptor,
+			s.configInterceptor,
+			s.sessionInterceptor,
+			s.authInterceptor),
+	)
+
+	s.mux.Handle(path, handler)
+}
+
+func (s *grpcServer) registerSettingsServer() {
+	settingsService := settings.NewServer(
+		settings.WithTracer(s.tracer),
+		settings.WithSupportsLogin(appConfig.SupportIDP),
+	)
+	path, handler := settingsv1connect.NewSettingsServiceHandler(
+		settingsService,
+		connect.WithInterceptors(
+			s.otel,
+			s.traceIDInterceptor,
+			s.configInterceptor,
+			s.sessionInterceptor,
+			s.authInterceptor),
+	)
+
+	s.mux.Handle(path, handler)
+}
+
 func (s *grpcServer) registerEventServer() {
 	eventServerImpl := event.NewServer(
 		event.WithRepositories(s.repos),
@@ -472,7 +685,12 @@ func (s *grpcServer) registerEventServer() {
 	path, handler := eventv1connect.NewEventServiceHandler(
 		eventServerImpl,
 		connect.WithInterceptors(
-			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor),
+			s.otel,
+			s.traceIDInterceptor,
+			s.configInterceptor,
+			s.sessionInterceptor,
+			s.authInterceptor,
+		),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -504,7 +722,12 @@ func (s *grpcServer) registerProviderServer() {
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
 		connect.WithInterceptors(
-			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor),
+			s.otel,
+			s.traceIDInterceptor,
+			s.configInterceptor,
+			s.sessionInterceptor,
+			s.authInterceptor,
+		),
 	)
 	s.mux.Handle(path, handler)
 }
@@ -607,7 +830,8 @@ func newCORS() *cors.Cors {
 			// Allow all origins, which effectively disables CORS.
 			return true
 		},
-		AllowedHeaders: []string{"*"},
+		AllowCredentials: true,
+		AllowedHeaders:   []string{"*"},
 		ExposedHeaders: []string{
 			// Content-Type is in the default safelist.
 			"Accept",

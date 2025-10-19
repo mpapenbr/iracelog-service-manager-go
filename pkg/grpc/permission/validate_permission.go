@@ -36,6 +36,7 @@ const (
 type PermissionEvaluator interface {
 	HasPermission(auth auth.Authentication, perm Permission) bool
 	HasObjectPermission(auth auth.Authentication, perm Permission, objectOwner string) bool
+	HasTenantPermission(auth auth.Authentication, perm Permission, tenantID uint32) bool
 }
 
 func NewPermissionEvaluator() PermissionEvaluator {

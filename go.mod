@@ -1,15 +1,16 @@
 module github.com/mpapenbr/iracelog-service-manager-go
 
-go 1.25.0
+go 1.25
 
 require (
-	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.1-20250705185745-385bdc10baf0.2
-	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.10-20250705185745-385bdc10baf0.1
+	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.1-20251019125030-8cb75f92a51d.2
+	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.10-20251019125030-8cb75f92a51d.1
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/grpcreflect v1.3.0
 	connectrpc.com/otelconnect v0.8.0
 	github.com/aarondl/opt v0.0.0-20250607033636-982744e1bd65
+	github.com/coreos/go-oidc/v3 v3.16.0
 	github.com/docker/go-connections v0.6.0
 	github.com/exaring/otelpgx v0.9.3
 	github.com/gofrs/uuid/v5 v5.3.2
@@ -45,6 +46,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.29.0
 	golang.org/x/net v0.46.0
+	golang.org/x/oauth2 v0.32.0
 	google.golang.org/protobuf v1.36.10
 	gotest.tools/v3 v3.5.2
 	moul.io/zapfilter v1.7.0
@@ -72,6 +74,7 @@ require (
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect

@@ -3,6 +3,10 @@
     "admin": [
       "unregister-all-events"
     ],
+    "editor": [
+      "update-event",
+      "delete-event"
+    ],
     "racedata-provider": [
       "register-event",
       "update-event",
@@ -28,6 +32,7 @@
       "track-manager",
       "tenant-manager"
     ],
+    "editor": [],
     "racedata-provider": [],
     "tenant-manager": [],
     "track-manager": []

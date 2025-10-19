@@ -25,9 +25,10 @@
           "formatting.gofumpt": true
         },
         "[go]": {
-          "editor.rulers": [90]
+          "editor.rulers": [90],
+          "editor.defaultFormatter": "golang.go"
         },
-        "editor.defaultFormatter": "golang.go",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true
       },
       // Add the IDs of extensions you want installed when the container is created.
