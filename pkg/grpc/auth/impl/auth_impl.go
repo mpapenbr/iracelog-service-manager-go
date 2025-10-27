@@ -22,10 +22,8 @@ const (
 
 type (
 	authInterceptor struct {
-		cfg        *auth.Config
-		adminToken string
-
-		tenantCache  cache.Cache[string, model.Tenant]
+		cfg          *auth.Config
+		adminToken   string
 		authProvider []auth.AuthenticationProvider
 		l            *log.Logger
 	}
@@ -40,8 +38,8 @@ func NewAuthInterceptor(opts ...auth.Option) connect.Interceptor {
 		opt(ret.cfg)
 	}
 	ret.authProvider = []auth.AuthenticationProvider{
-		&apiKeyAuthenticator{adminToken: ret.adminToken, tenantCache: ret.tenantCache},
-		&sessionAuthenticator{tenantCache: ret.tenantCache},
+		&apiKeyAuthenticator{adminToken: ret.adminToken, tenantCache: ret.cfg.TenantCache},
+		&sessionAuthenticator{tenantCache: ret.cfg.TenantCache},
 		&anonymousAuthenticator{},
 	}
 	return ret
