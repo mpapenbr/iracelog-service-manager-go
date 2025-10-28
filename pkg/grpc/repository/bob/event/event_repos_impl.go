@@ -138,9 +138,9 @@ func (r repo) UpdateEvent(
 	if req.Name != "" {
 		setter.Name = omit.From(req.Name)
 	}
-	if req.Description != "" {
-		setter.Description = omitnull.From(req.Description)
-	}
+
+	setter.Description = omitnull.From(req.Description)
+
 	if req.Key != "" {
 		setter.EventKey = omit.From(req.Key)
 	}
