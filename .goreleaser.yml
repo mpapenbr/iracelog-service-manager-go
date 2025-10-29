@@ -47,7 +47,6 @@ dockers:
       - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
       - "--label=org.opencontainers.image.description=Backend for iRacelog"
       - "--label=org.opencontainers.image.licenses=MIT license"
-      - "--build-arg=ARCH=amd64"
       - "--platform=linux/amd64"
 
     extra_files:
@@ -71,7 +70,6 @@ dockers:
       - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
       - "--label=org.opencontainers.image.description=Backend for iRacelog"
       - "--label=org.opencontainers.image.licenses=MIT license"
-      - "--build-arg=ARCH=arm64"
       - "--platform=linux/arm64"
 
     extra_files:
