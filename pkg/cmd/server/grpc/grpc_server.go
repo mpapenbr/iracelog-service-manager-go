@@ -336,15 +336,15 @@ func (s *grpcServer) SetupSessionStore() {
 	if appConfig.SupportIDP {
 		extraStoreOptions = append(extraStoreOptions,
 			oauth2SessConfig.WithOIDCParams(s.oidcParam))
-	}
-	if config.EnableNats {
-		s.log.Info("Using NATS for session store")
-		nc, nErr := nats.Connect(config.NatsURL)
-		if nErr != nil {
-			s.log.Fatal("Could not connect to NATS", log.ErrorField(nErr))
+		if config.EnableNats {
+			s.log.Info("Using NATS for session store")
+			nc, nErr := nats.Connect(config.NatsURL)
+			if nErr != nil {
+				s.log.Fatal("Could not connect to NATS", log.ErrorField(nErr))
+			}
+			extraStoreOptions = append(extraStoreOptions,
+				oauth2SessConfig.WithNATS(nc))
 		}
-		extraStoreOptions = append(extraStoreOptions,
-			oauth2SessConfig.WithNATS(nc))
 	}
 	s.sessionStore, err = sessionFactory.New[session.SessionStore, oauth2SessConfig.Option](
 		oauth2SessConfig.SessionTypeOAuth2,
