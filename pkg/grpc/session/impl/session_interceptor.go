@@ -35,7 +35,7 @@ func (i *sessionInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc
 		req connect.AnyRequest,
 	) (connect.AnyResponse, error) {
 		dummyReq := http.Request{Header: req.Header()}
-		if myCookie, err := dummyReq.Cookie(session.SessionIDCookie); err == nil {
+		if myCookie, err := dummyReq.Cookie(i.sessionStore.CookieName()); err == nil {
 			i.l.Debug("found session cookie", log.String("cookie", myCookie.String()))
 			sessionID := myCookie.Value
 			if s, sErr := i.sessionStore.Get(sessionID); sErr == nil {
@@ -61,7 +61,10 @@ func (i *sessionInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc
 		if sessionData != nil {
 			i.l.Debug("adding session cookie", log.String("session_id", sessionData.ID()))
 			res.Header().Add("Set-Cookie",
-				session.CreateCookieForSession(sessionData, i.sessionStore.Timeout()).String())
+				session.CreateCookieForSession(
+					i.sessionStore.CookieName(),
+					sessionData,
+					i.sessionStore.Timeout()).String())
 		}
 
 		return res, nil

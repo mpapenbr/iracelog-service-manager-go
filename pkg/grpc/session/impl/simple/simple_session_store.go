@@ -55,6 +55,10 @@ func (s *simpleSessionStore) Timeout() time.Duration {
 	return s.cfg.Timeout
 }
 
+func (s *simpleSessionStore) CookieName() string {
+	return s.cfg.CookieName
+}
+
 func init() {
 	factory.Register(SessionTypeSimple, New)
 }
