@@ -15,8 +15,8 @@ import (
 
 func New(common []session.Option, specific []Option) (session.SessionStore, error) {
 	cfg := &session.Config{
-		Timeout: 30 * time.Second, // TODO: change to minutes after testing
-
+		Timeout:    30 * time.Minute,
+		CookieName: "iracelog_session",
 	}
 	for _, o := range common {
 		o(cfg)
@@ -209,6 +209,10 @@ func (s *oauth2SessionStore) Delete(id string) error {
 
 func (s *oauth2SessionStore) Timeout() time.Duration {
 	return s.cfg.Timeout
+}
+
+func (s *oauth2SessionStore) CookieName() string {
+	return s.cfg.CookieName
 }
 
 func (s *sessionImpl) ID() string {

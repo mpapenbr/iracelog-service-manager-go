@@ -30,6 +30,7 @@ var (
 	MaxConcurrentStreams int    // max number of concurrent streams per connection
 	NatsURL              string // nats server url
 	EnableNats           bool   // enable nats
+	CookieName           string // name of the session cookie
 
 	// IDPConfig 		IDPConfig
 	IDPClientID              string        // oauth2 client id

@@ -191,6 +191,10 @@ func NewServerCmd() *cobra.Command {
 		"session-timeout",
 		5*time.Minute,
 		"Idle time after which a session is removed")
+	cmd.Flags().StringVar(&config.CookieName,
+		"cookie-name",
+		"iracelog_session",
+		"name of the session cookie")
 
 	return cmd
 }
@@ -348,7 +352,10 @@ func (s *grpcServer) SetupSessionStore() {
 	}
 	s.sessionStore, err = sessionFactory.New[session.SessionStore, oauth2SessConfig.Option](
 		oauth2SessConfig.SessionTypeOAuth2,
-		[]session.Option{session.WithTimeout(config.SessionTimeout)},
+		[]session.Option{
+			session.WithTimeout(config.SessionTimeout),
+			session.WithCookieName(config.CookieName),
+		},
 		extraStoreOptions,
 	)
 	if err != nil {

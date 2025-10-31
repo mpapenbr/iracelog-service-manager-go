@@ -187,7 +187,10 @@ func (s *authServer) Logout(
 		s.log.Debug("deleted session", log.String("session_id", sessionData.ID()))
 	}
 
-	cookie := session.CreateCookieForSession(sessionData, s.sessionStore.Timeout())
+	cookie := session.CreateCookieForSession(
+		s.sessionStore.CookieName(),
+		sessionData,
+		s.sessionStore.Timeout())
 	cookie.Value = ""
 	cookie.MaxAge = -1 // delete cookie
 
@@ -276,7 +279,9 @@ func (s *authServer) CallbackHandler() (path string, handler http.Handler) {
 				s.log.Warn("failed to save session", log.ErrorField(err))
 			}
 			w.Header().Set("Set-Cookie", session.CreateCookieForSession(
-				sessionData, s.sessionStore.Timeout()).String())
+				s.sessionStore.CookieName(),
+				sessionData,
+				s.sessionStore.Timeout()).String())
 			http.Redirect(w, r, pl.ClientRedirectURI, http.StatusFound)
 		})
 }

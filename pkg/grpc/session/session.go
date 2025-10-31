@@ -9,8 +9,6 @@ import (
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/auth"
 )
 
-const SessionIDCookie = "iracelog_sessionid"
-
 type (
 	Session interface {
 		ID() string
@@ -33,6 +31,7 @@ type (
 		Save(s Session) error
 		Delete(id string) error
 		Timeout() time.Duration
+		CookieName() string
 	}
 	sessionCtxKey struct{}
 )
@@ -60,9 +59,14 @@ func AddSessionToContext(ctx context.Context, session Session) context.Context {
 	return context.WithValue(ctx, sessionKey, session)
 }
 
-func CreateCookieForSession(session Session, timeout time.Duration) *http.Cookie {
+//nolint:whitespace // editor/linter issue
+func CreateCookieForSession(
+	cookieName string,
+	session Session,
+	timeout time.Duration,
+) *http.Cookie {
 	newCookie := &http.Cookie{
-		Name:     SessionIDCookie,
+		Name:     cookieName,
 		Value:    session.ID(),
 		Path:     "/",
 		HttpOnly: true,

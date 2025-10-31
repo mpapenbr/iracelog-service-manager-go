@@ -4,7 +4,8 @@ import "time"
 
 type (
 	Config struct {
-		Timeout time.Duration
+		Timeout    time.Duration
+		CookieName string
 	}
 	Option func(*Config)
 )
@@ -12,5 +13,11 @@ type (
 func WithTimeout(d time.Duration) Option {
 	return func(c *Config) {
 		c.Timeout = d
+	}
+}
+
+func WithCookieName(name string) Option {
+	return func(c *Config) {
+		c.CookieName = name
 	}
 }
