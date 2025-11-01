@@ -13,7 +13,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.16.0
 	github.com/docker/go-connections v0.6.0
 	github.com/exaring/otelpgx v0.9.3
-	github.com/gofrs/uuid/v5 v5.3.2
+	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -21,7 +21,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.47.0
 	github.com/ohler55/ojg v1.26.10
-	github.com/open-policy-agent/opa v1.9.0
+	github.com/open-policy-agent/opa v1.10.0
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.52.0
