@@ -119,7 +119,7 @@ func (s *providerServer) ListLiveEvents(
 	for _, v := range events {
 		if t == nil {
 			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
-		} else if t.Tenant.Name == v.Owner {
+		} else if fmt.Sprintf("%d", t.ID) == v.Owner { // quick fix for issue #342
 			ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 		}
 	}
