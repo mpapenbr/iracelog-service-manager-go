@@ -10,7 +10,7 @@ require (
 	connectrpc.com/grpcreflect v1.3.0
 	connectrpc.com/otelconnect v0.8.0
 	github.com/aarondl/opt v0.0.0-20250607033636-982744e1bd65
-	github.com/coreos/go-oidc/v3 v3.16.0
+	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/docker/go-connections v0.6.0
 	github.com/exaring/otelpgx v0.9.3
 	github.com/gofrs/uuid/v5 v5.4.0
@@ -43,7 +43,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	golang.org/x/mod v0.30.0
 	golang.org/x/net v0.47.0
 	golang.org/x/oauth2 v0.33.0
