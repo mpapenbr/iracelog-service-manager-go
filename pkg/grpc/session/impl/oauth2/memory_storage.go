@@ -1,6 +1,7 @@
 package oauth2
 
 import (
+	"sync"
 	"time"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -15,6 +16,7 @@ type (
 		sessions  map[string]*sessionImpl
 		log       *log.Logger
 		refresher map[string]*myRefresher
+		mu        sync.Mutex
 	}
 )
 
@@ -31,10 +33,13 @@ func newInMemoryStorage(
 		sessions:   make(map[string]*sessionImpl),
 		refresher:  make(map[string]*myRefresher),
 		log:        log.Default().Named("grpc.session.oauth2.inmemory"),
+		mu:         sync.Mutex{},
 	}
 }
 
 func (s *inMemoryStorage) Get(id string) (*sessionImpl, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if sess, ok := s.sessions[id]; ok {
 		return sess, nil
 	}
@@ -42,6 +47,8 @@ func (s *inMemoryStorage) Get(id string) (*sessionImpl, error) {
 }
 
 func (s *inMemoryStorage) Save(mySession *sessionImpl) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	mySession.raw.LastAccessed = time.Now()
 
 	s.refresher[mySession.ID()] = &myRefresher{
@@ -53,6 +60,8 @@ func (s *inMemoryStorage) Save(mySession *sessionImpl) error {
 }
 
 func (s *inMemoryStorage) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.sessions, id)
 	if _, ok := s.refresher[id]; ok {
 		s.refresher[id].timer.Stop()

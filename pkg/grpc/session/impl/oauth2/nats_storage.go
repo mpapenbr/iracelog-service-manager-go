@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -31,6 +32,7 @@ type (
 		cache        map[string]*mySession
 		oauth2Config *oauth2.Config
 		refresher    map[string]*myRefresher
+		mu           sync.Mutex
 	}
 	mySession struct {
 		si *sessionImpl
@@ -53,6 +55,7 @@ func newNATSStorage(
 		log:        log.Default().Named("grpc.session.oauth2.nats"),
 		cache:      make(map[string]*mySession),
 		refresher:  make(map[string]*myRefresher),
+		mu:         sync.Mutex{},
 	}
 	ret.log.Debug("Initializing NATS storage for OAuth2 sessions")
 	if err := ret.init(); err != nil {
@@ -103,6 +106,9 @@ func (s *natsStorage) setupOAuth2Config() error {
 }
 
 func (s *natsStorage) Get(id string) (*sessionImpl, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.cache[id] != nil {
 		s.log.Debug("local cache hit", log.String("id", id))
 		return s.cache[id].si, nil
@@ -127,6 +133,8 @@ func (s *natsStorage) Get(id string) (*sessionImpl, error) {
 }
 
 func (s *natsStorage) Save(sess *sessionImpl) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	err := s.internalStore(sess.raw)
 	if err == nil {
 		s.cache[sess.raw.ID] = &mySession{
@@ -142,6 +150,8 @@ func (s *natsStorage) Save(sess *sessionImpl) error {
 }
 
 func (s *natsStorage) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	subj := s.composeKey(id)
 	delete(s.cache, id)
 	if _, ok := s.refresher[id]; ok {
@@ -207,6 +217,9 @@ func (s *natsStorage) setupCleanupLoop() {
 	ticker := time.NewTicker(20 * time.Second)
 	go func() {
 		for range ticker.C {
+			s.mu.Lock()
+			s.log.Debug("starting cleanup loop for nats storage cache")
+
 			for k, v := range s.cache {
 				raw, err := s.internalRead(k)
 
@@ -241,6 +254,7 @@ func (s *natsStorage) setupCleanupLoop() {
 			}
 			// forget old cache by creating a new cache
 			s.cache = make(map[string]*mySession)
+			s.mu.Unlock()
 		}
 	}()
 }
@@ -323,7 +337,6 @@ func (s *natsStorage) createRefresher(
 				log.String("id", mySession.raw.ID),
 				log.ErrorField(sErr))
 		}
-		// TODO: release lock
 
 		s.refresher[id] = &myRefresher{
 			id:    id,
