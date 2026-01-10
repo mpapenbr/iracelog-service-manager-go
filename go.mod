@@ -8,7 +8,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/grpcreflect v1.3.0
-	connectrpc.com/otelconnect v0.8.0
+	connectrpc.com/otelconnect v0.9.0
 	github.com/aarondl/opt v0.0.0-20250607033636-982744e1bd65
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/docker/go-connections v0.6.0
@@ -21,7 +21,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.48.0
 	github.com/ohler55/ojg v1.27.0
-	github.com/open-policy-agent/opa v1.12.1
+	github.com/open-policy-agent/opa v1.12.2
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.52.0
@@ -44,7 +44,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.39.0
 	go.opentelemetry.io/otel/trace v1.39.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/mod v0.31.0
+	golang.org/x/mod v0.32.0
 	golang.org/x/net v0.48.0
 	golang.org/x/oauth2 v0.34.0
 	google.golang.org/protobuf v1.36.11
