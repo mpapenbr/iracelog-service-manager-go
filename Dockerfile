@@ -11,4 +11,4 @@ RUN apk add --no-cache ca-certificates
 COPY $TARGETPLATFORM/iracelog-service-manager-go /
 COPY pkg/db/migrate/migrations /migrations
 COPY samples /
-COPY ext/healthcheck/$TARGETPLATFORM /grpc_health_probe
+COPY ext/healthcheck/$TARGETPLATFORM/grpc_health_probe /grpc_health_probe
