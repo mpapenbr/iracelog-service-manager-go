@@ -32,58 +32,29 @@ archives:
       - goos: windows
         formats: ["zip"]
 
-dockers:
-  - id: backend-amd64
-    image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-amd64"
+dockers_v2:
+  - id: standard
+    images:
+      - "ghcr.io/mpapenbr/{{ .ProjectName }}"
+    labels:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.source: "https://{{ .ModulePath }}"
+      org.opencontainers.image.url: "https://{{ .ModulePath }}"
+      org.opencontainers.image.description: "Backend for iRacelog"
+      org.opencontainers.image.licenses: "MIT license"
+      description: "Backend for iRacelog"
 
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://{{.ModulePath}}"
-      - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
-      - "--label=org.opencontainers.image.description=Backend for iRacelog"
-      - "--label=org.opencontainers.image.licenses=MIT license"
-      - "--platform=linux/amd64"
-
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    sbom: true
     extra_files:
       - pkg/db/migrate/migrations
       - samples
-      - ext/healthcheck/grpc_health_probe.amd64
-    use: buildx
-    goarch: amd64
-
-  - id: backend-arm64
-    image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-arm64"
-
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://{{.ModulePath}}"
-      - "--label=org.opencontainers.image.url=https://{{.ModulePath}}"
-      - "--label=org.opencontainers.image.description=Backend for iRacelog"
-      - "--label=org.opencontainers.image.licenses=MIT license"
-      - "--platform=linux/arm64"
-
-    extra_files:
-      - pkg/db/migrate/migrations
-      - samples
-      - ext/healthcheck/grpc_health_probe.arm64
-    use: buildx
-    goarch: arm64
-
-docker_manifests:
-  - name_template: "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}"
-    image_templates:
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-amd64"
-      - "ghcr.io/mpapenbr/{{ .ProjectName }}:{{ .Tag }}-arm64"
+      - ext/healthcheck
 
 sboms:
   - artifacts: archive
