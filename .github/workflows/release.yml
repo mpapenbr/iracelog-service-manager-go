@@ -15,12 +15,13 @@ jobs:
     steps:
       - name: get grpc health check
         run: |
-          curl -L https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.36/grpc_health_probe-linux-${{matrix.config}} -o ${{ runner.temp }}/grpc_health_probe.${{matrix.config}}
+          mkdir -p ${{ runner.temp }}/linux/${{matrix.config}}
+          curl -L https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.36/grpc_health_probe-linux-${{matrix.config}} -o ${{ runner.temp }}/linux/${{matrix.config}}/grpc_health_probe
       - name: Upload health check artifacts
         uses: actions/upload-artifact@v6
         with:
           name: grpc-${{matrix.config}}
-          path: ${{ runner.temp }}/grpc_health_probe.${{matrix.config}}
+          path: ${{ runner.temp }}/linux/${{matrix.config}}/grpc_health_probe
 
   goreleaser:
     needs:
@@ -36,18 +37,18 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: grpc-amd64
-          path: ext/healthcheck
+          path: ext/healthcheck/linux/amd64
       - name: Download grpc health check artifacts (arm64)
         uses: actions/download-artifact@v7
         with:
           name: grpc-arm64
-          path: ext/healthcheck
+          path: ext/healthcheck/linux/arm64
 
       - name: add execute permissions
-        run: chmod +x ext/healthcheck/*
+        run: chmod +x ext/healthcheck/linux/{amd64,arm64}/*
 
       - name: show ext/healthcheck
-        run: ls -la ext/healthcheck
+        run: ls -laR ext/healthcheck
 
       - uses: actions/setup-go@v6
         with:
@@ -75,8 +76,7 @@ jobs:
       - name: Release via goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          # remove version if switched to dockers_v2 in .goreleaser.yml
-          version: "v2.12.7"
+          version: "~> v2"
           args: release --release-notes=/tmp/CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
