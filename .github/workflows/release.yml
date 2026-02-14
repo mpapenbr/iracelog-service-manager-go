@@ -75,6 +75,8 @@ jobs:
       - name: Release via goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
+          # remove version if switched to dockers_v2 in .goreleaser.yml
+          version: "v2.12.7"
           args: release --release-notes=/tmp/CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
