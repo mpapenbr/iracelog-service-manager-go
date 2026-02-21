@@ -21,7 +21,7 @@ require (
 	github.com/lib/pq v1.11.2
 	github.com/nats-io/nats.go v1.48.0
 	github.com/ohler55/ojg v1.28.0
-	github.com/open-policy-agent/opa v1.13.1
+	github.com/open-policy-agent/opa v1.13.2
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.52.0
