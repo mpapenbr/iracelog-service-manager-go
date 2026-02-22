@@ -17,6 +17,7 @@ var (
 	MigrationSourceURL   string // location of migration files
 	EnableTelemetry      bool   // enable telemetry
 	TelemetryEndpoint    string // endpoint for telemetry
+	OtelOutput           string // telemetry output (stdout, grpc)
 	ProfilingPort        int    // port for profiling
 	GrpcServerAddr       string // listen addr for gRPC server (insecure)
 	TLSServerAddr        string // listen addr for gRPC server (tls)

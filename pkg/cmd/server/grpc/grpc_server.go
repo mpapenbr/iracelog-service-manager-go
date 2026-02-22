@@ -33,7 +33,6 @@ import (
 	"github.com/pgx-contrib/pgxtrace"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
-	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/http2"
@@ -73,6 +72,7 @@ import (
 	sessionFactory "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session/factory"
 	sessionImpl "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session/impl"
 	oauth2SessConfig "github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/session/impl/oauth2"
+	myOtel "github.com/mpapenbr/iracelog-service-manager-go/pkg/otel"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
 	utilsCache "github.com/mpapenbr/iracelog-service-manager-go/pkg/utils/cache"
 	"github.com/mpapenbr/iracelog-service-manager-go/version"
@@ -126,6 +126,10 @@ func NewServerCmd() *cobra.Command {
 		"enable-telemetry",
 		false,
 		"enables telemetry")
+	cmd.Flags().StringVar(&config.OtelOutput,
+		"otel-output",
+		"grpc",
+		"defines the output for telemetry data (stdout, grpc)")
 	cmd.Flags().StringVar(&config.TelemetryEndpoint,
 		"telemetry-endpoint",
 		"localhost:4317",
@@ -204,7 +208,7 @@ type grpcServer struct {
 	log                   *log.Logger
 	pool                  *pgxpool.Pool
 	mux                   *http.ServeMux
-	telemetry             *config.Telemetry
+	telemetry             *myOtel.Telemetry
 	otel                  *otelconnect.Interceptor
 	eventLookup           *utils.EventLookup
 	tlsConfig             *tls.Config
@@ -229,11 +233,11 @@ func startServer(ctx context.Context) error {
 		tlsConfig: NewTLSConfigProvider(ctx),
 	}
 	srv.tracer = otel.Tracer("ism")
+	srv.SetupTelemetry()
 	srv.SetupLogger()
 	srv.waitForRequiredServices()
 	srv.log.Info("Starting iRaclog backend", log.String("version", version.FullVersion))
 	srv.SetupProfiling()
-	srv.SetupTelemetry()
 	srv.SetupDB()
 	srv.SetupFeatures()
 	srv.SetupIDPParam()
@@ -252,10 +256,11 @@ func startServer(ctx context.Context) error {
 
 func (s *grpcServer) SetupTelemetry() {
 	if config.EnableTelemetry {
-		s.log.Info("Enabling telemetry")
-		err := otlpruntime.Start(otlpruntime.WithMinimumReadMemStatsInterval(time.Second))
-		if err != nil {
-			s.log.Warn("Could not start runtime metrics", log.ErrorField(err))
+		var err error
+		if s.telemetry, err = myOtel.SetupTelemetry(
+			myOtel.WithTelemetryOutput(myOtel.ParseTelemetryOutput(config.OtelOutput)),
+		); err != nil {
+			log.Error("Could not setup telemetry", log.ErrorField(err))
 		}
 	}
 }
@@ -277,21 +282,31 @@ func (s *grpcServer) SetupProfiling() {
 }
 
 func (s *grpcServer) SetupLogger() {
-	s.log = log.GetFromContext(s.ctx).Named("grpc")
+	logConfig := log.DefaultDevConfig()
+	if config.LogConfig != "" {
+		var err error
+		logConfig, err = log.LoadConfig(config.LogConfig)
+		if err != nil {
+			log.Fatal("could not load log config", log.ErrorField(err))
+		}
+	}
+
+	l := log.New(
+		log.WithLogConfig(logConfig),
+		log.WithLogLevel(config.LogLevel),
+		log.WithTelemetry(s.telemetry),
+		log.WithRemoveContextFields(true),
+		log.WithUseZap(true),
+	)
+
+	log.ResetDefault(l)
+	s.log = l.Named("grpc")
 }
 
 func (s *grpcServer) SetupDB() {
 	pgTracer := pgxtrace.CompositeQueryTracer{
 		postgres.NewMyTracer(log.Default().Named("sql"), log.DebugLevel),
-	}
-
-	if config.EnableTelemetry {
-		var err error
-		if s.telemetry, err = config.SetupTelemetry(context.Background()); err == nil {
-			pgTracer = append(pgTracer, postgres.NewOtlpTracer())
-		} else {
-			s.log.Warn("Could not setup db telemetry", log.ErrorField(err))
-		}
+		postgres.NewOtlpTracer(),
 	}
 
 	pgOptions := []postgres.PoolConfigOption{

@@ -13,6 +13,7 @@ import (
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
 	"connectrpc.com/connect"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -95,19 +96,23 @@ func (s *eventsServer) GetEvents(
 			tenantID = &t.ID
 		}
 	} else {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return err
 	}
 	data, err := s.repos.Event().LoadAll(ctx, tenantID)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return err
 	}
 	for i := range data {
 		if err := stream.Send(
 			&eventv1.GetEventsResponse{Event: data[i]}); err != nil {
-			s.log.Error("Error sending event", log.ErrorField(err))
+			s.log.WithCtx(ctx).Error("Error sending event", log.ErrorField(err))
+			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 			return err
 		}
 	}
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "events sent successfully")
 	return nil
 }
 
@@ -125,13 +130,16 @@ func (s *eventsServer) GetLatestEvents(
 			tenantID = &t.ID
 		}
 	} else {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	data, err := s.repos.Event().LoadAll(ctx, tenantID)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "latest events sent successfully")
 	return connect.NewResponse(&eventv1.GetLatestEventsResponse{Events: data}), nil
 }
 

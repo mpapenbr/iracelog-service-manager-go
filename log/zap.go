@@ -1,122 +1,44 @@
 package log
 
 import (
-	"io"
+	"context"
 	"maps"
-	"os"
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 
+	"go.opentelemetry.io/contrib/bridges/otelzap"
+	"go.opentelemetry.io/contrib/processors/minsev"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"moul.io/zapfilter"
 )
 
-type Level = zapcore.Level
+type (
+	Level = zapcore.Level
+	Field = zap.Field
+	// note: if ctx is set it will be added as a log.Field for all log calls
+	// the use case is to add the span context to the log,
+	//  so that the traceID is included in the log output
+	// for example:
+	// log.Ctx(spanCtx).Debug("message") will add the span context to the log entry
+	Logger struct {
+		l             *zap.Logger // zap ensure that zap.Logger is safe for concurrent use
+		level         Level
+		zapConfig     *zap.Config
+		loggerConfigs map[string]string
+		myCfg         *loggerConfig
+		ctx           context.Context
+	}
+	LevelEnablerFunc func(lvl Level) bool
 
-const (
-	InfoLevel   Level = zap.InfoLevel   // 0, default level
-	WarnLevel   Level = zap.WarnLevel   // 1
-	ErrorLevel  Level = zap.ErrorLevel  // 2
-	DPanicLevel Level = zap.DPanicLevel // 3, used in development log
-	// PanicLevel logs a message, then panics
-	PanicLevel Level = zap.PanicLevel // 4
-	// FatalLevel logs a message, then calls os.Exit(1).
-	FatalLevel Level = zap.FatalLevel // 5
-	DebugLevel Level = zap.DebugLevel // -1
+	TeeOption struct {
+		Filename string
+		Ropt     RotateOptions
+		Lef      LevelEnablerFunc
+	}
 )
-
-type Field = zap.Field
-
-type Logger struct {
-	l             *zap.Logger // zap ensure that zap.Logger is safe for concurrent use
-	level         Level
-	baseConfig    *zap.Config
-	loggerConfigs map[string]string
-}
-
-func (l *Logger) Level() Level {
-	return l.level
-}
-
-func (l *Logger) Debug(msg string, fields ...Field) {
-	l.l.Debug(msg, fields...)
-}
-
-func (l *Logger) Info(msg string, fields ...Field) {
-	l.l.Info(msg, fields...)
-}
-
-func (l *Logger) Warn(msg string, fields ...Field) {
-	l.l.Warn(msg, fields...)
-}
-
-func (l *Logger) Error(msg string, fields ...Field) {
-	l.l.Error(msg, fields...)
-}
-
-func (l *Logger) DPanic(msg string, fields ...Field) {
-	l.l.DPanic(msg, fields...)
-}
-
-func (l *Logger) Panic(msg string, fields ...Field) {
-	l.l.Panic(msg, fields...)
-}
-
-func (l *Logger) Fatal(msg string, fields ...Field) {
-	l.l.Fatal(msg, fields...)
-}
-
-func (l *Logger) Log(lvl Level, msg string, fields ...Field) {
-	l.l.Log(lvl, msg, fields...)
-}
-
-func (l *Logger) Named(name string) *Logger {
-	level := l.level // default level in case of no match or no valid log level
-	fullLoggerName := name
-	if l.l.Name() != "" {
-		fullLoggerName = l.l.Name() + "." + name
-	}
-	loggers := slices.Collect(maps.Keys(l.loggerConfigs))
-	bestMatch := findBestMatch(loggers, fullLoggerName)
-	if bestMatch != "" {
-		if cfg, ok := l.loggerConfigs[bestMatch]; ok {
-			if cfg != "" {
-				lvl, _ := zap.ParseAtomicLevel(cfg)
-				level = lvl.Level()
-			}
-		}
-
-		myConfig := *l.baseConfig
-		myConfig.Level = zap.NewAtomicLevelAt(level)
-		lt, _ := myConfig.Build()
-		return &Logger{
-			l: zap.New(lt.Core(),
-				zap.WithCaller(!l.baseConfig.DisableCaller),
-				zap.AddStacktrace(zap.ErrorLevel),
-				AddCallerSkip(1)).Named(fullLoggerName),
-
-			level:         lt.Level(),
-			baseConfig:    l.baseConfig,
-			loggerConfigs: l.loggerConfigs,
-		}
-	}
-	return &Logger{
-		l:             l.l.Named(name),
-		level:         level,
-		baseConfig:    l.baseConfig,
-		loggerConfigs: l.loggerConfigs,
-	}
-}
-
-func (l *Logger) WithOptions(opts ...Option) *Logger {
-	return &Logger{
-		l:     l.l.WithOptions(opts...),
-		level: l.level,
-	}
-}
 
 // function variables for all field types
 // in github.com/uber-go/zap/field.go
@@ -179,6 +101,62 @@ var (
 	Debug  = std.Debug
 )
 
+const (
+	InfoLevel   Level = zap.InfoLevel   // 0, default level
+	WarnLevel   Level = zap.WarnLevel   // 1
+	ErrorLevel  Level = zap.ErrorLevel  // 2
+	DPanicLevel Level = zap.DPanicLevel // 3, used in development log
+	// PanicLevel logs a message, then panics
+	PanicLevel Level = zap.PanicLevel // 4
+	// FatalLevel logs a message, then calls os.Exit(1).
+	FatalLevel Level = zap.FatalLevel // 5
+	DebugLevel Level = zap.DebugLevel // -1
+)
+
+var std = New()
+
+func New(opts ...ConfigOption) *Logger {
+	myCfg := newLoggerConfig(opts...)
+	cfg := myCfg.cfg
+
+	if myCfg.level != "" {
+		lvl, _ := zap.ParseAtomicLevel(myCfg.level)
+		cfg.Zap.Level = lvl
+	}
+
+	zapLogger, _ := cfg.Zap.Build()
+
+	zapLogger = combinedCores(zapLogger, "", myCfg, cfg.Zap.Level.Level())
+
+	if cfg.Filters != nil {
+		// concatenate items to one string
+		var filters string
+		for _, filter := range cfg.Filters {
+			filters += filter + " "
+		}
+		zapLogger = zap.New(zapfilter.NewFilteringCore(
+			zapLogger.Core(),
+			zapfilter.MustParseRules(filters)),
+		)
+	}
+	logger := &Logger{
+		l:             zapLogger,
+		level:         cfg.Zap.Level.Level(),
+		zapConfig:     &cfg.Zap,
+		loggerConfigs: cfg.Loggers,
+		myCfg:         myCfg,
+	}
+	return logger
+}
+
+func Default() *Logger {
+	return std
+}
+
+func ErrorField(err error) Field {
+	return zap.Error(err)
+}
+
 // not safe for concurrent use
 func ResetDefault(l *Logger) {
 	std = l
@@ -189,16 +167,6 @@ func ResetDefault(l *Logger) {
 	Panic = std.Panic
 	Fatal = std.Fatal
 	Debug = std.Debug
-}
-
-var std = New(os.Stderr, InfoLevel, WithCaller(true), AddCallerSkip(1))
-
-func Default() *Logger {
-	return std
-}
-
-func ErrorField(err error) Field {
-	return zap.Error(err)
 }
 
 type Option = zap.Option
@@ -216,93 +184,167 @@ type RotateOptions struct {
 	Compress   bool
 }
 
-type LevelEnablerFunc func(lvl Level) bool
-
-type TeeOption struct {
-	Filename string
-	Ropt     RotateOptions
-	Lef      LevelEnablerFunc
+func (l *Logger) Level() Level {
+	return l.level
 }
 
-// New create a new logger for production.
-//
-//nolint:dupl //yes, very similar to DevLogger
-func New(writer io.Writer, level Level, opts ...Option) *Logger {
-	if writer == nil {
-		panic("the writer is nil")
+func (l *Logger) WithCtx(ctx context.Context) *Logger {
+	ret := &Logger{
+		l:             l.l,
+		level:         l.level,
+		zapConfig:     l.zapConfig,
+		loggerConfigs: l.loggerConfigs,
+		myCfg:         l.myCfg,
+		ctx:           ctx,
 	}
-	cfg := zap.NewProductionConfig()
-	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(t.Format("2006-01-02T15:04:05.000Z0700"))
-	}
-
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(cfg.EncoderConfig),
-		zapcore.AddSync(writer),
-		level,
-	)
-	logger := &Logger{
-		l:     zap.New(core, opts...),
-		level: level,
-	}
-	return logger
+	return ret
 }
 
-func NewWithConfig(cfg *Config, level string) *Logger {
-	if level != "" {
-		lvl, _ := zap.ParseAtomicLevel(level)
-		cfg.Zap.Level = lvl
-	}
+func (l *Logger) Debug(msg string, fields ...Field) {
+	l.l.Debug(msg, l.addContext(fields)...)
+}
 
-	lt, _ := cfg.Zap.Build()
-	myCore := lt.Core()
-	if cfg.Filters != nil {
-		// concatenate items to one string
-		var filters string
-		for _, filter := range cfg.Filters {
-			filters += filter + " "
+func (l *Logger) Info(msg string, fields ...Field) {
+	l.l.Info(msg, l.addContext(fields)...)
+}
+
+func (l *Logger) Warn(msg string, fields ...Field) {
+	l.l.Warn(msg, l.addContext(fields)...)
+}
+
+func (l *Logger) Error(msg string, fields ...Field) {
+	l.l.Error(msg, l.addContext(fields)...)
+}
+
+func (l *Logger) DPanic(msg string, fields ...Field) {
+	l.l.DPanic(msg, l.addContext(fields)...)
+}
+
+func (l *Logger) Panic(msg string, fields ...Field) {
+	l.l.Panic(msg, l.addContext(fields)...)
+}
+
+func (l *Logger) Fatal(msg string, fields ...Field) {
+	l.l.Fatal(msg, l.addContext(fields)...)
+}
+
+func (l *Logger) Log(lvl Level, msg string, fields ...Field) {
+	l.l.Log(lvl, msg, l.addContext(fields)...)
+}
+
+func (l *Logger) addContext(fields []Field) []Field {
+	if l.ctx == nil {
+		return fields
+	}
+	return append(fields, zap.Any("context", l.ctx))
+}
+
+func (l *Logger) Named(name string) *Logger {
+	level := l.level // default level in case of no match or no valid log level
+	fullLoggerName := name
+	if l.l.Name() != "" {
+		fullLoggerName = l.l.Name() + "." + name
+	}
+	zapL := l.l.Named(name)
+	loggers := slices.Collect(maps.Keys(l.loggerConfigs))
+	bestMatch := findBestMatch(loggers, fullLoggerName)
+	if bestMatch != "" {
+		if cfg, ok := l.loggerConfigs[bestMatch]; ok {
+			if cfg != "" {
+				lvl, _ := zap.ParseAtomicLevel(cfg)
+				level = lvl.Level()
+			}
 		}
-		lt = zap.New(zapfilter.NewFilteringCore(
-			myCore,
-			zapfilter.MustParseRules(filters)),
-		)
-	}
 
-	logger := &Logger{
-		l: zap.New(lt.Core(),
-			zap.WithCaller(!cfg.Zap.DisableCaller),
-			zap.AddStacktrace(zap.ErrorLevel),
-			AddCallerSkip(1)),
-		level:         lt.Level(),
-		baseConfig:    &cfg.Zap,
-		loggerConfigs: cfg.Loggers,
+		myConfig := *l.zapConfig
+		myConfig.Level = zap.NewAtomicLevelAt(level)
+
+		lt, _ := myConfig.Build()
+		zapL = combinedCores(lt.Named(fullLoggerName), fullLoggerName, l.myCfg, level)
 	}
-	return logger
+	return &Logger{
+		l:             zapL,
+		level:         level,
+		zapConfig:     l.zapConfig,
+		loggerConfigs: l.loggerConfigs,
+		myCfg:         l.myCfg,
+	}
 }
 
-// DevLogger create a new logger for development.
-//
-//nolint:dupl //yes, very similar to New
-func DevLogger(writer io.Writer, level Level, opts ...Option) *Logger {
-	if writer == nil {
-		panic("the writer is nil")
-	}
+// this core is used to remove fields containing a context.Context value
+// we need this to prevent the span context from being logged
+// we need the span context for the otelzap logger to output the traceID
+type contextIgnoringCore struct {
+	zapcore.Core
+}
 
-	cfg := zap.NewDevelopmentConfig()
-	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
+func (c *contextIgnoringCore) With(fields []zapcore.Field) zapcore.Core {
+	return &contextIgnoringCore{Core: c.Core.With(fields)}
+}
+
+//nolint:gocritic // external interface
+func (c *contextIgnoringCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	cleanedFields := make([]zapcore.Field, 0, len(fields))
+	for i := range fields {
+		f := fields[i]
+		if _, ok := f.Interface.(context.Context); ok {
+			continue
+		}
+		cleanedFields = append(cleanedFields, f)
 	}
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(cfg.EncoderConfig),
-		zapcore.AddSync(writer),
-		level,
+	return c.Core.Write(ent, cleanedFields)
+}
+
+//nolint:whitespace,gocritic // editor/linter issue
+func (c *contextIgnoringCore) Check(
+	ent zapcore.Entry,
+	ce *zapcore.CheckedEntry,
+) *zapcore.CheckedEntry {
+	// we just need to set add ourselves to the core
+	ret := ce.AddCore(ent, c)
+	return ret
+}
+
+//nolint:whitespace // editor/linter issue
+func combinedCores(
+	zl *zap.Logger,
+	name string,
+	myCfg *loggerConfig,
+	level Level,
+) *zap.Logger {
+	useCores := make([]zapcore.Core, 0)
+	if myCfg.telemetry != nil {
+		otelSeverity := &minsevSeverity{convertLevel(level)}
+		customLogger := myCfg.telemetry.CustomizedLogger(func(
+			exporter sdklog.Exporter,
+			downstream sdklog.Processor,
+		) sdklog.LoggerProviderOption {
+			proc := minsev.NewLogProcessor(downstream, otelSeverity)
+			return sdklog.WithProcessor(proc)
+		})
+
+		useCores = append(useCores, otelzap.NewCore(
+			name, otelzap.WithLoggerProvider(customLogger)))
+	}
+	if myCfg.useZap {
+		if myCfg.removeContextFields {
+			useCores = append(useCores, &contextIgnoringCore{
+				Core: zl.Core(),
+			})
+		} else {
+			useCores = append(useCores, zl.Core())
+		}
+	}
+	combinedCore := zapcore.NewTee(
+		useCores...,
 	)
 
-	logger := &Logger{
-		l:     zap.New(core, opts...),
-		level: level,
-	}
-	return logger
+	ret := zap.New(combinedCore,
+		zap.WithCaller(!myCfg.cfg.Zap.DisableCaller),
+		zap.AddStacktrace(zap.ErrorLevel),
+		AddCallerSkip(1))
+
+	return ret
 }
 
 func ParseLevel(levelStr string) (Level, error) {
