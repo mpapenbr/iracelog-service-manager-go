@@ -12,6 +12,7 @@ import (
 
 //nolint:lll,tagliatelle //readability,external API
 type (
+	//nolint:gosec // ignore G117
 	OIDCParam struct {
 		IssuerURL    string
 		ClientID     string

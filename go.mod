@@ -1,6 +1,6 @@
 module github.com/mpapenbr/iracelog-service-manager-go
 
-go 1.25
+go 1.26
 
 require (
 	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.1-20251019125030-8cb75f92a51d.2
@@ -33,7 +33,9 @@ require (
 	github.com/stephenafamo/scan v0.7.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
+	go.opentelemetry.io/contrib/bridges/otelzap v0.15.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.65.0
+	go.opentelemetry.io/contrib/processors/minsev v0.13.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.16.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0
@@ -141,9 +143,7 @@ require (
 	github.com/yashtewari/glob-intersection v0.2.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/bridges/otelzap v0.15.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
-	go.opentelemetry.io/contrib/processors/minsev v0.13.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect

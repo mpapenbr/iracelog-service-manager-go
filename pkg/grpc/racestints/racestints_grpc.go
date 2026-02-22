@@ -99,7 +99,9 @@ func Calc(c *predictv1.PredictParam) (*predictv1.PredictResult, error) {
 				curLap += remain
 			} else {
 				// calc remaining laps in remaining time and quit
-				remain = int32(math.Ceil((c.Race.Duration.AsDuration() - curDur).Seconds() / avgLap.Seconds()))
+				remain = int32(
+					math.Ceil((c.Race.Duration.AsDuration() - curDur).Seconds() / avgLap.Seconds()),
+				)
 				if remain == 0 {
 					return &predictv1.PredictResult{Parts: parts}, nil
 				}
