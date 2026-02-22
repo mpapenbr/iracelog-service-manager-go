@@ -116,6 +116,7 @@ linters:
     gosec:
       excludes:
         - G115
+        - G704 # SSRF taint reports are not needed here
     govet:
       disable:
         - fieldalignment

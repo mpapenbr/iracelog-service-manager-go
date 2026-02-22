@@ -51,7 +51,7 @@ type (
 		SupportTenants bool // if true, tenant support is enabled
 		SupportIDP     bool // if true, identity provider based authentication is enabled
 	}
-
+	//nolint:gosec // ignore G117
 	IDPConfig struct {
 		IssuerURL    string
 		ClientID     string

@@ -8,7 +8,7 @@
 [![Semantic Versioning](https://img.shields.io/badge/versioning-semantic-black?style=for-the-badge&logo=semver)][github-releases]
 [![Pre-Commit Enabled](https://img.shields.io/badge/Pre--Commit-Enabled-blue?style=for-the-badge&logo=pre-commit)][precommit-config]
 [![License](https://img.shields.io/github/license/mpapenbr/iracelog-service-manager-go?color=red&style=for-the-badge)][project-license]
-[![Go v1.25](https://img.shields.io/badge/Go-%20v1.25-black?style=for-the-badge&logo=go)][gomod-file]
+[![Go v1.26](https://img.shields.io/badge/Go-%20v1.26-black?style=for-the-badge&logo=go)][gomod-file]
 
 This repository contains the service backend for processing gRPC messages of the iRacelog project.
 
@@ -89,13 +89,13 @@ would be automatically run every time you use the `git commit` command.
 The pre-commit hooks used by `iracelog-service-manager-go` are located within the
 [`.pre-commit-config.yml`][precommit-config] file. These hooks are configured to run;
 
--   Series of basic checks (JSON, YAML, XML file schema validation)
--   Checks for merge conflicts, and possible leaks of private keys
--   File formatters - whitespace trimming, end-of-file fixers
--   Checks for executable scripts
--   JSON formatters
--   Code Formatters
--   Test-suite
+- Series of basic checks (JSON, YAML, XML file schema validation)
+- Checks for merge conflicts, and possible leaks of private keys
+- File formatters - whitespace trimming, end-of-file fixers
+- Checks for executable scripts
+- JSON formatters
+- Code Formatters
+- Test-suite
 
 To install pre-commit, simply use the Makefile command
 
@@ -323,9 +323,9 @@ requests are merged.
 
 Labels allowed;
 
--   `major`: Affects the `<major>` version number for semantic versioning
--   `minor`, `enhancement`, `update`, `feature`: Affects the `<minor>` version number for semantic versioning
--   all other labels affect the `<patch>` version number
+- `major`: Affects the `<major>` version number for semantic versioning
+- `minor`, `enhancement`, `update`, `feature`: Affects the `<minor>` version number for semantic versioning
+- all other labels affect the `<patch>` version number
 
 Whenever a pull request with one of these labels is merged to the `main` branch,
 the corresponding version number will be bumped by one digit!
