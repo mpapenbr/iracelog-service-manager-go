@@ -48,7 +48,10 @@ var rootCmd = &cobra.Command{
 				log.Fatal("could not load log config", log.ErrorField(err))
 			}
 		}
-		l := log.NewWithConfig(logConfig, config.LogLevel)
+		l := log.New(
+			log.WithLogConfig(logConfig),
+			log.WithLogLevel(config.LogLevel),
+		)
 		cmd.SetContext(log.AddToContext(context.Background(), l))
 		log.ResetDefault(l)
 	},

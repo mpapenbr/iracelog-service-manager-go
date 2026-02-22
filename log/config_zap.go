@@ -8,6 +8,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// this config is used to configure the zap logger by yaml file
+// additional to the zap config, it contains a default level and a map of named loggers
+// with theire respective levels. These level have precedence over the default level.
 type Config struct {
 	DefaultLevel string            `yaml:"defaultLevel"`
 	Loggers      map[string]string `yaml:"loggers"`

@@ -8,6 +8,7 @@ import (
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	"connectrpc.com/connect"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -69,7 +70,8 @@ type analysisServer struct {
 func (s *analysisServer) GetAnalysis(
 	ctx context.Context, req *connect.Request[analysisv1.GetAnalysisRequest],
 ) (*connect.Response[analysisv1.GetAnalysisResponse], error) {
-	s.log.Debug("GetAnalysis called",
+	l := s.log.WithCtx(ctx)
+	l.Debug("GetAnalysis called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	var analysisData *analysisv1.Analysis
@@ -79,19 +81,23 @@ func (s *analysisServer) GetAnalysis(
 
 	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
 	if err != nil {
-		s.log.Error("error resolving event",
+		l.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	analysisData, err = s.repos.Analysis().LoadByEventID(ctx, int(e.GetId()))
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	snapshots, err = s.repos.Speedmap().LoadSnapshots(ctx, int(e.GetId()), 300)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "analysis data retrieved successfully")
 	return connect.NewResponse(&analysisv1.GetAnalysisResponse{
 		Analysis:  analysisData,
 		Snapshots: snapshots,
@@ -102,11 +108,13 @@ func (s *analysisServer) GetAnalysis(
 func (s *analysisServer) ComputeAnalysis(
 	ctx context.Context, req *connect.Request[analysisv1.ComputeAnalysisRequest],
 ) (*connect.Response[analysisv1.ComputeAnalysisResponse], error) {
-	s.log.Debug("ComputeAnalysis called",
+	l := s.log.WithCtx(ctx)
+	l.Debug("ComputeAnalysis called",
 		log.Any("arg", req.Msg),
 		log.Int32("id", req.Msg.EventSelector.GetId()))
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasPermission(a, permission.PermissionUpdateEvent) {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, auth.ErrPermissionDenied.Error())
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 	var analysisData *analysisv1.Analysis
@@ -116,21 +124,24 @@ func (s *analysisServer) ComputeAnalysis(
 
 	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
 	if err != nil {
-		s.log.Error("error resolving event",
+		l.Error("error resolving event",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	analysisData, err = s.repos.Analysis().LoadByEventID(ctx, int(e.GetId()))
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	var recompAnalysisData *analysisv1.Analysis
 	recompAnalysisData, err = RecomputeAnalysis(ctx, s.repos, e)
 	if err != nil {
-		s.log.Error("error recomputing analysis",
+		l.Error("error recomputing analysis",
 			log.Any("selector", req.Msg.EventSelector),
 			log.ErrorField(err))
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	// lets see what we need to update
@@ -143,11 +154,11 @@ func (s *analysisServer) ComputeAnalysis(
 	}
 	// finally store the data if requested
 	if req.Msg.PersistMode == analysisv1.AnalysisPersistMode_ANALYSIS_PERSIST_MODE_ON {
-		log.Debug("storing analysis data",
+		l.Debug("storing analysis data",
 			log.Any("selector", req.Msg.EventSelector))
 		s.storeAnalysisData(int(e.GetId()), analysisData)
 	} else {
-		log.Debug("not storing analysis data",
+		l.Debug("not storing analysis data",
 			log.Any("selector", req.Msg.EventSelector),
 			log.String("persist_mode", req.Msg.PersistMode.String()))
 	}

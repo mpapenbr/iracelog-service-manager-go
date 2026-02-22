@@ -2,7 +2,6 @@ package check
 
 import (
 	"context"
-	"os"
 	"strconv"
 	"time"
 
@@ -27,21 +26,14 @@ func NewCheckDataFetcherCmd() *cobra.Command {
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			checkDriverDataFetcher(args[0])
+			checkDriverDataFetcher(cmd.Context(), args[0])
 		},
 	}
 	cmd.Flags().Float64Var(&startTS, "start", 0, "start timestamp")
 	return cmd
 }
 
-func checkDriverDataFetcher(eventArg string) {
-	logger := log.DevLogger(
-		os.Stderr,
-		parseLogLevel(logLevel, log.DebugLevel),
-		log.WithCaller(true),
-		log.AddCallerSkip(1))
-	log.ResetDefault(logger)
-
+func checkDriverDataFetcher(ctx context.Context, eventArg string) {
 	// wait for database
 	timeout, err := time.ParseDuration(config.WaitForServices)
 	if err != nil {
@@ -49,7 +41,7 @@ func checkDriverDataFetcher(eventArg string) {
 		timeout = 60 * time.Second
 	}
 	eventID, _ := strconv.Atoi(eventArg)
-	ctx := context.Background()
+
 	postgresAddr := utils.ExtractFromDBURL(config.DB)
 	if err = utils.WaitForTCP(postgresAddr, timeout); err != nil {
 		log.Fatal("database  not ready", log.ErrorField(err))

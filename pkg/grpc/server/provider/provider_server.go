@@ -96,6 +96,7 @@ func (s *providerServer) ListLiveEvents(
 	req *connect.Request[providerv1.ListLiveEventsRequest],
 ) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
 	mainSpan := trace.SpanFromContext(ctx)
+	l := s.log.WithCtx(ctx)
 	t, err := serverUtil.ResolveTenant(ctx, s.repos.Tenant(), req.Msg.TenantSelector)
 	if err != nil {
 		mainSpan.SetStatus(codes.Error, err.Error())
@@ -108,7 +109,7 @@ func (s *providerServer) ListLiveEvents(
 	events := s.dataProxy.LiveEvents()
 	attrs = append(attrs, attribute.Int("total_events", len(events)))
 
-	s.log.Debug("ListLiveEvents called")
+	l.Debug("ListLiveEvents called")
 
 	spanCtx, span := s.tracer.Start(ctx, "ListLiveEvents", trace.WithAttributes(attrs...))
 	defer span.End()
@@ -133,19 +134,22 @@ func (s *providerServer) RegisterEvent(
 	ctx context.Context,
 	req *connect.Request[providerv1.RegisterEventRequest],
 ) (*connect.Response[providerv1.RegisterEventResponse], error) {
-	s.log.Debug("RegisterEvent called", log.Any("header", req.Header()))
+	l := s.log.WithCtx(ctx)
+	l.Debug("RegisterEvent called", log.Any("header", req.Header()))
 	a := auth.FromContext(&ctx)
 	ta, ok := a.(auth.TenantAuthentication)
 	if !ok {
-		s.log.Debug("no tenant auth found")
+		l.Debug("no tenant auth found")
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "no tenant auth found")
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
 	if !s.pe.HasTenantPermission(a, permission.PermissionRegisterEvent, ta.GetTenantID()) {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 
-	s.log.Debug("RegisterEvent",
+	l.Debug("RegisterEvent",
 		log.Any("track", req.Msg.Track),
 		log.Any("event", req.Msg.Event),
 		log.String("tenant", a.Principal().Name()),
@@ -157,6 +161,7 @@ func (s *providerServer) RegisterEvent(
 		},
 	}
 	if ed, _ := s.dataProxy.GetEvent(selector); ed != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "event already registered")
 		return nil, connect.NewError(connect.CodeAlreadyExists, ErrEventAlreadyRegistered)
 	}
 
@@ -168,16 +173,17 @@ func (s *providerServer) RegisterEvent(
 				return err
 			}
 
-			s.log.Debug("tenant id", log.Uint32("id", ta.GetTenantID()))
+			l.Debug("tenant id", log.Uint32("id", ta.GetTenantID()))
 			return s.repos.Event().Create(ctx, req.Msg.Event, ta.GetTenantID())
 		}); err != nil {
-		s.log.Error("error creating data", log.ErrorField(err))
+		l.Error("error creating data", log.ErrorField(err))
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	// read track from db to include pit stop info if already there
 	dbTrack, err := s.repos.Track().LoadByID(ctx, int(req.Msg.Event.TrackId))
 	if err != nil {
-		s.log.Error("error loading track", log.ErrorField(err))
+		l.Error("error loading track", log.ErrorField(err))
 		dbTrack = req.Msg.Track
 	}
 	epd := s.lookup.AddEvent(
@@ -189,9 +195,10 @@ func (s *providerServer) RegisterEvent(
 	s.storeAnalysisDataWorker(epd)
 	s.storeReplayInfoWorker(epd)
 	if err = s.dataProxy.PublishEventRegistered(epd); err != nil {
-		s.log.Error("error publishing registered event", log.ErrorField(err))
+		l.Error("error publishing registered event", log.ErrorField(err))
 	}
-	s.log.Debug("event registered")
+	l.Debug("event registered")
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "event registered successfully")
 	return connect.NewResponse(&providerv1.RegisterEventResponse{
 			Event: req.Msg.Event,
 			Track: dbTrack,
@@ -204,26 +211,29 @@ func (s *providerServer) UnregisterEvent(
 	ctx context.Context,
 	req *connect.Request[providerv1.UnregisterEventRequest],
 ) (*connect.Response[providerv1.UnregisterEventResponse], error) {
-	s.log.Debug("UnregisterEvent",
+	l := s.log.WithCtx(ctx)
+	l.Debug("UnregisterEvent",
 		log.Any("event", req.Msg.EventSelector))
 	a := auth.FromContext(&ctx)
 	ed, err := s.validateEventAccess(a, req.Msg.EventSelector)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, err
 	}
 	epd, _ := s.lookup.GetEvent(req.Msg.EventSelector)
 	if epd != nil {
-		s.log.Debug("I was processing this event", log.String("key", epd.Event.Key))
+		l.Debug("I was processing this event", log.String("key", epd.Event.Key))
 
 		s.storeAnalysisData(epd)
 		s.storeReplayInfo(epd)
 		s.lookup.RemoveEvent(req.Msg.EventSelector)
 	}
 	if err := s.dataProxy.PublishEventUnregistered(ed.Event.Key); err != nil {
-		s.log.Error("error publishing unregistered event", log.ErrorField(err))
+		l.Error("error publishing unregistered event", log.ErrorField(err))
 	}
-	s.log.Debug("Event unregistered",
+	l.Debug("Event unregistered",
 		log.Any("event", req.Msg.EventSelector))
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "event unregistered successfully")
 	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
 }
 
@@ -261,6 +271,7 @@ func (s *providerServer) UnregisterAll(
 ) (*connect.Response[providerv1.UnregisterAllResponse], error) {
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasPermission(a, permission.PermissionAdminUnregisterAllEvents) {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
 	}
 	// TODO: data has to retrieved by pubsubData
@@ -270,6 +281,7 @@ func (s *providerServer) UnregisterAll(
 		ec = append(ec, &providerv1.LiveEventContainer{Event: v.Event, Track: v.Track})
 	}
 	s.lookup.Clear()
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "all events unregistered")
 	return connect.NewResponse(&providerv1.UnregisterAllResponse{Events: ec}), nil
 }
 
@@ -278,6 +290,8 @@ func (s *providerServer) Ping(
 	ctx context.Context,
 	req *connect.Request[providerv1.PingRequest],
 ) (*connect.Response[providerv1.PingResponse], error) {
+	l := s.log.WithCtx(ctx)
+	l.Debug("Ping called", log.Any("request", req.Msg))
 	return connect.NewResponse(&providerv1.PingResponse{
 		Num:       req.Msg.Num,
 		Timestamp: timestamppb.Now(),

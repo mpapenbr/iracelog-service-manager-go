@@ -11,6 +11,7 @@ import (
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
 	"connectrpc.com/connect"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -102,18 +103,20 @@ func (s *stateServer) PublishState(
 	*connect.Response[racestatev1.PublishStateResponse], error,
 ) {
 	a := auth.FromContext(&ctx)
+	l := s.log.WithCtx(ctx)
 	// get the epd
 	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, err
 	}
 	if s.debugWire {
-		s.wireLog.Debug("PublishState called",
+		s.wireLog.WithCtx(ctx).Debug("PublishState called",
 			log.String("event", epd.Event.Key),
 			log.Int("car entries", len(req.Msg.Cars)))
 	}
 	if err := s.dataProxy.PublishRaceStateData(req.Msg); err != nil {
-		s.log.Error("error publishing state", log.ErrorField(err))
+		l.Error("error publishing state", log.ErrorField(err))
 	}
 	if s.isRaceSession(epd, req.Msg) {
 		if err := s.storeData(ctx, epd,
@@ -125,13 +128,14 @@ func (s *stateServer) PublishState(
 				}
 				return err
 			}); err != nil {
-			s.log.Error("error storing state", log.ErrorField(err))
+			l.Error("error storing state", log.ErrorField(err))
 		}
 	}
 	epd.Mutex.Lock()
 	epd.MarkDataEvent()
 	defer epd.Mutex.Unlock()
 	epd.Processor.ProcessState(req.Msg)
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "state published successfully")
 	return connect.NewResponse(&racestatev1.PublishStateResponse{}), nil
 }
 
@@ -157,29 +161,31 @@ func (s *stateServer) PublishSpeedmap(
 	req *connect.Request[racestatev1.PublishSpeedmapRequest]) (
 	*connect.Response[racestatev1.PublishSpeedmapResponse], error,
 ) {
+	l := s.log.WithCtx(ctx)
 	a := auth.FromContext(&ctx)
 	// get the epd
 	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, err
 	}
 	if s.debugWire {
-		s.wireLog.Debug("PublishSpeedmap called",
+		s.wireLog.WithCtx(ctx).Debug("PublishSpeedmap called",
 			log.String("event", epd.Event.Key),
 			log.Int("speedmap map entries", len(req.Msg.Speedmap.Data)))
 	}
 
 	if err := s.dataProxy.PublishSpeedmapData(req.Msg); err != nil {
-		s.log.Error("error publishing speedmap", log.ErrorField(err))
+		l.Error("error publishing speedmap", log.ErrorField(err))
 	}
 	if err := s.storeData(ctx, epd, func(ctx context.Context) error {
 		return s.repos.Speedmap().Create(ctx, epd.LastRsInfoID, req.Msg)
 	}); err != nil {
-		s.log.Error("error storing speedmap", log.ErrorField(err))
+		l.Error("error storing speedmap", log.ErrorField(err))
 	}
 
 	epd.Processor.ProcessSpeedmap(req.Msg)
-
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "speedmap published successfully")
 	return connect.NewResponse(&racestatev1.PublishSpeedmapResponse{}), nil
 }
 
@@ -189,24 +195,27 @@ func (s *stateServer) PublishDriverData(
 	req *connect.Request[racestatev1.PublishDriverDataRequest]) (
 	*connect.Response[racestatev1.PublishDriverDataResponse], error,
 ) {
+	l := s.log.WithCtx(ctx)
 	a := auth.FromContext(&ctx)
 	// get the epd
 	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, err
 	}
 
 	if s.debugWire {
-		s.wireLog.Debug("PublishDriverData called", log.String("event", epd.Event.Key))
+		s.wireLog.WithCtx(ctx).Debug("PublishDriverData called",
+			log.String("event", epd.Event.Key))
 	}
 
 	if err := s.dataProxy.PublishDriverData(req.Msg); err != nil {
-		s.log.Error("error publishing state", log.ErrorField(err))
+		l.Error("error publishing state", log.ErrorField(err))
 	}
 	if err := s.storeData(ctx, epd, func(ctx context.Context) error {
 		// Note: carrepos uses eventId, carprotorepos rsInfoId
 		if err := s.repos.Car().Create(ctx, int(epd.Event.Id), req.Msg); err != nil {
-			s.log.Error("error storing car data", log.ErrorField(err))
+			l.Error("error storing car data", log.ErrorField(err))
 		}
 		rsInfoID := epd.LastRsInfoID
 		if epd.LastRsInfoID == 0 {
@@ -216,19 +225,19 @@ func (s *stateServer) PublishDriverData(
 				req.Msg.SessionTime, req.Msg.SessionNum,
 			)
 			if rsErr != nil {
-				s.log.Error("error creating dummy racestate info", log.ErrorField(rsErr))
+				l.Error("error creating dummy racestate info", log.ErrorField(rsErr))
 				return rsErr
 			}
 		}
 		return s.repos.CarProto().Create(ctx, rsInfoID, req.Msg)
 	}); err != nil {
-		s.log.Error("error storing car state", log.ErrorField(err))
+		l.Error("error storing car state", log.ErrorField(err))
 	}
 
 	epd.Mutex.Lock()
 	defer epd.Mutex.Unlock()
 	epd.Processor.ProcessCarData(req.Msg)
-
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "driver data published successfully")
 	return connect.NewResponse(&racestatev1.PublishDriverDataResponse{}), nil
 }
 
@@ -263,14 +272,17 @@ func (s *stateServer) PublishEventExtraInfo(
 	req *connect.Request[racestatev1.PublishEventExtraInfoRequest]) (
 	*connect.Response[racestatev1.PublishEventExtraInfoResponse], error,
 ) {
+	l := s.log.WithCtx(ctx)
 	a := auth.FromContext(&ctx)
 	// get the epd
 	epd, err := s.validateEventAccess(a, req.Msg.Event)
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, err
 	}
 	if s.debugWire {
-		s.wireLog.Debug("PublishEventExtraInfo called", log.String("event", epd.Event.Key))
+		s.wireLog.WithCtx(ctx).Debug("PublishEventExtraInfo called",
+			log.String("event", epd.Event.Key))
 	}
 
 	if err := s.storeData(ctx, epd, func(ctx context.Context) error {
@@ -278,9 +290,11 @@ func (s *stateServer) PublishEventExtraInfo(
 
 		return s.repos.EventExt().Upsert(ctx, int(epd.Event.Id), req.Msg.ExtraInfo)
 	}); err != nil {
-		s.log.Error("error storing event extra info", log.ErrorField(err))
+		l.Error("error storing event extra info", log.ErrorField(err))
 	}
 
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok,
+		"event extra info published successfully")
 	return connect.NewResponse(&racestatev1.PublishEventExtraInfoResponse{}), nil
 }
 
@@ -326,13 +340,16 @@ func (s *stateServer) GetDriverData(
 	var sc *driverDataContainer
 	var err error
 	if sc, err = CreateDriverDataContainer(ctx, s.repos, req.Msg); err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
 	tmp, err = sc.InitialRequest()
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "driver data retrieved successfully")
 	// Note: we don't want to return more data then configured in driverDataContainer
 	// if a client needs more, it should call again or use the stream method
 	return connect.NewResponse(&racestatev1.GetDriverDataResponse{
@@ -351,16 +368,18 @@ func (s *stateServer) GetDriverDataStream(
 ) (err error) {
 	var sc *driverDataContainer
 	if sc, err = CreateDriverDataContainer(ctx, s.repos, req.Msg); err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishDriverDataRequest]
 	rc, err = sc.InitialRequest()
 	for {
 		if err != nil {
+			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 			return err
 		}
 		if len(rc.Data) == 0 {
-			s.log.Debug("GetDriverDataStream no more data",
+			s.log.WithCtx(ctx).Debug("GetDriverDataStream no more data",
 				log.String("event", sc.e.GetKey()))
 			return nil
 		}
@@ -368,6 +387,7 @@ func (s *stateServer) GetDriverDataStream(
 			if sErr := stream.Send(&racestatev1.GetDriverDataStreamResponse{
 				DriverData: s,
 			}); sErr != nil {
+				trace.SpanFromContext(ctx).SetStatus(codes.Error, sErr.Error())
 				return sErr
 			}
 		}
@@ -384,15 +404,18 @@ func (s *stateServer) GetStates(
 	var sc *racestatesContainer
 	var err error
 	if sc, err = CreateRacestatesContainer(ctx, s.repos, req.Msg); err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
 	tmp, err = sc.InitialRequest()
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	// Note: we don't want to return more data then configured in statesContainer
 	// if a client needs more, it should call again or use the stream method
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "states retrieved successfully")
 	return connect.NewResponse(&racestatev1.GetStatesResponse{
 		States:          tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
@@ -409,22 +432,26 @@ func (s *stateServer) GetStateStream(
 ) (err error) {
 	var sc *racestatesContainer
 	if sc, err = CreateRacestatesContainer(ctx, s.repos, req.Msg); err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishStateRequest]
 	rc, err = sc.InitialRequest()
 	for {
 		if err != nil {
+			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 			return err
 		}
 		if len(rc.Data) == 0 {
-			s.log.Debug("GetStateStream no more data", log.String("event", sc.e.GetKey()))
+			s.log.WithCtx(ctx).Debug("GetStateStream no more data",
+				log.String("event", sc.e.GetKey()))
 			return nil
 		}
 		for _, s := range rc.Data {
 			if sErr := stream.Send(&racestatev1.GetStateStreamResponse{
 				State: s,
 			}); sErr != nil {
+				trace.SpanFromContext(ctx).SetStatus(codes.Error, sErr.Error())
 				return sErr
 			}
 		}
@@ -441,15 +468,18 @@ func (s *stateServer) GetSpeedmaps(
 	var sc *speedmapContainer
 	var err error
 	if sc, err = createSpeedmapContainer(ctx, s.repos, req.Msg); err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	var tmp *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
 	tmp, err = sc.InitialRequest()
 	if err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	// Note: we don't want to return more data then configured in speedmapContainer
 	// if a client needs more, it should call again or use the stream method
+	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "speedmaps retrieved successfully")
 	return connect.NewResponse(&racestatev1.GetSpeedmapsResponse{
 		Speedmaps:       tmp.Data,
 		LastTs:          timestamppb.New(tmp.LastTimestamp),
@@ -466,22 +496,26 @@ func (s *stateServer) GetSpeedmapStream(
 ) (err error) {
 	var sc *speedmapContainer
 	if sc, err = createSpeedmapContainer(ctx, s.repos, req.Msg); err != nil {
+		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return err
 	}
 	var rc *mainUtil.RangeContainer[racestatev1.PublishSpeedmapRequest]
 	rc, err = sc.InitialRequest()
 	for {
 		if err != nil {
+			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 			return err
 		}
 		if len(rc.Data) == 0 {
-			s.log.Debug("GetSpeedmapStream no more data", log.String("event", sc.e.GetKey()))
+			s.log.WithCtx(ctx).Debug("GetSpeedmapStream no more data",
+				log.String("event", sc.e.GetKey()))
 			return nil
 		}
 		for _, s := range rc.Data {
 			if sErr := stream.Send(&racestatev1.GetSpeedmapStreamResponse{
 				Speedmap: s,
 			}); sErr != nil {
+				trace.SpanFromContext(ctx).SetStatus(codes.Error, sErr.Error())
 				return sErr
 			}
 		}
