@@ -18,7 +18,7 @@ jobs:
           mkdir -p ${{ runner.temp }}/linux/${{matrix.config}}
           curl -L https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.36/grpc_health_probe-linux-${{matrix.config}} -o ${{ runner.temp }}/linux/${{matrix.config}}/grpc_health_probe
       - name: Upload health check artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: grpc-${{matrix.config}}
           path: ${{ runner.temp }}/linux/${{matrix.config}}/grpc_health_probe
@@ -34,12 +34,12 @@ jobs:
         run: git fetch --prune --unshallow
 
       - name: Download grpc health check artifacts (amd64)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: grpc-amd64
           path: ext/healthcheck/linux/amd64
       - name: Download grpc health check artifacts (arm64)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: grpc-arm64
           path: ext/healthcheck/linux/arm64
@@ -74,7 +74,7 @@ jobs:
           echo "${{ steps.rd.outputs.body }}" > /tmp/CHANGELOG.md
 
       - name: Release via goreleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --release-notes=/tmp/CHANGELOG.md
