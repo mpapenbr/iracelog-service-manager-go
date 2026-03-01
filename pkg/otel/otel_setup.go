@@ -320,7 +320,11 @@ func initResource() *sdkresource.Resource {
 			sdkresource.WithProcess(),
 			sdkresource.WithContainer(),
 			sdkresource.WithHost(),
-			sdkresource.WithAttributes(semconv.ServiceVersion(version.Version)),
+
+			sdkresource.WithAttributes(
+				semconv.ServiceVersion(version.Version),
+				semconv.ServiceInstanceIDKey.String(hostName()),
+			),
 		)
 		resource, _ = sdkresource.Merge(
 			sdkresource.Default(),
@@ -328,4 +332,12 @@ func initResource() *sdkresource.Resource {
 		)
 	})
 	return resource
+}
+
+func hostName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return name
 }
