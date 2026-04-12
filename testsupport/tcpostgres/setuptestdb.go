@@ -37,7 +37,7 @@ func SetupTestDB() *pgxpool.Pool {
 		log.Fatal(err)
 	}
 	//nolint fmt.Printf("%+v\n", container)
-	containerPort, _ := container.MappedPort(ctx, port)
+	containerPort, _ := container.MappedPort(ctx, port.Port())
 	host, _ := container.Host(ctx)
 	dbURL := fmt.Sprintf("postgresql://postgres:password@%s:%s/postgres",
 		host, containerPort.Port())
