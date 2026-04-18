@@ -11,7 +11,7 @@ require (
 	connectrpc.com/otelconnect v0.9.0
 	github.com/aarondl/opt v0.0.0-20250607033636-982744e1bd65
 	github.com/coreos/go-oidc/v3 v3.18.0
-	github.com/docker/go-connections v0.6.0
+	github.com/docker/go-connections v0.7.0
 	github.com/exaring/otelpgx v0.10.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/lib/pq v1.12.3
-	github.com/nats-io/nats.go v1.50.0
+	github.com/nats-io/nats.go v1.51.0
 	github.com/ohler55/ojg v1.28.1
 	github.com/open-policy-agent/opa v1.15.2
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
