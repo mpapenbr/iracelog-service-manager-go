@@ -3,9 +3,9 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.26
 
 require (
-	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.1-20251019125030-8cb75f92a51d.2
+	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.19.2-20251019125030-8cb75f92a51d.1
 	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.11-20251019125030-8cb75f92a51d.1
-	connectrpc.com/connect v1.19.1
+	connectrpc.com/connect v1.19.2
 	connectrpc.com/grpchealth v1.4.0
 	connectrpc.com/grpcreflect v1.3.0
 	connectrpc.com/otelconnect v0.9.0
@@ -17,7 +17,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.9.1
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/lib/pq v1.12.3
 	github.com/nats-io/nats.go v1.51.0
 	github.com/ohler55/ojg v1.28.1
