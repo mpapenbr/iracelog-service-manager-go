@@ -71,6 +71,7 @@ func NewBroadcastServer[T any](
 	eventKey, name string,
 	source <-chan T,
 ) BroadcastServer[T] {
+	//nolint:gosec // false positive
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &broadcastServer[T]{
 		eventKey:       eventKey,
@@ -101,6 +102,7 @@ type (
 
 var myMeter = otel.GetMeterProvider().Meter("ism.broadcast")
 
+//nolint:goconst // false positive
 func (b *broadcastServer[T]) createMData(meter metric.Meter) (*mData, error) {
 	ret := &mData{meter: meter}
 

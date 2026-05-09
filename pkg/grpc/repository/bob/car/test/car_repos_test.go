@@ -1,4 +1,4 @@
-//nolint:whitespace,lll,funlen // readability
+//nolint:whitespace,lll,funlen,goconst // readability
 package car_test
 
 import (
