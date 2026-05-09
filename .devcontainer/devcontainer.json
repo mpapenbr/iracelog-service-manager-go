@@ -62,6 +62,7 @@
       "version": "1.26"
     },
     "ghcr.io/devcontainers/features/docker-in-docker": "latest",
-    "ghcr.io/devcontainers-extra/features/pre-commit": "latest"
+    "ghcr.io/devcontainers-extra/features/pre-commit": "latest",
+    "ghcr.io/jungaretti/features/ripgrep:1": {}
   }
 }

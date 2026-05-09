@@ -1,4 +1,4 @@
-//nolint:dupl,funlen,errcheck,gocognit //ok for this test code
+//nolint:dupl,funlen,errcheck,gocognit,goconst //ok for this test code
 package event_test
 
 import (

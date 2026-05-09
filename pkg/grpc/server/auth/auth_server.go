@@ -186,7 +186,7 @@ func (s *authServer) Logout(
 	} else {
 		s.log.Debug("deleted session", log.String("session_id", sessionData.ID()))
 	}
-
+	//nolint:gosec // false positive
 	cookie := session.CreateCookieForSession(
 		s.sessionStore.CookieName(),
 		sessionData,
@@ -282,8 +282,43 @@ func (s *authServer) CallbackHandler() (path string, handler http.Handler) {
 				s.sessionStore.CookieName(),
 				sessionData,
 				s.sessionStore.Timeout()).String())
-			http.Redirect(w, r, pl.ClientRedirectURI, http.StatusFound)
+			redirectURL := "/"
+			if isValidRedirectTarget(pl.ClientRedirectURI, r) {
+				redirectURL = pl.ClientRedirectURI
+			} else if pl.ClientRedirectURI != "" {
+				s.log.Warn("invalid redirect URL. fallback to root",
+					log.String("redirect_url", pl.ClientRedirectURI))
+			}
+			//nolint:gosec // redirectURL is validated by isValidRedirectTarget
+			http.Redirect(w, r, redirectURL, http.StatusFound)
 		})
+}
+
+func isValidRedirectTarget(target string, r *http.Request) bool {
+	if target == "" || target == "/" {
+		return true
+	}
+	u, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	if u.IsAbs() {
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return false
+		}
+		if u.User != nil {
+			return false
+		}
+		requestHost := (&url.URL{Host: r.Host}).Hostname()
+		if requestHost == "" || !strings.EqualFold(u.Hostname(), requestHost) {
+			return false
+		}
+		return true
+	}
+	if strings.HasPrefix(target, "//") {
+		return false
+	}
+	return strings.HasPrefix(target, "/")
 }
 
 // used to get additional endpoints that oidc provider does not provide

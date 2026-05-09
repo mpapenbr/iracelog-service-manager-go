@@ -35,8 +35,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
@@ -498,6 +496,10 @@ func (s *grpcServer) Start() error {
 	setupGoRoutinesDump()
 	ch := make(chan error, 2)
 	if s.tlsConfig != nil {
+		tlsProtocols := new(http.Protocols)
+		tlsProtocols.SetHTTP1(true)
+		tlsProtocols.SetHTTP2(true)
+
 		//nolint:gocritic // keep it as sample
 		// caCert, err := os.ReadFile(config.TLSCertFile)
 		// if err != nil {
@@ -521,11 +523,11 @@ func (s *grpcServer) Start() error {
 			server := &http.Server{
 				Addr:      config.TLSServerAddr,
 				TLSConfig: s.tlsConfig,
-				Handler: h2c.NewHandler(
-					newCORS().Handler(s.mux),
-					&http2.Server{
-						MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
-					}),
+				Handler:   newCORS().Handler(s.mux),
+				Protocols: tlsProtocols,
+				HTTP2: &http.HTTP2Config{
+					MaxConcurrentStreams: config.MaxConcurrentStreams,
+				},
 			}
 
 			// don't need to pass cert and key here, already done by TLSConfig above
@@ -536,16 +538,20 @@ func (s *grpcServer) Start() error {
 		go startServerTLS()
 	}
 
+	h2cProtocols := new(http.Protocols)
+	h2cProtocols.SetHTTP1(true)
+	h2cProtocols.SetUnencryptedHTTP2(true)
+
 	startServer := func() {
 		s.log.Info("Starting gRPC server", log.String("addr", config.GrpcServerAddr))
 		//nolint:gosec // by design
 		server := &http.Server{
-			Addr: config.GrpcServerAddr,
-			Handler: h2c.NewHandler(
-				newCORS().Handler(s.mux),
-				&http2.Server{
-					MaxConcurrentStreams: uint32(config.MaxConcurrentStreams),
-				}),
+			Addr:      config.GrpcServerAddr,
+			Handler:   newCORS().Handler(s.mux),
+			Protocols: h2cProtocols,
+			HTTP2: &http.HTTP2Config{
+				MaxConcurrentStreams: config.MaxConcurrentStreams,
+			},
 		}
 
 		err := server.ListenAndServe()
