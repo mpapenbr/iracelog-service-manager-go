@@ -47,7 +47,7 @@ func (b *bobTransaction) RunInTx(
 	ctx context.Context,
 	fn func(ctx context.Context) error,
 ) error {
-	return b.db.RunInTx(ctx, nil, func(ctx context.Context, e bob.Executor) error {
+	return b.db.RunInTx(ctx, nil, func(ctx context.Context, e bob.Transaction) error {
 		if ctx == nil {
 			ctx = context.Background()
 		}

@@ -44,7 +44,7 @@ var sampleTrack = &trackv1.Track{
 func createSampleEntry(db bob.DB) *trackv1.Track {
 	ctx := context.Background()
 
-	err := db.RunInTx(ctx, nil, func(ctx context.Context, ex bob.Executor) error {
+	err := db.RunInTx(ctx, nil, func(ctx context.Context, ex bob.Transaction) error {
 		r := NewTrackRepository(ex)
 		return r.Create(ctx, sampleTrack)
 	})
