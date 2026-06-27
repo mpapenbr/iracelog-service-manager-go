@@ -25,7 +25,7 @@ var sampleTenant = &tenantv1.CreateTenantRequest{
 func createSampleEntry(db bob.DB) *model.Tenant {
 	ctx := context.Background()
 	var ret *model.Tenant
-	err := db.RunInTx(ctx, nil, func(ctx context.Context, ex bob.Executor) error {
+	err := db.RunInTx(ctx, nil, func(ctx context.Context, ex bob.Transaction) error {
 		var err error
 		r := NewTenantRepository(ex)
 		ret, err = r.Create(ctx, sampleTenant)
