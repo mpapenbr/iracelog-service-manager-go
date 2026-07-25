@@ -29,8 +29,8 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/stephenafamo/bob v0.48.0
-	github.com/stephenafamo/scan v0.8.0
+	github.com/stephenafamo/bob v0.49.0
+	github.com/stephenafamo/scan v0.9.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.43.0
 	go.opentelemetry.io/contrib/bridges/otelzap v0.19.0
