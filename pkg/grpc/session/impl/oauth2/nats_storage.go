@@ -93,7 +93,8 @@ func (s *natsStorage) init() error {
 func (s *natsStorage) setupOAuth2Config() error {
 	if oidcProvider, err := oidc.NewProvider(
 		context.Background(),
-		s.storeCfg.oidcParam.IssuerURL); err != nil {
+		s.storeCfg.oidcParam.IssuerURL,
+	); err != nil {
 		return err
 	} else {
 		s.oauth2Config = &oauth2.Config{

@@ -14,5 +14,6 @@ func NewTenantCache(r api.TenantRepository) utilsCache.Cache[string, model.Tenan
 	return loadercache.New(loadercache.WithLoader(
 		func(key string) (*model.Tenant, error) {
 			return r.LoadByAPIKey(context.Background(), key)
-		}))
+		},
+	))
 }

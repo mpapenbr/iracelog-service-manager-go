@@ -64,7 +64,8 @@ func (i *sessionInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc
 				session.CreateCookieForSession(
 					i.sessionStore.CookieName(),
 					sessionData,
-					i.sessionStore.Timeout()).String())
+					i.sessionStore.Timeout(),
+				).String())
 		}
 
 		return res, nil

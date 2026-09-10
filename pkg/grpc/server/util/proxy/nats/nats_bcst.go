@@ -77,7 +77,8 @@ func (bc *broadcastContainer) createDriverDataChannels() (
 		bc.driverDataBcstSupporter = createDriverDataBcstSupporter(
 			bc.eventKey,
 			bc.kv,
-			bc.l)
+			bc.l,
+		)
 	}
 	return bc.driverDataBcstSupporter.createChannels()
 }

@@ -174,7 +174,8 @@ func (s *authServer) Logout(
 	if idToken := sImpl.GetIDToken(sessionData); idToken != "" {
 		if loErr := s.oidcSessionLogout(
 			idToken,
-			s.wellKnown.EndSessionEndpoint); loErr != nil {
+			s.wellKnown.EndSessionEndpoint,
+		); loErr != nil {
 			s.log.Warn("failed to logout at identity provider", log.ErrorField(loErr))
 		}
 	} else {
@@ -190,7 +191,8 @@ func (s *authServer) Logout(
 	cookie := session.CreateCookieForSession(
 		s.sessionStore.CookieName(),
 		sessionData,
-		s.sessionStore.Timeout())
+		s.sessionStore.Timeout(),
+	)
 	cookie.Value = ""
 	cookie.MaxAge = -1 // delete cookie
 
@@ -227,7 +229,8 @@ func (s *authServer) CallbackHandler() (path string, handler http.Handler) {
 			token, err := s.oauth2Config.Exchange(
 				ctx,
 				code,
-				oauth2.VerifierOption(pl.CodeVerifier))
+				oauth2.VerifierOption(pl.CodeVerifier),
+			)
 			if err != nil {
 				s.log.Warn("failed to exchange token", log.ErrorField(err))
 				http.Error(w, "failed to exchange token", http.StatusInternalServerError)
@@ -271,7 +274,8 @@ func (s *authServer) CallbackHandler() (path string, handler http.Handler) {
 			early := oauth2.ReuseTokenSourceWithExpiry(
 				token,
 				tokenSource,
-				2*time.Second+s.refreshThreshold)
+				2*time.Second+s.refreshThreshold,
+			)
 			sessionData := s.buildSession(token, rawIDToken, early, claims)
 
 			err = s.sessionStore.Save(sessionData)
@@ -281,7 +285,8 @@ func (s *authServer) CallbackHandler() (path string, handler http.Handler) {
 			w.Header().Set("Set-Cookie", session.CreateCookieForSession(
 				s.sessionStore.CookieName(),
 				sessionData,
-				s.sessionStore.Timeout()).String())
+				s.sessionStore.Timeout(),
+			).String())
 			redirectURL := "/"
 			if isValidRedirectTarget(pl.ClientRedirectURI, r) {
 				redirectURL = pl.ClientRedirectURI
@@ -291,7 +296,8 @@ func (s *authServer) CallbackHandler() (path string, handler http.Handler) {
 			}
 			//nolint:gosec // redirectURL is validated by isValidRedirectTarget
 			http.Redirect(w, r, redirectURL, http.StatusFound)
-		})
+		},
+	)
 }
 
 func isValidRedirectTarget(target string, r *http.Request) bool {
@@ -332,7 +338,8 @@ func (s *authServer) oidcSessionLogout(rawIDTokenStr, logoutURL string) error {
 		context.Background(),
 		http.MethodPost,
 		logoutURL,
-		strings.NewReader(values.Encode()))
+		strings.NewReader(values.Encode()),
+	)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(s.oauth2Config.ClientID, s.oauth2Config.ClientSecret)
 	client := &http.Client{Timeout: 5 * time.Second}

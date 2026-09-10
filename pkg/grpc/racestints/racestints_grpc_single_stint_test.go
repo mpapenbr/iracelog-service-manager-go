@@ -47,7 +47,8 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(1),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("60s"), conv("5m"),
@@ -61,11 +62,13 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 			"first lap last seconds", fields{
 				param: CopyPredictParam(pp,
 					WithPPRace(
-						CopyRaceParam(pp.Race, WithRPSession(conv("45s")))),
+						CopyRaceParam(pp.Race, WithRPSession(conv("45s"))),
+					),
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(1),
-							WithCPRemainLapTime(conv("15s"))))),
+							WithCPRemainLapTime(conv("15s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("15s"), conv("5m"),
@@ -79,11 +82,13 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 			"first lap end", fields{
 				param: CopyPredictParam(pp,
 					WithPPRace(
-						CopyRaceParam(pp.Race, WithRPSession(conv("60s")))),
+						CopyRaceParam(pp.Race, WithRPSession(conv("60s"))),
+					),
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(1),
-							WithCPRemainLapTime(0)))),
+							WithCPRemainLapTime(0)),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("60s"), conv("5m"),
@@ -100,11 +105,13 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 				param: CopyPredictParam(pp,
 					WithPPRace(
 						CopyRaceParam(pp.Race,
-							WithRPDuration(conv("5m")), WithRPSession(conv("60s")))),
+							WithRPDuration(conv("5m")), WithRPSession(conv("60s"))),
+					),
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(1),
-							WithCPRemainLapTime(0)))),
+							WithCPRemainLapTime(0)),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("60s"), conv("4m"),
@@ -122,11 +129,13 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 						CopyRaceParam(pp.Race,
 							WithRPLc(1),
 							WithRPDuration(conv("4m10s")),
-							WithRPSession(conv("90s")))),
+							WithRPSession(conv("90s"))),
+					),
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(2),
-							WithCPRemainLapTime(conv("30s"))))),
+							WithCPRemainLapTime(conv("30s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("2m"), conv("4m"),
@@ -144,11 +153,13 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 						CopyRaceParam(pp.Race,
 							WithRPLc(4),
 							WithRPDuration(conv("1m10s")),
-							WithRPSession(conv("4m30s")))),
+							WithRPSession(conv("4m30s"))),
+					),
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(2),
-							WithCPRemainLapTime(conv("30s"))))),
+							WithCPRemainLapTime(conv("30s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("5m"), conv("60s"),
@@ -166,11 +177,13 @@ func Test_racestintsCalc_Calc_singleStint(t *testing.T) {
 						CopyRaceParam(pp.Race,
 							WithRPLc(5),
 							WithRPDuration(conv("10s")),
-							WithRPSession(conv("5m30s")))),
+							WithRPSession(conv("5m30s"))),
+					),
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(2),
-							WithCPRemainLapTime(conv("30s"))))),
+							WithCPRemainLapTime(conv("30s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					// empty by design for last lap

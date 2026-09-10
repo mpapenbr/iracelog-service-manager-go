@@ -405,7 +405,8 @@ func (s *liveDataServer) LiveAnalysisSel(
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*analysisv1.Analysis)
 		if err := stream.Send(
-			s.composeAnalysisResponse(work, req.Msg.Selector)); err != nil {
+			s.composeAnalysisResponse(work, req.Msg.Selector),
+		); err != nil {
 			l.Warn("Error sending live analysis data by selector", log.ErrorField(err))
 			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 			return err

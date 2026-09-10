@@ -175,7 +175,8 @@ func (s *providerServer) RegisterEvent(
 
 			l.Debug("tenant id", log.Uint32("id", ta.GetTenantID()))
 			return s.repos.Event().Create(ctx, req.Msg.Event, ta.GetTenantID())
-		}); err != nil {
+		},
+	); err != nil {
 		l.Error("error creating data", log.ErrorField(err))
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -245,13 +246,15 @@ func (s *providerServer) validateEventAccess(
 	if err != nil {
 		ta, ok := a.(auth.TenantAuthentication)
 		if ok && s.pe.HasTenantPermission(
-			a, permission.PermissionPostRacedata, ta.GetTenantID()) {
+			a, permission.PermissionPostRacedata, ta.GetTenantID(),
+		) {
 
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied)
+			auth.ErrPermissionDenied,
+		)
 	}
 	if !s.pe.HasObjectPermission(a,
 		permission.PermissionPostRacedata,
@@ -259,7 +262,8 @@ func (s *providerServer) validateEventAccess(
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied)
+			auth.ErrPermissionDenied,
+		)
 	}
 	return ed, nil
 }
@@ -317,7 +321,8 @@ func (s *providerServer) VersionCheck(
 		ValidCredentials: s.pe.HasTenantPermission(
 			a,
 			permission.PermissionPostRacedata,
-			tenantID),
+			tenantID,
+		),
 	}), nil
 }
 
@@ -342,7 +347,8 @@ func (s *providerServer) storeAnalysisDataWorker(
 						return s.repos.Analysis().Upsert(
 							ctx,
 							int(epd.Event.Id),
-							data)
+							data,
+						)
 					}); err != nil {
 					s.log.Error("error storing analysis data", log.ErrorField(err))
 				}
@@ -372,7 +378,8 @@ func (s *providerServer) storeReplayInfoWorker(
 						return s.repos.Event().UpdateReplayInfo(
 							ctx,
 							int(epd.Event.Id),
-							data)
+							data,
+						)
 					}); err != nil {
 					s.log.Error("error storing replay info data", log.ErrorField(err))
 				}
@@ -392,8 +399,10 @@ func (s *providerServer) storeAnalysisData(
 			return s.repos.Analysis().Upsert(
 				ctx,
 				int(epd.Event.Id),
-				epd.LastAnalysisData)
-		}); err != nil {
+				epd.LastAnalysisData,
+			)
+		},
+	); err != nil {
 		s.log.Error("error storing analysis data", log.ErrorField(err))
 	}
 }
@@ -409,8 +418,10 @@ func (s *providerServer) storeReplayInfo(
 			return s.repos.Event().UpdateReplayInfo(
 				ctx,
 				int(epd.Event.Id),
-				epd.LastReplayInfo)
-		}); err != nil {
+				epd.LastReplayInfo,
+			)
+		},
+	); err != nil {
 		s.log.Error("error storing replay info", log.ErrorField(err))
 	}
 }

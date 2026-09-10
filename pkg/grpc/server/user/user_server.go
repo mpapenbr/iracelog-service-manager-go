@@ -95,6 +95,7 @@ func (s *userServer) GetUserInfo(
 		// a is not of type *auth.SessionAuth
 		return nil, connect.NewError(
 			connect.CodeUnauthenticated,
-			errors.New("no auth info in context"))
+			errors.New("no auth info in context"),
+		)
 	}
 }

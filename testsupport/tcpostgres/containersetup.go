@@ -63,7 +63,8 @@ func SetupPostgres(ctx context.Context, opts ...PostgresContainerOption) (
 			ContainerRequest: req,
 			Started:          true,
 			Reuse:            true,
-		})
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

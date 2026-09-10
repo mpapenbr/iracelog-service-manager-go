@@ -63,7 +63,8 @@ func GetWellKnownConfig(issuerURL string) (
 		http.MethodGet,
 		fmt.Sprintf("%s/%s",
 			strings.TrimRight(issuerURL, "/"), ".well-known/openid-configuration"),
-		http.NoBody)
+		http.NoBody,
+	)
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

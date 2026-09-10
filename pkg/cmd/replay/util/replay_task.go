@@ -104,9 +104,11 @@ func (p *peekSpeedmapData) publish() error {
 
 func (r *ReplayTask) Replay(eventID int) error {
 	r.providerService = providerv1connect.NewProviderServiceClient(
-		http.DefaultClient, Addr, connect.WithGRPC())
+		http.DefaultClient, Addr, connect.WithGRPC(),
+	)
 	r.raceStateService = racestatev1connect.NewRaceStateServiceClient(
-		http.DefaultClient, Addr, connect.WithGRPC())
+		http.DefaultClient, Addr, connect.WithGRPC(),
+	)
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	defer r.cancel()
 
@@ -319,7 +321,8 @@ func (r *ReplayTask) unregisterEvent() error {
 	req := connect.NewRequest[providerv1.UnregisterEventRequest](
 		&providerv1.UnregisterEventRequest{
 			EventSelector: r.buildEventSelector(),
-		})
+		},
+	)
 	withToken(req.Header())
 
 	_, err := r.providerService.UnregisterEvent(r.ctx, req)

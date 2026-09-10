@@ -58,7 +58,8 @@ func (r *repo) LoadByEventID(
 	eventID int,
 ) (*racestatev1.ExtraInfo, error) {
 	res, err := models.EventExts.Query(
-		models.SelectWhere.EventExts.EventID.EQ(int32(eventID))).
+		models.SelectWhere.EventExts.EventID.EQ(int32(eventID)),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err

@@ -3,7 +3,7 @@
 {
   "name": "Go",
 
-  "image": "mcr.microsoft.com/devcontainers/go:2-1.26",
+  "image": "mcr.microsoft.com/devcontainers/go:2-1.27",
   // in case you want to start with the base image instead of the Go image, uncomment the following line.
   // you need to add the go feature manually (see below)
   // "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
@@ -63,7 +63,7 @@
   "features": {
     // uncomment the following lines to install Go if you are starting from the base image instead of the Go image.
     // "ghcr.io/devcontainers/features/go:2": {
-    //   "version": "1.26"
+    //   "version": "1.27"
     // },
     "ghcr.io/devcontainers/features/docker-in-docker:3": {
       "moby": false

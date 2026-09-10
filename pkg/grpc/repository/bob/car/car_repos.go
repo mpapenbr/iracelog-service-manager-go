@@ -296,13 +296,15 @@ func (r *repo) DeleteByEventID(ctx context.Context, eventID int) (int, error) {
 	)
 
 	_, err = models.CCarTeams.Delete(
-		dm.Where(models.CCarTeams.Columns.CCarEntryID.In(subQuery))).
+		dm.Where(models.CCarTeams.Columns.CCarEntryID.In(subQuery)),
+	).
 		Exec(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return 0, err
 	}
 	_, err = models.CCarDrivers.Delete(
-		dm.Where(models.CCarDrivers.Columns.CCarEntryID.In(subQuery))).
+		dm.Where(models.CCarDrivers.Columns.CCarEntryID.In(subQuery)),
+	).
 		Exec(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return 0, err

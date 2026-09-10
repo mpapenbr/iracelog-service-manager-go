@@ -121,7 +121,8 @@ func (c *certs) loadCert() {
 			log.String("domain", config.TraefikCertDomain))
 		cert, err := traefik.GetCertFromTraefik(
 			config.TraefikCerts,
-			config.TraefikCertDomain)
+			config.TraefikCertDomain,
+		)
 		if err != nil {
 			c.log.Error("could not load traefik certs", log.ErrorField(err))
 			return

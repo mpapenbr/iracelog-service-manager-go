@@ -44,27 +44,31 @@ func (s *driverDataContainer) InitialRequest() (
 			s.ctx,
 			int(s.e.Id),
 			s.req.GetStart().GetRecordStamp().AsTime(),
-			s.toFetchEntries())
+			s.toFetchEntries(),
+		)
 	case *commonv1.StartSelector_SessionTime:
 		ret, err = s.repos.CarProto().LoadRangeBySessionTime(
 			s.ctx,
 			int(s.e.Id),
 			s.getDefaultSessionNum(),
 			float64(s.req.GetStart().GetSessionTime()),
-			s.toFetchEntries())
+			s.toFetchEntries(),
+		)
 	case *commonv1.StartSelector_SessionTimeSelector:
 		ret, err = s.repos.CarProto().LoadRangeBySessionTime(
 			s.ctx,
 			int(s.e.Id),
 			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
 			s.req.GetStart().GetSessionTimeSelector().GetDuration().AsDuration().Seconds(),
-			s.toFetchEntries())
+			s.toFetchEntries(),
+		)
 	case *commonv1.StartSelector_Id:
 		ret, err = s.repos.CarProto().LoadRangeByID(
 			s.ctx,
 			int(s.e.Id),
 			int(s.req.GetStart().GetId()),
-			s.toFetchEntries())
+			s.toFetchEntries(),
+		)
 
 	default:
 		ret = nil
@@ -90,13 +94,15 @@ func (s *driverDataContainer) NextRequest() (
 			int(s.e.Id),
 			uint32(s.req.GetStart().GetSessionTimeSelector().GetNum()),
 			s.lastRsInfoID+1,
-			s.toFetchEntries())
+			s.toFetchEntries(),
+		)
 	default:
 		ret, err = s.repos.CarProto().LoadRangeByID(
 			s.ctx,
 			int(s.e.Id),
 			s.lastRsInfoID+1,
-			s.toFetchEntries())
+			s.toFetchEntries(),
+		)
 	}
 	if err == nil {
 		s.lastRsInfoID = ret.LastRsInfoID

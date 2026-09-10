@@ -75,7 +75,8 @@ func (s *trackServer) GetTracks(
 	}
 	for i := range data {
 		if err := stream.Send(
-			&trackv1.GetTracksResponse{Track: data[i]}); err != nil {
+			&trackv1.GetTracksResponse{Track: data[i]},
+		); err != nil {
 			s.log.Error("Error sending track", log.ErrorField(err))
 			return err
 		}

@@ -59,9 +59,11 @@ func (r *repo) Create(
 	if event.ReplayInfo != nil {
 		setter.ReplayMinTimestamp = omit.From(event.ReplayInfo.MinTimestamp.AsTime())
 		setter.ReplayMinSessionTime = omit.From(decimal.NewFromFloat32(
-			event.ReplayInfo.MinSessionTime))
+			event.ReplayInfo.MinSessionTime,
+		))
 		setter.ReplayMaxSessionTime = omit.From(decimal.NewFromFloat32(
-			event.ReplayInfo.MaxSessionTime))
+			event.ReplayInfo.MaxSessionTime,
+		))
 	}
 	res, err := models.Events.Insert(setter).One(ctx, r.getExecutor(ctx))
 	if err != nil {
@@ -76,7 +78,8 @@ func (r *repo) LoadByID(ctx context.Context, id int) (
 	*eventv1.Event, error,
 ) {
 	ret, err := models.Events.Query(
-		models.SelectWhere.Events.ID.EQ(int32(id))).
+		models.SelectWhere.Events.ID.EQ(int32(id)),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err
@@ -89,7 +92,8 @@ func (r *repo) LoadByKey(ctx context.Context, key string) (
 	*eventv1.Event, error,
 ) {
 	ret, err := models.Events.Query(
-		models.SelectWhere.Events.EventKey.EQ(key)).
+		models.SelectWhere.Events.EventKey.EQ(key),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err
@@ -192,9 +196,11 @@ func (r *repo) addReplayInfo(
 		return
 	}
 	setter.ReplayMinSessionTime = omit.From(decimal.NewFromFloat32(
-		replayInfo.MinSessionTime))
+		replayInfo.MinSessionTime,
+	))
 	setter.ReplayMaxSessionTime = omit.From(decimal.NewFromFloat32(
-		replayInfo.MaxSessionTime))
+		replayInfo.MaxSessionTime,
+	))
 	if replayInfo.MinTimestamp != nil {
 		setter.ReplayMinTimestamp = omit.From(replayInfo.MinTimestamp.AsTime())
 	}

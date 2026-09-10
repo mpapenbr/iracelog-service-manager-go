@@ -122,7 +122,8 @@ func (s *stateServer) PublishState(
 		if err := s.storeData(ctx, epd,
 			func(ctx context.Context) error {
 				id, err := s.repos.Racestate().CreateRacestate(
-					ctx, int(epd.Event.Id), req.Msg)
+					ctx, int(epd.Event.Id), req.Msg,
+				)
 				if err == nil {
 					epd.LastRsInfoID = id
 				}
@@ -250,7 +251,8 @@ func (s *stateServer) validateEventAccess(
 		if !s.pe.HasPermission(a, permission.PermissionPostRacedata) {
 			return nil, connect.NewError(
 				connect.CodePermissionDenied,
-				auth.ErrPermissionDenied)
+				auth.ErrPermissionDenied,
+			)
 		} else {
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
@@ -261,7 +263,8 @@ func (s *stateServer) validateEventAccess(
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied)
+			auth.ErrPermissionDenied,
+		)
 	}
 	return epd, nil
 }

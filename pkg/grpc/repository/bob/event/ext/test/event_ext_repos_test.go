@@ -51,7 +51,8 @@ func TestUpsert(t *testing.T) {
 		t.Errorf("LoadByEventId() error = %v", err)
 	}
 	if !proto.Equal(
-		pitInfo.PitInfo, &trackv1.PitInfo{Entry: 0.2, Exit: 0.4, LaneLength: 400}) {
+		pitInfo.PitInfo, &trackv1.PitInfo{Entry: 0.2, Exit: 0.4, LaneLength: 400},
+	) {
 		t.Errorf("Data on reload not correct: %s", pitInfo)
 	}
 }

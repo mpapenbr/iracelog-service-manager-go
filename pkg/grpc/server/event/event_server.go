@@ -91,7 +91,8 @@ func (s *eventsServer) GetEvents(
 	if t, err := util.ResolveTenant(
 		ctx,
 		s.repos.Tenant(),
-		req.Msg.TenantSelector); err == nil {
+		req.Msg.TenantSelector,
+	); err == nil {
 		if t != nil {
 			tenantID = &t.ID
 		}
@@ -106,7 +107,8 @@ func (s *eventsServer) GetEvents(
 	}
 	for i := range data {
 		if err := stream.Send(
-			&eventv1.GetEventsResponse{Event: data[i]}); err != nil {
+			&eventv1.GetEventsResponse{Event: data[i]},
+		); err != nil {
 			s.log.WithCtx(ctx).Error("Error sending event", log.ErrorField(err))
 			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 			return err
@@ -125,7 +127,8 @@ func (s *eventsServer) GetLatestEvents(
 	if t, err := util.ResolveTenant(
 		ctx,
 		s.repos.Tenant(),
-		req.Msg.TenantSelector); err == nil {
+		req.Msg.TenantSelector,
+	); err == nil {
 		if t != nil {
 			tenantID = &t.ID
 		}
@@ -249,7 +252,8 @@ func (s *eventsServer) DeleteEvent(
 		ctx,
 		a,
 		permission.PermissionDeleteEvent,
-		req.Msg.EventSelector)
+		req.Msg.EventSelector,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +277,8 @@ func (s *eventsServer) UpdateEvent(
 		ctx,
 		a,
 		permission.PermissionUpdateEvent,
-		req.Msg.EventSelector)
+		req.Msg.EventSelector,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +304,8 @@ func (s *eventsServer) validateEventAccess(
 		} else {
 			return nil, connect.NewError(
 				connect.CodePermissionDenied,
-				auth.ErrPermissionDenied)
+				auth.ErrPermissionDenied,
+			)
 		}
 	}
 	t, err := s.repos.Tenant().LoadByEventID(ctx, int(data.Id))
@@ -312,7 +318,8 @@ func (s *eventsServer) validateEventAccess(
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied)
+			auth.ErrPermissionDenied,
+		)
 	}
 	return data, nil
 }

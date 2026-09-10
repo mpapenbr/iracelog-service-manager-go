@@ -104,7 +104,8 @@ func TestOpa_HasPermission_Admin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := opaPE.HasPermission(
 				&admin,
-				tt.args.perm); got != tt.want {
+				tt.args.perm,
+			); got != tt.want {
 				t.Errorf("opaPE.HasPermission() = %v, want %v", got, tt.want)
 			}
 		})
@@ -284,7 +285,8 @@ func TestOpa_HasObjectPermission_Provider(t *testing.T) {
 			if got := opaPE.HasObjectPermission(
 				&provider,
 				tt.args.perm,
-				tt.args.objOwner); got != tt.want {
+				tt.args.objOwner,
+			); got != tt.want {
 				t.Errorf("opaPE.HasObjectPermission() = %v, want %v", got, tt.want)
 			}
 		})
@@ -352,7 +354,8 @@ func TestOpa_HasObjectPermission_Editor(t *testing.T) {
 			if got := opaPE.HasObjectPermission(
 				&editor,
 				tt.args.perm,
-				tt.args.objOwner); got != tt.want {
+				tt.args.objOwner,
+			); got != tt.want {
 				t.Errorf("opaPE.HasObjectPermission() = %v, want %v", got, tt.want)
 			}
 		})
@@ -413,7 +416,8 @@ func TestOpa_HasObjectPermission_Mixed(t *testing.T) {
 			if got := opaPE.HasObjectPermission(
 				&tt.args.testAuth,
 				tt.args.perm,
-				tt.args.objOwner); got != tt.want {
+				tt.args.objOwner,
+			); got != tt.want {
 				t.Errorf("opaPE.HasObjectPermission() = %v, want %v", got, tt.want)
 			}
 		})
