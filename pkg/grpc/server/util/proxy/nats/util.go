@@ -80,7 +80,8 @@ func (s eventLookupTransfer) ToBinary(input map[string]*containerv1.EventContain
 		if err = binary.Write(
 			&result,
 			binary.LittleEndian,
-			uint32(len(data))); err != nil {
+			uint32(len(data)),
+		); err != nil {
 			return nil, fmt.Errorf("error writing EventData  length: %w", err)
 		}
 

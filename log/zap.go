@@ -136,7 +136,8 @@ func New(opts ...ConfigOption) *Logger {
 		}
 		zapLogger = zap.New(zapfilter.NewFilteringCore(
 			zapLogger.Core(),
-			zapfilter.MustParseRules(filters)),
+			zapfilter.MustParseRules(filters),
+		),
 		)
 	}
 	logger := &Logger{
@@ -324,7 +325,8 @@ func combinedCores(
 		})
 
 		useCores = append(useCores, otelzap.NewCore(
-			name, otelzap.WithLoggerProvider(customLogger)))
+			name, otelzap.WithLoggerProvider(customLogger),
+		))
 	}
 	if myCfg.useZap {
 		if myCfg.removeContextFields {

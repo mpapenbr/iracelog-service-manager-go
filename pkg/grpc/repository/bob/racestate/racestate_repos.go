@@ -186,7 +186,8 @@ func (r *repo) LoadLatest(
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[protoInfoData]())
+		q, scan.StructMapper[protoInfoData](),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +216,8 @@ func (r *repo) CollectMessages(
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[protoInfoData]())
+		q, scan.StructMapper[protoInfoData](),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +347,8 @@ func (r *repo) loadRange(
 ) (*util.RangeContainer[racestatev1.PublishStateRequest], error) {
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[protoInfoData]())
+		q, scan.StructMapper[protoInfoData](),
+	)
 	if err != nil {
 		return nil, err
 	}

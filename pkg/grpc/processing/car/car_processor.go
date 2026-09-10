@@ -93,7 +93,8 @@ func (p *CarProcessor) updateCarInfo(payload *racestatev1.PublishDriverDataReque
 
 			driverIndex, driverEntry := p.driverEntryByName(item.Drivers, name)
 			currentDriverIdx, currentDriverEntry := p.driverEntryByName(
-				item.Drivers, p.CurrentDrivers[carIdx])
+				item.Drivers, p.CurrentDrivers[carIdx],
+			)
 			if driverIndex == -1 {
 				item.Drivers = append(item.Drivers,
 					p.newDriverEntry(name, payload.SessionTime))
@@ -112,7 +113,8 @@ func (p *CarProcessor) updateCarInfo(payload *racestatev1.PublishDriverDataReque
 						&analysisv1.SeatTime{
 							EnterCarTime: payload.SessionTime,
 							LeaveCarTime: payload.SessionTime,
-						})
+						},
+					)
 				} else {
 					updateLeave(driverEntry)
 				}
@@ -151,7 +153,8 @@ func (p *CarProcessor) driverEntryByName(data []*analysisv1.Driver, name string)
 		data,
 		func(item *analysisv1.Driver) bool {
 			return item.Name == name
-		})
+		},
+	)
 	if driverIndex == -1 {
 		return -1, nil
 	} else {

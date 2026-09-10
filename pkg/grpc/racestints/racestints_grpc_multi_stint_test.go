@@ -48,7 +48,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(1),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("60s"), conv("7m"), createPartStint(7, 2, 8)),
@@ -66,7 +67,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(1),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("60s"), conv("3m"), createPartStint(3, 2, 4)),
@@ -99,7 +101,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(3),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("4m"), conv("60s"), createPartStint(1, 5, 5)),
@@ -126,7 +129,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(4),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreatePitPart(conv("4m"), pitTime, createPartPit()),
@@ -153,7 +157,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(4),
-							WithCPRemainLapTime(conv("10s"))))),
+							WithCPRemainLapTime(conv("10s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreatePitPart(conv("3m10s"), pitTime, createPartPit()),
@@ -181,7 +186,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(4),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreatePitPart(conv("4m"), pitTime, createPartPit()),
@@ -209,7 +215,8 @@ func Test_racestintsCalc_Calc_multiStint(t *testing.T) {
 					WithPPCar(
 						CopyCarParam(pp.Car,
 							WithCPStintLap(3),
-							WithCPRemainLapTime(conv("60s"))))),
+							WithCPRemainLapTime(conv("60s"))),
+					)),
 			}, &predictv1.PredictResult{
 				Parts: []*predictv1.Part{
 					CreateStintPart(conv("4m"), conv("60s"), createPartStint(1, 5, 5)),

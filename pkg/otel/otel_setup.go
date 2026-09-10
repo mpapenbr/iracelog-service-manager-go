@@ -132,7 +132,9 @@ func SetupTelemetry(opts ...TelemetryOption) (*Telemetry, error) {
 		if err := otlpruntime.Start(
 			otlpruntime.WithMeterProvider(ret.metrics),
 			otlpruntime.WithMinimumReadMemStatsInterval(
-				otlpruntime.DefaultMinimumReadMemStatsInterval)); err != nil {
+				otlpruntime.DefaultMinimumReadMemStatsInterval,
+			),
+		); err != nil {
 			return nil, fmt.Errorf("could not start runtime stats: %w", err)
 		}
 	}
@@ -238,7 +240,8 @@ func (t *Telemetry) setupLogs() (err error) {
 		}
 		if tlsCfg != nil {
 			grpcExpOpt = append(grpcExpOpt, otlploggrpc.WithTLSCredentials(
-				credentials.NewTLS(tlsCfg)))
+				credentials.NewTLS(tlsCfg),
+			))
 		} else {
 			grpcExpOpt = append(grpcExpOpt, otlploggrpc.WithInsecure())
 		}

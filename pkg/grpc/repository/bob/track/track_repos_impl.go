@@ -60,7 +60,8 @@ func (r *repo) LoadByID(ctx context.Context, id int) (
 	*trackv1.Track, error,
 ) {
 	ret, err := models.Tracks.Query(
-		models.SelectWhere.Tracks.ID.EQ(int32(id))).
+		models.SelectWhere.Tracks.ID.EQ(int32(id)),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err

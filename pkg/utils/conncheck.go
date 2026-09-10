@@ -42,7 +42,8 @@ func WaitForHTTPResponse(url string, timeout time.Duration) error {
 	cli := &http.Client{}
 	for time.Now().Before(timeoutReached) {
 		req, _ := http.NewRequestWithContext(
-			context.Background(), http.MethodGet, url, http.NoBody)
+			context.Background(), http.MethodGet, url, http.NoBody,
+		)
 		_, err := cli.Do(req)
 		if err == nil {
 			log.Debug("http request successful",
@@ -58,7 +59,8 @@ func WaitForHTTPResponse(url string, timeout time.Duration) error {
 
 func ExtractFromWebsocketURL(url string) (addr, proto string) {
 	param := resolveRegex(
-		"^(?P<proto>ws|wss)://(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
+		"^(?P<proto>ws|wss)://(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url,
+	)
 	if len(param) == 0 {
 		return "", ""
 	}
@@ -74,7 +76,8 @@ func ExtractFromWebsocketURL(url string) (addr, proto string) {
 
 func ExtractFromDBURL(url string) string {
 	param := resolveRegex(
-		"^postgresql://(.*@)(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url)
+		"^postgresql://(.*@)(?P<addr>(?P<host>.*?)(:(?P<port>\\d+))?)/.*", url,
+	)
 	if len(param) == 0 {
 		return ""
 	}

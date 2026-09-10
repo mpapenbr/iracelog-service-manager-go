@@ -137,7 +137,8 @@ func (n *NatsProxy) PublishEventRegistered(epd *utils.EventProcessingData) error
 				rev, err := n.kv.Put(
 					context.Background(),
 					fmt.Sprintf("snapshots.%s", epd.Event.GetKey()),
-					histData)
+					histData,
+				)
 				n.l.Debug("snapshots put",
 					log.String("key",
 						fmt.Sprintf("snapshots.%s", epd.Event.GetKey())),
@@ -182,7 +183,8 @@ func (n *NatsProxy) PublishDriverData(req *racestatev1.PublishDriverDataRequest)
 	rev, err := n.kv.Put(
 		context.Background(),
 		fmt.Sprintf("driverdata.%s", req.Event.GetKey()),
-		data)
+		data,
+	)
 	n.l.Debug("driverdata put",
 		log.String("key",
 			fmt.Sprintf("driverdata.%s", req.Event.GetKey())),
@@ -296,7 +298,8 @@ func (n *NatsProxy) HistorySnapshotData(sel *commonv1.EventSelector) []*analysis
 
 	histData, err := n.kv.Get(
 		context.Background(),
-		fmt.Sprintf("snapshots.%s", event.eventData.Event.GetKey()))
+		fmt.Sprintf("snapshots.%s", event.eventData.Event.GetKey()),
+	)
 	if err != nil {
 		n.l.Error("error getting snapshot history", log.ErrorField(err))
 		return nil

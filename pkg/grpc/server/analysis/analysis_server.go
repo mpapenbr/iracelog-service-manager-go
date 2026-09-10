@@ -179,8 +179,10 @@ func (s *analysisServer) storeAnalysisData(
 			return s.repos.Analysis().Upsert(
 				context.Background(),
 				eventID,
-				data)
-		}); err != nil {
+				data,
+			)
+		},
+	); err != nil {
 		s.log.Error("error storing analysis data", log.ErrorField(err))
 	}
 }

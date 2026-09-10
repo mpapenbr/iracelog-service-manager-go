@@ -271,7 +271,8 @@ func (s *grpcServer) SetupProfiling() {
 			//nolint:gosec // by design
 			err := http.ListenAndServe(
 				fmt.Sprintf("localhost:%d", config.ProfilingPort),
-				nil)
+				nil,
+			)
 			if err != nil {
 				s.log.Error("Profiling server stopped", log.ErrorField(err))
 			}
@@ -469,7 +470,8 @@ func (s *grpcServer) SetupGrpcServices() {
 			s.dataProxy = inst
 			s.eventLookup = utils.NewEventLookup(
 				utils.WithStaleDuration(staleDuration),
-				utils.WithDeleteEventCB(inst.DeleteEventCallback))
+				utils.WithDeleteEventCB(inst.DeleteEventCallback),
+			)
 			inst.SetOnUnregisterCB(s.eventLookup.RemoveEvent)
 		} else {
 			s.log.Warn("Could not setup NATS proxy. Continue with standard mode",
@@ -620,7 +622,8 @@ func (s *grpcServer) registerReflectionServer() {
 		providerv1connect.ProviderServiceName,
 		racestatev1connect.RaceStateServiceName,
 		trackv1connect.TrackServiceName,
-		tenantv1connect.TenantServiceName)
+		tenantv1connect.TenantServiceName,
+	)
 	s.mux.Handle(grpcreflect.NewHandlerV1(checker))
 	s.mux.Handle(grpcreflect.NewHandlerV1Alpha(checker))
 }
@@ -676,7 +679,8 @@ func (s *grpcServer) registerUserServer() {
 			s.traceIDInterceptor,
 			s.configInterceptor,
 			s.sessionInterceptor,
-			s.authInterceptor),
+			s.authInterceptor,
+		),
 	)
 
 	s.mux.Handle(path, handler)
@@ -694,7 +698,8 @@ func (s *grpcServer) registerSettingsServer() {
 			s.traceIDInterceptor,
 			s.configInterceptor,
 			s.sessionInterceptor,
-			s.authInterceptor),
+			s.authInterceptor,
+		),
 	)
 
 	s.mux.Handle(path, handler)
@@ -706,7 +711,8 @@ func (s *grpcServer) registerEventServer() {
 		event.WithTxManager(s.txManager),
 		event.WithEventService(eventService.NewEventService(
 			s.repos,
-			s.txManager)),
+			s.txManager,
+		)),
 		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 		event.WithTracer(s.tracer), // Added
 	)
@@ -733,7 +739,8 @@ func (s *grpcServer) registerAnalysisServer() {
 	path, handler := analysisv1connect.NewAnalysisServiceHandler(
 		analysisService,
 		connect.WithInterceptors(
-			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor),
+			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor,
+		),
 	)
 
 	s.mux.Handle(path, handler)
@@ -746,7 +753,8 @@ func (s *grpcServer) registerProviderServer() {
 		provider.WithEventLookup(s.eventLookup),
 		provider.WithDataProxy(s.dataProxy),
 		provider.WithTracer(s.tracer),
-		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()))
+		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
+	)
 	path, handler := providerv1connect.NewProviderServiceHandler(
 		providerService,
 		connect.WithInterceptors(

@@ -77,6 +77,7 @@ func (c *loaderCache[K, V]) Get(ctx context.Context, key K) (*V, error) {
 	}
 }
 
+//nolint:unparam // ctx may be used later and is uniform across other methods
 func (c *loaderCache[K, V]) load(ctx context.Context, key K) (*V, error) {
 	if c.config.loader != nil {
 		v, err := c.config.loader(key)

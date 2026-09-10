@@ -57,11 +57,13 @@ func (c *computeRace) recomputeEvent() (ret *analysisv1.Analysis, err error) {
 
 	raceProc := race.NewRaceProcessor(
 		race.WithCarProcessor(carProc),
-		race.WithRaceSessions(raceSessions))
+		race.WithRaceSessions(raceSessions),
+	)
 
 	c.p = processing.NewProcessor(
 		processing.WithCarProcessor(carProc),
-		processing.WithRaceProcessor(raceProc))
+		processing.WithRaceProcessor(raceProc),
+	)
 	var dp ReplayDataProvider
 	if dp, err = c.newDataProviderImpl(); err != nil {
 		return nil, err

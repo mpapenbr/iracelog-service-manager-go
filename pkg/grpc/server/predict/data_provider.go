@@ -82,7 +82,8 @@ func GetPredictParam(
 		eventID,
 		utils.CollectRaceSessions(event)[0],
 		sessionTime.Seconds(),
-		1); err != nil || len(states.Data) == 0 {
+		1,
+	); err != nil || len(states.Data) == 0 {
 		return nil, err
 	}
 	pd := &predictData{
@@ -293,7 +294,8 @@ func (pd *predictData) collectStints(carNum string, lc int32) []*stintStats {
 			st := createStintStats(
 				cs.LapExit,
 				min(lc, cs.LapEnter),
-				pd.analyis.CarLaps[myLapsIdx].Laps)
+				pd.analyis.CarLaps[myLapsIdx].Laps,
+			)
 			if st != nil {
 				pd.l.Debug("stint", log.Int("idx", i), log.Any("data", cs),
 					log.Int("numLaps", st.numLaps), log.Float32("rAvg", st.rAvg))
@@ -307,7 +309,8 @@ func (pd *predictData) collectStints(carNum string, lc int32) []*stintStats {
 		st := createStintStats(
 			cs.LapExit,
 			min(lc, cs.LapEnter),
-			pd.analyis.CarLaps[myLapsIdx].Laps)
+			pd.analyis.CarLaps[myLapsIdx].Laps,
+		)
 		if st != nil {
 			pd.l.Debug("currentStint", log.Any("data", cs),
 				log.Int("numLaps", st.numLaps), log.Float32("rAvg", st.rAvg))

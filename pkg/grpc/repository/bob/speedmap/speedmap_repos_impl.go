@@ -96,7 +96,8 @@ func (r *repo) LoadLatest(
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[protoInfoData]())
+		q, scan.StructMapper[protoInfoData](),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +234,8 @@ func (r *repo) LoadSnapshots(
 		sm.Columns(
 			models.RSInfos.Columns.ID,
 			models.RSInfos.Columns.RecordStamp,
-			psql.F("to_timestamp", psql.Arg(startTS.UnixMilli()))().As("race_start")),
+			psql.F("to_timestamp", psql.Arg(startTS.UnixMilli()))().As("race_start"),
+		),
 		sm.From(models.RSInfos.Name()),
 		models.SelectWhere.RSInfos.EventID.EQ(int32(eventID)),
 		models.SelectWhere.RSInfos.RecordStamp.GTE(*startTS),
@@ -359,7 +361,8 @@ order by rs.record_stamp
 
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[snapRaw]())
+		q, scan.StructMapper[snapRaw](),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +420,8 @@ func (r *repo) findStartingPoint(
 	)
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[protoInfoData]())
+		q, scan.StructMapper[protoInfoData](),
+	)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -465,7 +469,8 @@ func (r *repo) loadRange(
 ) (*util.RangeContainer[racestatev1.PublishSpeedmapRequest], error) {
 	res, err := bob.All(
 		ctx, r.getExecutor(ctx),
-		q, scan.StructMapper[protoInfoData]())
+		q, scan.StructMapper[protoInfoData](),
+	)
 	if err != nil {
 		return nil, err
 	}

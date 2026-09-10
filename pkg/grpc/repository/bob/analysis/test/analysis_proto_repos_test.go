@@ -46,7 +46,8 @@ func TestUpsert(t *testing.T) {
 		t.Errorf("LoadByEventId() error = %v", err)
 	}
 	if diff := cmp.Diff(
-		analysisRet.RaceOrder, []string{"4", "5", "6"}); diff != "" {
+		analysisRet.RaceOrder, []string{"4", "5", "6"},
+	); diff != "" {
 		t.Errorf("Data on reload not correct: %s", diff)
 	}
 	// check the same by event key
@@ -55,7 +56,8 @@ func TestUpsert(t *testing.T) {
 		t.Errorf("LoadByEventKey() error = %v", err)
 	}
 	if diff := cmp.Diff(
-		analysisRet.RaceOrder, []string{"4", "5", "6"}); diff != "" {
+		analysisRet.RaceOrder, []string{"4", "5", "6"},
+	); diff != "" {
 		t.Errorf("Data on reload not correct: %s", diff)
 	}
 }

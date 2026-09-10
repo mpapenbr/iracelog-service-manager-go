@@ -60,7 +60,8 @@ func (r *repo) LoadByID(ctx context.Context, id uint32) (
 	*model.Tenant, error,
 ) {
 	ret, err := models.Tenants.Query(
-		models.SelectWhere.Tenants.ID.EQ(int32(id))).
+		models.SelectWhere.Tenants.ID.EQ(int32(id)),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err
@@ -73,7 +74,8 @@ func (r *repo) LoadByExternalID(ctx context.Context, externalID string) (
 	*model.Tenant, error,
 ) {
 	ret, err := models.Tenants.Query(
-		models.SelectWhere.Tenants.ExternalID.EQ(uuid.FromStringOrNil(externalID))).
+		models.SelectWhere.Tenants.ExternalID.EQ(uuid.FromStringOrNil(externalID)),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err
@@ -86,7 +88,8 @@ func (r *repo) LoadByAPIKey(ctx context.Context, apiKey string) (
 	*model.Tenant, error,
 ) {
 	ret, err := models.Tenants.Query(
-		models.SelectWhere.Tenants.APIKey.EQ(apiKey)).
+		models.SelectWhere.Tenants.APIKey.EQ(apiKey),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err
@@ -99,7 +102,8 @@ func (r *repo) LoadByName(ctx context.Context, name string) (
 	*model.Tenant, error,
 ) {
 	ret, err := models.Tenants.Query(
-		models.SelectWhere.Tenants.Name.EQ(name)).
+		models.SelectWhere.Tenants.Name.EQ(name),
+	).
 		One(ctx, r.getExecutor(ctx))
 	if err != nil {
 		return nil, err

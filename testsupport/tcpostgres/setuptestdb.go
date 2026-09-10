@@ -30,7 +30,8 @@ func SetupTestDB() *pgxpool.Pool {
 		WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithStartupTimeout(5*time.Second),
+		),
 		WithName("iracelog-service-manager-test"),
 	)
 	if err != nil {
