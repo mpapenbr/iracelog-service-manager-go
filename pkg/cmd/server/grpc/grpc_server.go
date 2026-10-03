@@ -442,9 +442,7 @@ func (s *grpcServer) SetupTransactionManager() {
 //nolint:funlen // by design
 func (s *grpcServer) SetupGrpcServices() {
 	s.mux = http.NewServeMux()
-	s.otel, _ = otelconnect.NewInterceptor(
-		otelconnect.WithoutServerPeerAttributes(),
-	)
+	s.otel, _ = otelconnect.NewInterceptor()
 	staleDuration, err := time.ParseDuration(config.StaleDuration)
 	if err != nil {
 		staleDuration = 1 * time.Minute
@@ -463,7 +461,8 @@ func (s *grpcServer) SetupGrpcServices() {
 		if err != nil {
 			s.log.Error("Could not connect to NATS", log.ErrorField(err))
 		}
-		if inst, err := ownNats.NewNatsProxy(nc,
+		if inst, err := ownNats.NewNatsProxy(
+			nc,
 			ownNats.WithContext(s.ctx),
 			ownNats.WithLogger(log.GetFromContext(s.ctx).Named("nats")),
 		); err == nil {
