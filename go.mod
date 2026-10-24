@@ -23,11 +23,11 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/nats-io/nats.go v1.54.0
 	github.com/ohler55/ojg v1.28.7
-	github.com/open-policy-agent/opa v1.21.2
+	github.com/open-policy-agent/opa v1.21.3
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.53.0
-	github.com/shopspring/decimal v1.5.0
+	github.com/shopspring/decimal v1.6.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
