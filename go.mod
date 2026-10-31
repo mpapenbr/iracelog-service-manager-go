@@ -21,9 +21,9 @@ require (
 	github.com/jackc/pgx-gofrs-uuid v0.0.0-20230224015001-1d428863c2e2
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/lib/pq v1.12.3
-	github.com/nats-io/nats.go v1.54.0
-	github.com/ohler55/ojg v1.28.7
-	github.com/open-policy-agent/opa v1.21.3
+	github.com/nats-io/nats.go v1.55.0
+	github.com/ohler55/ojg v1.28.9
+	github.com/open-policy-agent/opa v1.21.4
 	github.com/pgx-contrib/pgxtrace v0.0.0-20240527110916-8d77e0b27e17
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.53.0
@@ -54,7 +54,7 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/oauth2 v0.37.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
