@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/event/v1/eventv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	carv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/car/v1"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -84,14 +84,14 @@ type eventsServer struct {
 //nolint:whitespace // can't make both editor and linter happy
 func (s *eventsServer) GetEvents(
 	ctx context.Context,
-	req *connect.Request[eventv1.GetEventsRequest],
-	stream *connect.ServerStream[eventv1.GetEventsResponse],
+	req *eventv1.GetEventsRequest,
+	stream x.EventServiceGetEventsServerStream,
 ) error {
 	var tenantID *uint32 = nil
 	if t, err := util.ResolveTenant(
 		ctx,
 		s.repos.Tenant(),
-		req.Msg.TenantSelector,
+		req.TenantSelector,
 	); err == nil {
 		if t != nil {
 			tenantID = &t.ID
@@ -121,13 +121,13 @@ func (s *eventsServer) GetEvents(
 //nolint:whitespace // can't make both editor and linter happy
 func (s *eventsServer) GetLatestEvents(
 	ctx context.Context,
-	req *connect.Request[eventv1.GetLatestEventsRequest],
-) (*connect.Response[eventv1.GetLatestEventsResponse], error) {
+	req *eventv1.GetLatestEventsRequest,
+) (*eventv1.GetLatestEventsResponse, error) {
 	var tenantID *uint32 = nil
 	if t, err := util.ResolveTenant(
 		ctx,
 		s.repos.Tenant(),
-		req.Msg.TenantSelector,
+		req.TenantSelector,
 	); err == nil {
 		if t != nil {
 			tenantID = &t.ID
@@ -143,24 +143,24 @@ func (s *eventsServer) GetLatestEvents(
 	}
 
 	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "latest events sent successfully")
-	return connect.NewResponse(&eventv1.GetLatestEventsResponse{Events: data}), nil
+	return &eventv1.GetLatestEventsResponse{Events: data}, nil
 }
 
 //nolint:whitespace,funlen // can't make both editor and linter happy
 func (s *eventsServer) GetEvent(
-	ctx context.Context, req *connect.Request[eventv1.GetEventRequest],
-) (*connect.Response[eventv1.GetEventResponse], error) {
+	ctx context.Context, req *eventv1.GetEventRequest,
+) (*eventv1.GetEventResponse, error) {
 	s.log.Debug("GetEvent called",
-		log.Any("arg", req.Msg),
-		log.Int32("id", req.Msg.EventSelector.GetId()))
+		log.Any("arg", req),
+		log.Int32("id", req.EventSelector.GetId()))
 	var e *eventv1.Event
 	var a *analysisv1.Analysis
 
 	var err error
-	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.EventSelector)
 	if err != nil {
 		s.log.Error("error resolving event",
-			log.Any("selector", req.Msg.EventSelector),
+			log.Any("selector", req.EventSelector),
 			log.ErrorField(err))
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (s *eventsServer) GetEvent(
 		return nil, err
 	}
 
-	return connect.NewResponse(&eventv1.GetEventResponse{
+	return &eventv1.GetEventResponse{
 		Event: e, Track: t, Analysis: a,
 		Car: &carv1.CarContainer{
 			Cars:           cd.Cars,
@@ -235,24 +235,24 @@ func (s *eventsServer) GetEvent(
 		},
 		Speedmap:  sm.Speedmap,
 		Snapshots: snapshots,
-	}), nil
+	}, nil
 }
 
 //nolint:whitespace,gocritic,funlen // can't make both editor and linter happy
 func (s *eventsServer) DeleteEvent(
-	ctx context.Context, req *connect.Request[eventv1.DeleteEventRequest],
-) (*connect.Response[eventv1.DeleteEventResponse], error) {
+	ctx context.Context, req *eventv1.DeleteEventRequest,
+) (*eventv1.DeleteEventResponse, error) {
 	a := auth.FromContext(&ctx)
 
 	s.log.Debug("DeleteEvent called",
-		log.Any("arg", req.Msg),
-		log.Int32("id", req.Msg.EventSelector.GetId()))
+		log.Any("arg", req),
+		log.Int32("id", req.EventSelector.GetId()))
 
 	data, err := s.validateEventAccess(
 		ctx,
 		a,
 		permission.PermissionDeleteEvent,
-		req.Msg.EventSelector,
+		req.EventSelector,
 	)
 	if err != nil {
 		return nil, err
@@ -262,29 +262,29 @@ func (s *eventsServer) DeleteEvent(
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&eventv1.DeleteEventResponse{}), nil
+	return &eventv1.DeleteEventResponse{}, nil
 }
 
 //nolint:whitespace,gocritic,funlen // can't make both editor and linter happy
 func (s *eventsServer) UpdateEvent(
-	ctx context.Context, req *connect.Request[eventv1.UpdateEventRequest],
-) (*connect.Response[eventv1.UpdateEventResponse], error) {
+	ctx context.Context, req *eventv1.UpdateEventRequest,
+) (*eventv1.UpdateEventResponse, error) {
 	a := auth.FromContext(&ctx)
 	s.log.Debug("UpdateEvent called",
-		log.Any("arg", req.Msg),
-		log.Int32("id", req.Msg.EventSelector.GetId()))
+		log.Any("arg", req),
+		log.Int32("id", req.EventSelector.GetId()))
 	data, err := s.validateEventAccess(
 		ctx,
 		a,
 		permission.PermissionUpdateEvent,
-		req.Msg.EventSelector,
+		req.EventSelector,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if data, err = s.service.UpdateEvent(ctx, int(data.Id), req.Msg); err == nil {
-		return connect.NewResponse(&eventv1.UpdateEventResponse{Event: data}), nil
+	if data, err = s.service.UpdateEvent(ctx, int(data.Id), req); err == nil {
+		return &eventv1.UpdateEventResponse{Event: data}, nil
 	}
 	return nil, err
 }
@@ -300,12 +300,12 @@ func (s *eventsServer) validateEventAccess(
 	if err != nil {
 		ta, ok := a.(auth.TenantAuthentication)
 		if ok && s.pe.HasTenantPermission(a, perm, ta.GetTenantID()) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 		} else {
 			return nil, connect.NewError(
 				connect.CodePermissionDenied,
-				auth.ErrPermissionDenied,
-			)
+				auth.ErrPermissionDenied.Error(),
+			).WithCause(auth.ErrPermissionDenied)
 		}
 	}
 	t, err := s.repos.Tenant().LoadByEventID(ctx, int(data.Id))
@@ -318,8 +318,8 @@ func (s *eventsServer) validateEventAccess(
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied,
-		)
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 	return data, nil
 }

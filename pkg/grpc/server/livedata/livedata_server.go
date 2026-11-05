@@ -2,14 +2,13 @@ package livedata
 
 import (
 	"context"
-	"errors"
 	"sort"
 
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/livedata/v1/livedatav1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	livedatav1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/livedata/v1"
 	speedmapv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/speedmap/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -75,17 +74,17 @@ type liveDataServer struct {
 //nolint:whitespace // can't make both editor and linter happy
 func (s *liveDataServer) LiveRaceState(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveRaceStateRequest],
-	stream *connect.ServerStream[livedatav1.LiveRaceStateResponse],
+	req *livedatav1.LiveRaceStateRequest,
+	stream livedatav1connect.LiveDataServiceLiveRaceStateServerStream,
 ) error {
 	l := s.log.WithCtx(ctx)
 	// get channels
-	dataChan, quitChan, err := s.dataProxy.SubscribeRaceStateData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeRaceStateData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l.Debug("Sending live race states",
 		log.String("event", eventKey),
 	)
@@ -120,17 +119,17 @@ func (s *liveDataServer) LiveRaceState(
 //nolint:whitespace,dupl,errcheck // can't make both editor and linter happy
 func (s *liveDataServer) LiveAnalysis(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveAnalysisRequest],
-	stream *connect.ServerStream[livedatav1.LiveAnalysisResponse],
+	req *livedatav1.LiveAnalysisRequest,
+	stream livedatav1connect.LiveDataServiceLiveAnalysisServerStream,
 ) error {
 	l := s.log.WithCtx(ctx)
 	// get channels
-	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l.Debug("Sending live analysis data",
 		log.String("event", eventKey),
 	)
@@ -162,15 +161,15 @@ func (s *liveDataServer) LiveAnalysis(
 //nolint:whitespace,dupl,errcheck // can't make both editor and linter happy
 func (s *liveDataServer) LiveSpeedmap(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveSpeedmapRequest],
-	stream *connect.ServerStream[livedatav1.LiveSpeedmapResponse],
+	req *livedatav1.LiveSpeedmapRequest,
+	stream livedatav1connect.LiveDataServiceLiveSpeedmapServerStream,
 ) error {
-	dataChan, quitChan, err := s.dataProxy.SubscribeSpeedmapData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeSpeedmapData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l := s.log.WithCtx(ctx)
 	l.Debug("Sending live speedmap data",
 		log.String("event", eventKey),
@@ -202,17 +201,17 @@ func (s *liveDataServer) LiveSpeedmap(
 //nolint:whitespace,dupl,funlen,errcheck // can't make both editor and linter happy
 func (s *liveDataServer) LiveSnapshotData(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveSnapshotDataRequest],
-	stream *connect.ServerStream[livedatav1.LiveSnapshotDataResponse],
+	req *livedatav1.LiveSnapshotDataRequest,
+	stream livedatav1connect.LiveDataServiceLiveSnapshotDataServerStream,
 ) error {
 	l := s.log.WithCtx(ctx)
 	// get channels
-	dataChan, quitChan, err := s.dataProxy.SubscribeSnapshotData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeSnapshotData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l.Debug("Sending live snapshot data",
 		log.String("event", eventKey),
 	)
@@ -222,8 +221,8 @@ func (s *liveDataServer) LiveSnapshotData(
 		close(quitChan)
 	}()
 
-	if req.Msg.StartFrom == livedatav1.SnapshotStartMode_SNAPSHOT_START_MODE_BEGIN {
-		historyData := s.dataProxy.HistorySnapshotData(req.Msg.Event)
+	if req.StartFrom == livedatav1.SnapshotStartMode_SNAPSHOT_START_MODE_BEGIN {
+		historyData := s.dataProxy.HistorySnapshotData(req.Event)
 		l.Debug("sending snapshots from beginning",
 			log.Int("snapshots", len(historyData)))
 		for _, a := range historyData {
@@ -263,16 +262,16 @@ func (s *liveDataServer) LiveSnapshotData(
 //nolint:whitespace,dupl,funlen // can't make both editor and linter happy
 func (s *liveDataServer) LiveDriverData(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveDriverDataRequest],
-	stream *connect.ServerStream[livedatav1.LiveDriverDataResponse],
+	req *livedatav1.LiveDriverDataRequest,
+	stream livedatav1connect.LiveDataServiceLiveDriverDataServerStream,
 ) error {
 	l := s.log.WithCtx(ctx)
-	dataChan, quitChan, err := s.dataProxy.SubscribeDriverData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeDriverData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l.Debug("Sending live driver data",
 		log.String("event", eventKey),
 	)
@@ -303,16 +302,16 @@ func (s *liveDataServer) LiveDriverData(
 //nolint:whitespace,dupl,gocritic // can't make both editor and linter happy
 func (s *liveDataServer) LiveCarOccupancies(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveCarOccupanciesRequest],
-	stream *connect.ServerStream[livedatav1.LiveCarOccupanciesResponse],
+	req *livedatav1.LiveCarOccupanciesRequest,
+	stream livedatav1connect.LiveDataServiceLiveCarOccupanciesServerStream,
 ) error {
 	// get channels
-	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l := s.log.WithCtx(ctx)
 	l.Debug("Sending car occupancy data",
 		log.String("event", eventKey),
@@ -344,17 +343,17 @@ func (s *liveDataServer) LiveCarOccupancies(
 //nolint:whitespace,dupl,funlen,gocritic,errcheck // by design
 func (s *liveDataServer) LiveAnalysisSel(
 	ctx context.Context,
-	req *connect.Request[livedatav1.LiveAnalysisSelRequest],
-	stream *connect.ServerStream[livedatav1.LiveAnalysisSelResponse],
+	req *livedatav1.LiveAnalysisSelRequest,
+	stream livedatav1connect.LiveDataServiceLiveAnalysisSelServerStream,
 ) error {
 	// get channels
-	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Msg.Event)
+	dataChan, quitChan, err := s.dataProxy.SubscribeAnalysisData(req.Event)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
-		return connect.NewError(connect.CodeNotFound, err)
+		return connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
 
-	eventKey := req.Msg.Event.GetKey()
+	eventKey := req.Event.GetKey()
 	l := s.log.WithCtx(ctx)
 	l.Debug("Sending selected live analysis data",
 		log.String("event", eventKey),
@@ -367,7 +366,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 
 	var snapshotsCopy []*analysisv1.SnapshotData
 
-	for _, snapshot := range s.dataProxy.HistorySnapshotData(req.Msg.Event) {
+	for _, snapshot := range s.dataProxy.HistorySnapshotData(req.Event) {
 		snapshotsCopy = append(snapshotsCopy,
 			proto.Clone(snapshot).(*analysisv1.SnapshotData))
 	}
@@ -377,7 +376,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 	if first == nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, "no analysis data")
 		return connect.NewError(connect.CodeFailedPrecondition,
-			errors.New("no analysis data"))
+			"no analysis data")
 	}
 	firstResp := &livedatav1.LiveAnalysisSelResponse{
 		Timestamp:        timestamppb.Now(),
@@ -405,7 +404,7 @@ func (s *liveDataServer) LiveAnalysisSel(
 		//nolint:errcheck // by design
 		work := proto.Clone(a).(*analysisv1.Analysis)
 		if err := stream.Send(
-			s.composeAnalysisResponse(work, req.Msg.Selector),
+			s.composeAnalysisResponse(work, req.Selector),
 		); err != nil {
 			l.Warn("Error sending live analysis data by selector", log.ErrorField(err))
 			trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())

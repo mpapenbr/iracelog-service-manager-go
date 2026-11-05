@@ -3,11 +3,11 @@ module github.com/mpapenbr/iracelog-service-manager-go
 go 1.27
 
 require (
-	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go v1.21.0-20251019125030-8cb75f92a51d.1
+	buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2 v2.0.2-20251019125030-8cb75f92a51d.1
 	buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go v1.36.12-20251019125030-8cb75f92a51d.2
-	connectrpc.com/connect v1.21.1
-	connectrpc.com/grpchealth v1.5.0
-	connectrpc.com/grpcreflect v1.3.1
+	connectrpc.com/connect/v2 v2.0.2
+	connectrpc.com/grpchealth/v2 v2.0.0
+	connectrpc.com/grpcreflect/v2 v2.0.0
 	connectrpc.com/otelconnect v0.12.0
 	github.com/aarondl/opt v0.0.0-20250607033636-982744e1bd65
 	github.com/coreos/go-oidc/v3 v3.21.0
@@ -62,7 +62,7 @@ require (
 )
 
 require (
-	connectrpc.com/connect/v2 v2.0.0 // indirect
+	connectrpc.com/connect v1.21.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

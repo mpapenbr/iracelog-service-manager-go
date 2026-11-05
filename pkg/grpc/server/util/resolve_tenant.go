@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/model"
@@ -35,7 +35,7 @@ func ResolveTenant(
 
 	if sel == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument,
-			ErrTenantSelectorRequired)
+			ErrTenantSelectorRequired.Error()).WithCause(ErrTenantSelectorRequired)
 	}
 	switch sel.Arg.(type) {
 	case *commonv1.TenantSelector_ExternalId:
@@ -47,7 +47,10 @@ func ResolveTenant(
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, repository.ErrNoData)
+			return nil, connect.NewError(
+				connect.CodeNotFound,
+				repository.ErrNoData.Error(),
+			).WithCause(repository.ErrNoData)
 		}
 		return nil, err
 	}

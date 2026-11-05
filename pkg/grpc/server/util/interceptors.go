@@ -3,46 +3,23 @@ package util
 import (
 	"context"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/config"
 )
 
-type configInjector struct {
-	config *config.Config
-}
-
-func NewAppContextInterceptor(cfg *config.Config) connect.Interceptor {
-	return &configInjector{config: cfg}
-}
-
-//nolint:whitespace // better readability
-func (i *configInjector) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return connect.UnaryFunc(func(
-		ctx context.Context,
-		req connect.AnyRequest,
-	) (connect.AnyResponse, error) {
-		return next(config.NewContext(ctx, i.config), req)
-	})
-}
-
+// NewAppContextInterceptor returns an interceptor that adds the app config
+// to the context
 //
-//nolint:lll,whitespace // readablity, editor/linter
-func (i *configInjector) WrapStreamingClient(
-	next connect.StreamingClientFunc,
-) connect.StreamingClientFunc {
-	return next
-}
-
-//
-//nolint:lll,whitespace // readablity, editor/linter
-func (i *configInjector) WrapStreamingHandler(
-	next connect.StreamingHandlerFunc,
-) connect.StreamingHandlerFunc {
-	return connect.StreamingHandlerFunc(func(
-		ctx context.Context,
-		conn connect.StreamingHandlerConn,
-	) error {
-		return next(config.NewContext(ctx, i.config), conn)
-	})
+//nolint:whitespace // editor/linter issue
+func NewAppContextInterceptor(cfg *config.Config) connect.ServerInterceptor {
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(
+			ctx context.Context,
+			spec connect.Spec,
+			stream connect.ServerStream,
+		) error {
+			return next(config.NewContext(ctx, cfg), spec, stream)
+		}
+	}
 }
