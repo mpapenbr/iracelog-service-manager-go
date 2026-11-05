@@ -3,10 +3,10 @@ package analysis
 import (
 	"context"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/analysis/v1/analysisv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/analysis/v1/analysisv1connect"
 	analysisv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/analysis/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -68,21 +68,21 @@ type analysisServer struct {
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *analysisServer) GetAnalysis(
-	ctx context.Context, req *connect.Request[analysisv1.GetAnalysisRequest],
-) (*connect.Response[analysisv1.GetAnalysisResponse], error) {
+	ctx context.Context, req *analysisv1.GetAnalysisRequest,
+) (*analysisv1.GetAnalysisResponse, error) {
 	l := s.log.WithCtx(ctx)
 	l.Debug("GetAnalysis called",
-		log.Any("arg", req.Msg),
-		log.Int32("id", req.Msg.EventSelector.GetId()))
+		log.Any("arg", req),
+		log.Int32("id", req.EventSelector.GetId()))
 	var analysisData *analysisv1.Analysis
 	var snapshots []*analysisv1.SnapshotData
 	var err error
 	var e *eventv1.Event
 
-	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.EventSelector)
 	if err != nil {
 		l.Error("error resolving event",
-			log.Any("selector", req.Msg.EventSelector),
+			log.Any("selector", req.EventSelector),
 			log.ErrorField(err))
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -98,34 +98,37 @@ func (s *analysisServer) GetAnalysis(
 		return nil, err
 	}
 	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "analysis data retrieved successfully")
-	return connect.NewResponse(&analysisv1.GetAnalysisResponse{
+	return &analysisv1.GetAnalysisResponse{
 		Analysis:  analysisData,
 		Snapshots: snapshots,
-	}), nil
+	}, nil
 }
 
 //nolint:whitespace,funlen // by design
 func (s *analysisServer) ComputeAnalysis(
-	ctx context.Context, req *connect.Request[analysisv1.ComputeAnalysisRequest],
-) (*connect.Response[analysisv1.ComputeAnalysisResponse], error) {
+	ctx context.Context, req *analysisv1.ComputeAnalysisRequest,
+) (*analysisv1.ComputeAnalysisResponse, error) {
 	l := s.log.WithCtx(ctx)
 	l.Debug("ComputeAnalysis called",
-		log.Any("arg", req.Msg),
-		log.Int32("id", req.Msg.EventSelector.GetId()))
+		log.Any("arg", req),
+		log.Int32("id", req.EventSelector.GetId()))
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasPermission(a, permission.PermissionUpdateEvent) {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, auth.ErrPermissionDenied.Error())
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 	var analysisData *analysisv1.Analysis
 
 	var err error
 	var e *eventv1.Event
 
-	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.EventSelector)
 	if err != nil {
 		l.Error("error resolving event",
-			log.Any("selector", req.Msg.EventSelector),
+			log.Any("selector", req.EventSelector),
 			log.ErrorField(err))
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -139,33 +142,33 @@ func (s *analysisServer) ComputeAnalysis(
 	recompAnalysisData, err = RecomputeAnalysis(ctx, s.repos, e)
 	if err != nil {
 		l.Error("error recomputing analysis",
-			log.Any("selector", req.Msg.EventSelector),
+			log.Any("selector", req.EventSelector),
 			log.ErrorField(err))
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	// lets see what we need to update
 	//nolint:exhaustive // by design
-	switch req.Msg.Component {
+	switch req.Component {
 	case analysisv1.AnalysisComponent_ANALYSIS_COMPONENT_RACEGRAPH:
 		analysisData.RaceGraph = recompAnalysisData.RaceGraph
 	case analysisv1.AnalysisComponent_ANALYSIS_COMPONENT_ALL:
 		analysisData.RaceGraph = recompAnalysisData.RaceGraph
 	}
 	// finally store the data if requested
-	if req.Msg.PersistMode == analysisv1.AnalysisPersistMode_ANALYSIS_PERSIST_MODE_ON {
+	if req.PersistMode == analysisv1.AnalysisPersistMode_ANALYSIS_PERSIST_MODE_ON {
 		l.Debug("storing analysis data",
-			log.Any("selector", req.Msg.EventSelector))
+			log.Any("selector", req.EventSelector))
 		s.storeAnalysisData(int(e.GetId()), analysisData)
 	} else {
 		l.Debug("not storing analysis data",
-			log.Any("selector", req.Msg.EventSelector),
-			log.String("persist_mode", req.Msg.PersistMode.String()))
+			log.Any("selector", req.EventSelector),
+			log.String("persist_mode", req.PersistMode.String()))
 	}
 
-	return connect.NewResponse(&analysisv1.ComputeAnalysisResponse{
+	return &analysisv1.ComputeAnalysisResponse{
 		Analysis: analysisData,
-	}), nil
+	}, nil
 }
 
 //nolint:whitespace,dupl // false positive

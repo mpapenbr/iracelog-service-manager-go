@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/provider/v1/providerv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/racestate/v1/racestatev1connect"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
 	racestatev1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/racestate/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
 )
@@ -62,9 +63,7 @@ func (p *peekDriverData) ts() time.Time {
 
 func (p *peekDriverData) publish() error {
 	log.Debug("Sending driver data", log.Time("time", p.dataReq.Timestamp.AsTime()))
-	req := connect.NewRequest[racestatev1.PublishDriverDataRequest](p.dataReq)
-	withToken(req.Header())
-	if _, err := p.r.raceStateService.PublishDriverData(p.r.ctx, req); err != nil {
+	if _, err := p.r.raceStateService.PublishDriverData(p.r.ctx, p.dataReq); err != nil {
 		log.Error("Error publishing driver data", log.ErrorField(err))
 		return err
 	}
@@ -77,9 +76,7 @@ func (p *peekStateData) ts() time.Time {
 
 func (p *peekStateData) publish() error {
 	log.Debug("Sending state data", log.Time("time", p.dataReq.Timestamp.AsTime()))
-	req := connect.NewRequest[racestatev1.PublishStateRequest](p.dataReq)
-	withToken(req.Header())
-	if _, err := p.r.raceStateService.PublishState(p.r.ctx, req); err != nil {
+	if _, err := p.r.raceStateService.PublishState(p.r.ctx, p.dataReq); err != nil {
 		log.Error("Error publishing state data", log.ErrorField(err))
 		return err
 	}
@@ -93,9 +90,7 @@ func (p *peekSpeedmapData) ts() time.Time {
 
 func (p *peekSpeedmapData) publish() error {
 	log.Debug("Sending speedmap data", log.Time("time", p.dataReq.Timestamp.AsTime()))
-	req := connect.NewRequest[racestatev1.PublishSpeedmapRequest](p.dataReq)
-	withToken(req.Header())
-	if _, err := p.r.raceStateService.PublishSpeedmap(p.r.ctx, req); err != nil {
+	if _, err := p.r.raceStateService.PublishSpeedmap(p.r.ctx, p.dataReq); err != nil {
 		log.Error("Error publishing speedmap data", log.ErrorField(err))
 		return err
 	}
@@ -103,12 +98,17 @@ func (p *peekSpeedmapData) publish() error {
 }
 
 func (r *ReplayTask) Replay(eventID int) error {
-	r.providerService = providerv1connect.NewProviderServiceClient(
-		http.DefaultClient, Addr, connect.WithGRPC(),
+	client := connect.NewClient(
+		connecthttp.NewTransport(
+			http.DefaultClient,
+			Addr,
+			connecthttp.WithReadMaxBytes(0), // keep v1 behavior (unlimited)
+			connecthttp.WithGRPC(),
+		),
+		tokenInterceptor(),
 	)
-	r.raceStateService = racestatev1connect.NewRaceStateServiceClient(
-		http.DefaultClient, Addr, connect.WithGRPC(),
-	)
+	r.providerService = providerv1connect.NewProviderServiceClient(client)
+	r.raceStateService = racestatev1connect.NewRaceStateServiceClient(client)
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	defer r.cancel()
 
@@ -308,24 +308,19 @@ func (r *ReplayTask) provideSpeedmapData() {
 func (r *ReplayTask) registerEvent(eventReq *providerv1.RegisterEventRequest) (
 	*eventv1.Event, error,
 ) {
-	req := connect.NewRequest[providerv1.RegisterEventRequest](eventReq)
-	withToken(req.Header())
-	resp, err := r.providerService.RegisterEvent(r.ctx, req)
+	resp, err := r.providerService.RegisterEvent(r.ctx, eventReq)
 	if err == nil {
-		return resp.Msg.Event, nil
+		return resp.Event, nil
 	}
 	return nil, err
 }
 
 func (r *ReplayTask) unregisterEvent() error {
-	req := connect.NewRequest[providerv1.UnregisterEventRequest](
+	_, err := r.providerService.UnregisterEvent(r.ctx,
 		&providerv1.UnregisterEventRequest{
 			EventSelector: r.buildEventSelector(),
 		},
 	)
-	withToken(req.Header())
-
-	_, err := r.providerService.UnregisterEvent(r.ctx, req)
 	return err
 }
 
@@ -333,6 +328,14 @@ func (r *ReplayTask) buildEventSelector() *commonv1.EventSelector {
 	return &commonv1.EventSelector{Arg: &commonv1.EventSelector_Key{Key: r.event.Key}}
 }
 
-func withToken(h http.Header) {
-	h.Set("api-token", Token)
+// tokenInterceptor adds the api token to each request
+func tokenInterceptor() connect.ClientInterceptor {
+	return func(next connect.ClientFunc) connect.ClientFunc {
+		return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
+			if info, ok := connect.CallInfoForClientContext(ctx); ok {
+				info.RequestHeader().Set("api-token", Token)
+			}
+			return next(ctx, spec)
+		}
+	}
 }

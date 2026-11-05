@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/samber/lo"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/log"
@@ -28,7 +28,7 @@ type (
 	}
 )
 
-func NewAuthInterceptor(opts ...auth.Option) connect.Interceptor {
+func NewAuthInterceptor(opts ...auth.Option) connect.ServerInterceptor {
 	ret := &authInterceptor{
 		cfg: &auth.Config{},
 		l:   log.Default().Named("grpc.auth"),
@@ -44,7 +44,7 @@ func NewAuthInterceptor(opts ...auth.Option) connect.Interceptor {
 		&sessionAuthenticator{tenantCache: ret.cfg.TenantCache},
 		&anonymousAuthenticator{},
 	}
-	return ret
+	return ret.intercept
 }
 
 type (
@@ -149,34 +149,18 @@ var (
 var anon = &SimpleAuth{principal: &SimplePrincipal{name: "anon"}, roles: []auth.Role{}}
 
 //nolint:whitespace // can't make both editor and linter happy
-func (i *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return connect.UnaryFunc(func(
+func (i *authInterceptor) intercept(next connect.ServerFunc) connect.ServerFunc {
+	return func(
 		ctx context.Context,
-		req connect.AnyRequest,
-	) (connect.AnyResponse, error) {
-		return next(i.handleAuth(ctx, req.Header()), req)
-	})
-}
-
-//
-//nolint:whitespace // editor/linter issue
-func (i *authInterceptor) WrapStreamingClient(
-	next connect.StreamingClientFunc,
-) connect.StreamingClientFunc {
-	return next
-}
-
-//
-//nolint:lll,whitespace // better readability
-func (i *authInterceptor) WrapStreamingHandler(
-	next connect.StreamingHandlerFunc,
-) connect.StreamingHandlerFunc {
-	return connect.StreamingHandlerFunc(func(
-		ctx context.Context,
-		conn connect.StreamingHandlerConn,
+		spec connect.Spec,
+		stream connect.ServerStream,
 	) error {
-		return next(i.handleAuth(ctx, conn.RequestHeader()), conn)
-	})
+		return next(
+			i.handleAuth(ctx, utils.RequestHeaderFromServerContext(ctx)),
+			spec,
+			stream,
+		)
+	}
 }
 
 //nolint:lll // better readability

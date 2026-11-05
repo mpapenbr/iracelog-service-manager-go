@@ -3,62 +3,33 @@ package util
 import (
 	"context"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel/trace"
 )
-
-type traceIDInjector struct{}
-
-func NewTraceIDInterceptor() connect.Interceptor {
-	return &traceIDInjector{}
-}
 
 const (
 	traceIDHeader = "X-Trace-ID"
 )
 
-//nolint:whitespace // better readability
-func (i *traceIDInjector) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return connect.UnaryFunc(func(
-		ctx context.Context,
-		req connect.AnyRequest,
-	) (connect.AnyResponse, error) {
-		span := trace.SpanFromContext(ctx)
-		if span != nil && span.SpanContext().IsValid() {
-			traceID := span.SpanContext().TraceID().String()
-			res, err := next(ctx, req)
-			if err != nil {
-				return nil, err
+// NewTraceIDInterceptor returns an interceptor that adds the trace id (if present)
+// to the response header
+//
+//nolint:whitespace // editor/linter issue
+func NewTraceIDInterceptor() connect.ServerInterceptor {
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(
+			ctx context.Context,
+			spec connect.Spec,
+			stream connect.ServerStream,
+		) error {
+			span := trace.SpanFromContext(ctx)
+			if span != nil && span.SpanContext().IsValid() {
+				if info, ok := connect.CallInfoForServerContext(ctx); ok {
+					info.ResponseHeader().Set(traceIDHeader,
+						span.SpanContext().TraceID().String())
+				}
 			}
-			res.Header().Set(traceIDHeader, traceID)
-			return res, nil
+			return next(ctx, spec, stream)
 		}
-		return next(ctx, req)
-	})
-}
-
-//
-//nolint:lll,whitespace // readablity, editor/linter
-func (i *traceIDInjector) WrapStreamingClient(
-	next connect.StreamingClientFunc,
-) connect.StreamingClientFunc {
-	return next
-}
-
-//
-//nolint:lll,whitespace // readablity, editor/linter
-func (i *traceIDInjector) WrapStreamingHandler(
-	next connect.StreamingHandlerFunc,
-) connect.StreamingHandlerFunc {
-	return connect.StreamingHandlerFunc(func(
-		ctx context.Context,
-		conn connect.StreamingHandlerConn,
-	) error {
-		span := trace.SpanFromContext(ctx)
-		if span != nil && span.SpanContext().IsValid() {
-			traceID := span.SpanContext().TraceID().String()
-			conn.ResponseHeader().Set(traceIDHeader, traceID)
-		}
-		return next(ctx, conn)
-	})
+	}
 }

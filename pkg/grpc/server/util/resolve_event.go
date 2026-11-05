@@ -7,7 +7,7 @@ import (
 
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/grpc/repository/api"
 	"github.com/mpapenbr/iracelog-service-manager-go/pkg/utils"
@@ -45,7 +45,10 @@ func ResolveEvent(
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, utils.ErrEventNotFound)
+			return nil, connect.NewError(
+				connect.CodeNotFound,
+				utils.ErrEventNotFound.Error(),
+			).WithCause(utils.ErrEventNotFound)
 		}
 		return nil, err
 	}

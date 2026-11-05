@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/provider/v1/providerv1connect"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	containerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/container/v1"
 	providerv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/provider/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -93,11 +93,11 @@ type providerServer struct {
 //nolint:whitespace // can't make both editor and linter happy
 func (s *providerServer) ListLiveEvents(
 	ctx context.Context,
-	req *connect.Request[providerv1.ListLiveEventsRequest],
-) (*connect.Response[providerv1.ListLiveEventsResponse], error) {
+	req *providerv1.ListLiveEventsRequest,
+) (*providerv1.ListLiveEventsResponse, error) {
 	mainSpan := trace.SpanFromContext(ctx)
 	l := s.log.WithCtx(ctx)
-	t, err := serverUtil.ResolveTenant(ctx, s.repos.Tenant(), req.Msg.TenantSelector)
+	t, err := serverUtil.ResolveTenant(ctx, s.repos.Tenant(), req.TenantSelector)
 	if err != nil {
 		mainSpan.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -126,55 +126,65 @@ func (s *providerServer) ListLiveEvents(
 	}
 
 	mainSpan.SetStatus(codes.Ok, "success")
-	return connect.NewResponse(&providerv1.ListLiveEventsResponse{Events: ec}), nil
+	return &providerv1.ListLiveEventsResponse{Events: ec}, nil
 }
 
 //nolint:whitespace,funlen // can't make both editor and linter happy
 func (s *providerServer) RegisterEvent(
 	ctx context.Context,
-	req *connect.Request[providerv1.RegisterEventRequest],
-) (*connect.Response[providerv1.RegisterEventResponse], error) {
+	req *providerv1.RegisterEventRequest,
+) (*providerv1.RegisterEventResponse, error) {
+	info, _ := connect.CallInfoForServerContext(ctx)
 	l := s.log.WithCtx(ctx)
-	l.Debug("RegisterEvent called", log.Any("header", req.Header()))
+	l.Debug("RegisterEvent called", log.Any("header", info.RequestHeader()))
 	a := auth.FromContext(&ctx)
 	ta, ok := a.(auth.TenantAuthentication)
 	if !ok {
 		l.Debug("no tenant auth found")
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, "no tenant auth found")
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 
 	if !s.pe.HasTenantPermission(a, permission.PermissionRegisterEvent, ta.GetTenantID()) {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 
 	l.Debug("RegisterEvent",
-		log.Any("track", req.Msg.Track),
-		log.Any("event", req.Msg.Event),
+		log.Any("track", req.Track),
+		log.Any("event", req.Event),
 		log.String("tenant", a.Principal().Name()),
 	)
 
 	selector := &commonv1.EventSelector{
 		Arg: &commonv1.EventSelector_Key{
-			Key: req.Msg.Key,
+			Key: req.Key,
 		},
 	}
 	if ed, _ := s.dataProxy.GetEvent(selector); ed != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, "event already registered")
-		return nil, connect.NewError(connect.CodeAlreadyExists, ErrEventAlreadyRegistered)
+		return nil, connect.NewError(
+			connect.CodeAlreadyExists,
+			ErrEventAlreadyRegistered.Error(),
+		).WithCause(ErrEventAlreadyRegistered)
 	}
 
 	if err := s.storeData(
 		ctx,
-		req.Msg.RecordingMode,
+		req.RecordingMode,
 		func(ctx context.Context) error {
-			if err := s.repos.Track().EnsureTrack(ctx, req.Msg.Track); err != nil {
+			if err := s.repos.Track().EnsureTrack(ctx, req.Track); err != nil {
 				return err
 			}
 
 			l.Debug("tenant id", log.Uint32("id", ta.GetTenantID()))
-			return s.repos.Event().Create(ctx, req.Msg.Event, ta.GetTenantID())
+			return s.repos.Event().Create(ctx, req.Event, ta.GetTenantID())
 		},
 	); err != nil {
 		l.Error("error creating data", log.ErrorField(err))
@@ -182,15 +192,15 @@ func (s *providerServer) RegisterEvent(
 		return nil, err
 	}
 	// read track from db to include pit stop info if already there
-	dbTrack, err := s.repos.Track().LoadByID(ctx, int(req.Msg.Event.TrackId))
+	dbTrack, err := s.repos.Track().LoadByID(ctx, int(req.Event.TrackId))
 	if err != nil {
 		l.Error("error loading track", log.ErrorField(err))
-		dbTrack = req.Msg.Track
+		dbTrack = req.Track
 	}
 	epd := s.lookup.AddEvent(
-		req.Msg.Event,
+		req.Event,
 		dbTrack,
-		req.Msg.RecordingMode,
+		req.RecordingMode,
 		fmt.Sprintf("%d", ta.GetTenantID()),
 	)
 	s.storeAnalysisDataWorker(epd)
@@ -200,42 +210,42 @@ func (s *providerServer) RegisterEvent(
 	}
 	l.Debug("event registered")
 	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "event registered successfully")
-	return connect.NewResponse(&providerv1.RegisterEventResponse{
-			Event: req.Msg.Event,
+	return &providerv1.RegisterEventResponse{
+			Event: req.Event,
 			Track: dbTrack,
-		}),
+		},
 		nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *providerServer) UnregisterEvent(
 	ctx context.Context,
-	req *connect.Request[providerv1.UnregisterEventRequest],
-) (*connect.Response[providerv1.UnregisterEventResponse], error) {
+	req *providerv1.UnregisterEventRequest,
+) (*providerv1.UnregisterEventResponse, error) {
 	l := s.log.WithCtx(ctx)
 	l.Debug("UnregisterEvent",
-		log.Any("event", req.Msg.EventSelector))
+		log.Any("event", req.EventSelector))
 	a := auth.FromContext(&ctx)
-	ed, err := s.validateEventAccess(a, req.Msg.EventSelector)
+	ed, err := s.validateEventAccess(a, req.EventSelector)
 	if err != nil {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
 		return nil, err
 	}
-	epd, _ := s.lookup.GetEvent(req.Msg.EventSelector)
+	epd, _ := s.lookup.GetEvent(req.EventSelector)
 	if epd != nil {
 		l.Debug("I was processing this event", log.String("key", epd.Event.Key))
 
 		s.storeAnalysisData(epd)
 		s.storeReplayInfo(epd)
-		s.lookup.RemoveEvent(req.Msg.EventSelector)
+		s.lookup.RemoveEvent(req.EventSelector)
 	}
 	if err := s.dataProxy.PublishEventUnregistered(ed.Event.Key); err != nil {
 		l.Error("error publishing unregistered event", log.ErrorField(err))
 	}
 	l.Debug("Event unregistered",
-		log.Any("event", req.Msg.EventSelector))
+		log.Any("event", req.EventSelector))
 	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "event unregistered successfully")
-	return connect.NewResponse(&providerv1.UnregisterEventResponse{}), nil
+	return &providerv1.UnregisterEventResponse{}, nil
 }
 
 func (s *providerServer) validateEventAccess(
@@ -249,12 +259,12 @@ func (s *providerServer) validateEventAccess(
 			a, permission.PermissionPostRacedata, ta.GetTenantID(),
 		) {
 
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 		}
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied,
-		)
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 	if !s.pe.HasObjectPermission(a,
 		permission.PermissionPostRacedata,
@@ -262,8 +272,8 @@ func (s *providerServer) validateEventAccess(
 
 		return nil, connect.NewError(
 			connect.CodePermissionDenied,
-			auth.ErrPermissionDenied,
-		)
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 	return ed, nil
 }
@@ -271,12 +281,15 @@ func (s *providerServer) validateEventAccess(
 //nolint:whitespace // can't make both editor and linter happy
 func (s *providerServer) UnregisterAll(
 	ctx context.Context,
-	req *connect.Request[providerv1.UnregisterAllRequest],
-) (*connect.Response[providerv1.UnregisterAllResponse], error) {
+	req *providerv1.UnregisterAllRequest,
+) (*providerv1.UnregisterAllResponse, error) {
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasPermission(a, permission.PermissionAdminUnregisterAllEvents) {
 		trace.SpanFromContext(ctx).SetStatus(codes.Error, "permission denied")
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 	// TODO: data has to retrieved by pubsubData
 	ec := []*providerv1.LiveEventContainer{}
@@ -286,44 +299,44 @@ func (s *providerServer) UnregisterAll(
 	}
 	s.lookup.Clear()
 	trace.SpanFromContext(ctx).SetStatus(codes.Ok, "all events unregistered")
-	return connect.NewResponse(&providerv1.UnregisterAllResponse{Events: ec}), nil
+	return &providerv1.UnregisterAllResponse{Events: ec}, nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *providerServer) Ping(
 	ctx context.Context,
-	req *connect.Request[providerv1.PingRequest],
-) (*connect.Response[providerv1.PingResponse], error) {
+	req *providerv1.PingRequest,
+) (*providerv1.PingResponse, error) {
 	l := s.log.WithCtx(ctx)
-	l.Debug("Ping called", log.Any("request", req.Msg))
-	return connect.NewResponse(&providerv1.PingResponse{
-		Num:       req.Msg.Num,
+	l.Debug("Ping called", log.Any("request", req))
+	return &providerv1.PingResponse{
+		Num:       req.Num,
 		Timestamp: timestamppb.Now(),
-	}), nil
+	}, nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *providerServer) VersionCheck(
 	ctx context.Context,
-	req *connect.Request[providerv1.VersionCheckRequest],
-) (*connect.Response[providerv1.VersionCheckResponse], error) {
+	req *providerv1.VersionCheckRequest,
+) (*providerv1.VersionCheckResponse, error) {
 	a := auth.FromContext(&ctx)
 	tenantID := uint32(0)
 	ta, ok := a.(auth.TenantAuthentication)
 	if ok {
 		tenantID = ta.GetTenantID()
 	}
-	return connect.NewResponse(&providerv1.VersionCheckResponse{
-		ProvidedRaceloggerVersion:  req.Msg.RaceloggerVersion,
+	return &providerv1.VersionCheckResponse{
+		ProvidedRaceloggerVersion:  req.RaceloggerVersion,
 		SupportedRaceloggerVersion: util.RequiredClientVersion,
 		ServerVersion:              version.Version,
-		RaceloggerCompatible:       util.CheckRaceloggerVersion(req.Msg.RaceloggerVersion),
+		RaceloggerCompatible:       util.CheckRaceloggerVersion(req.RaceloggerVersion),
 		ValidCredentials: s.pe.HasTenantPermission(
 			a,
 			permission.PermissionPostRacedata,
 			tenantID,
 		),
-	}), nil
+	}, nil
 }
 
 //nolint:whitespace,dupl // false positive

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/user/v1/userv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/user/v1/userv1connect"
 	userv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/user/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -62,8 +62,8 @@ type (
 //nolint:whitespace // can't make both editor and linter happy
 func (s *userServer) GetUserInfo(
 	ctx context.Context,
-	req *connect.Request[userv1.GetUserInfoRequest],
-) (*connect.Response[userv1.GetUserInfoResponse], error) {
+	req *userv1.GetUserInfoRequest,
+) (*userv1.GetUserInfoResponse, error) {
 	s.log.Debug("GetUserInfo called")
 	a := auth.FromContext(&ctx)
 	if sAuth, ok := a.(*authImpl.SessionAuth); ok {
@@ -86,16 +86,16 @@ func (s *userServer) GetUserInfo(
 			IsEditor:    lo.Contains(sAuth.CombinedRoles(), auth.RoleEditor),
 			ScopedRoles: scopedRoles,
 		}
-		resp := connect.NewResponse(&userv1.GetUserInfoResponse{
+		resp := &userv1.GetUserInfoResponse{
 			UserInfo: userInfo,
-		})
+		}
 		return resp, nil
 
 	} else {
 		// a is not of type *auth.SessionAuth
 		return nil, connect.NewError(
 			connect.CodeUnauthenticated,
-			errors.New("no auth info in context"),
+			"no auth info in context",
 		)
 	}
 }

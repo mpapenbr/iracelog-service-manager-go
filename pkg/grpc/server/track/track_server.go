@@ -3,9 +3,9 @@ package track
 import (
 	"context"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/track/v1/trackv1connect"
 	trackv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/track/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -66,8 +66,8 @@ type trackServer struct {
 //nolint:whitespace // can't make both editor and linter happy
 func (s *trackServer) GetTracks(
 	ctx context.Context,
-	req *connect.Request[trackv1.GetTracksRequest],
-	stream *connect.ServerStream[trackv1.GetTracksResponse],
+	req *trackv1.GetTracksRequest,
+	stream x.TrackServiceGetTracksServerStream,
 ) error {
 	data, err := s.trackRepos.LoadAll(ctx)
 	if err != nil {
@@ -87,47 +87,53 @@ func (s *trackServer) GetTracks(
 //nolint:whitespace // can't make both editor and linter happy
 func (s *trackServer) GetTrack(
 	ctx context.Context,
-	req *connect.Request[trackv1.GetTrackRequest],
-) (*connect.Response[trackv1.GetTrackResponse], error) {
-	data, err := s.trackRepos.LoadByID(context.Background(), int(req.Msg.Id))
+	req *trackv1.GetTrackRequest,
+) (*trackv1.GetTrackResponse, error) {
+	data, err := s.trackRepos.LoadByID(context.Background(), int(req.Id))
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&trackv1.GetTrackResponse{Track: data}), nil
+	return &trackv1.GetTrackResponse{Track: data}, nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *trackServer) EnsureTrack(
 	ctx context.Context,
-	req *connect.Request[trackv1.EnsureTrackRequest],
-) (*connect.Response[trackv1.EnsureTrackResponse], error) {
+	req *trackv1.EnsureTrackRequest,
+) (*trackv1.EnsureTrackResponse, error) {
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasPermission(a, permission.PermissionCreateTrack) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 	if err := s.txManager.RunInTx(ctx, func(ctx context.Context) error {
-		return s.trackRepos.EnsureTrack(ctx, req.Msg.Track)
+		return s.trackRepos.EnsureTrack(ctx, req.Track)
 	}); err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&trackv1.EnsureTrackResponse{}), nil
+	return &trackv1.EnsureTrackResponse{}, nil
 }
 
 //nolint:whitespace // can't make both editor and linter happy
 func (s *trackServer) UpdatePitInfo(
 	ctx context.Context,
-	req *connect.Request[trackv1.UpdatePitInfoRequest],
-) (*connect.Response[trackv1.UpdatePitInfoResponse], error) {
+	req *trackv1.UpdatePitInfoRequest,
+) (*trackv1.UpdatePitInfoResponse, error) {
 	a := auth.FromContext(&ctx)
 	if !s.pe.HasPermission(a, permission.PermissionUpdateTrack) {
-		return nil, connect.NewError(connect.CodePermissionDenied, auth.ErrPermissionDenied)
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			auth.ErrPermissionDenied.Error(),
+		).WithCause(auth.ErrPermissionDenied)
 	}
 
 	if err := s.txManager.RunInTx(ctx, func(ctx context.Context) error {
-		_, updErr := s.trackRepos.UpdatePitInfo(ctx, int(req.Msg.Id), req.Msg.PitInfo)
+		_, updErr := s.trackRepos.UpdatePitInfo(ctx, int(req.Id), req.PitInfo)
 		return updErr
 	}); err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&trackv1.UpdatePitInfoResponse{}), nil
+	return &trackv1.UpdatePitInfoResponse{}, nil
 }

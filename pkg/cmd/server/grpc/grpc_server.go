@@ -13,20 +13,21 @@ import (
 	"syscall"
 	"time"
 
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/analysis/v1/analysisv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/auth/v1/authv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/event/v1/eventv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/livedata/v1/livedatav1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/predict/v1/predictv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/provider/v1/providerv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/racestate/v1/racestatev1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/settings/v1/settingsv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/tenant/v1/tenantv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/track/v1/trackv1connect"
-	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/user/v1/userv1connect"
-	"connectrpc.com/connect"
-	"connectrpc.com/grpchealth"
-	"connectrpc.com/grpcreflect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/analysis/v1/analysisv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/auth/v1/authv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/event/v1/eventv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/livedata/v1/livedatav1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/predict/v1/predictv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/provider/v1/providerv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/racestate/v1/racestatev1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/settings/v1/settingsv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/tenant/v1/tenantv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/track/v1/trackv1connect"
+	"buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/user/v1/userv1connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
+	"connectrpc.com/grpchealth/v2"
+	"connectrpc.com/grpcreflect/v2"
 	"connectrpc.com/otelconnect"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -207,15 +208,15 @@ type grpcServer struct {
 	pool                  *pgxpool.Pool
 	mux                   *http.ServeMux
 	telemetry             *myOtel.Telemetry
-	otel                  *otelconnect.Interceptor
+	otel                  connect.ServerInterceptor
 	eventLookup           *utils.EventLookup
 	tlsConfig             *tls.Config
 	dataProxy             proxy.DataProxy
 	oidcParam             *oidc.OIDCParam
-	authInterceptor       connect.Interceptor
-	sessionInterceptor    connect.Interceptor
-	configInterceptor     connect.Interceptor
-	traceIDInterceptor    connect.Interceptor
+	authInterceptor       connect.ServerInterceptor
+	sessionInterceptor    connect.ServerInterceptor
+	configInterceptor     connect.ServerInterceptor
+	traceIDInterceptor    connect.ServerInterceptor
 	tenantCache           utilsCache.Cache[string, model.Tenant]
 	sessionStore          session.SessionStore
 	pendingAuthStateCache oidc.PendingAuthStateCache
@@ -441,8 +442,12 @@ func (s *grpcServer) SetupTransactionManager() {
 
 //nolint:funlen // by design
 func (s *grpcServer) SetupGrpcServices() {
+	var err error
 	s.mux = http.NewServeMux()
-	s.otel, _ = otelconnect.NewInterceptor()
+	if s.otel, err = otelconnect.NewServerInterceptor(); err != nil {
+		s.log.Error("Could not create otel interceptor", log.ErrorField(err))
+		s.otel = func(next connect.ServerFunc) connect.ServerFunc { return next }
+	}
 	staleDuration, err := time.ParseDuration(config.StaleDuration)
 	if err != nil {
 		staleDuration = 1 * time.Minute
@@ -607,13 +612,31 @@ func (s *grpcServer) waitForRequiredServices() {
 	s.log.Debug("Required services are available")
 }
 
+// mount creates a connect server with the given interceptors, lets register
+// add the services and mounts the server on the mux.
+//
+//nolint:whitespace // editor/linter issue
+func (s *grpcServer) mount(
+	register func(server *connect.Server),
+	interceptors ...connect.ServerInterceptor,
+) {
+	server := connect.NewServer(interceptors...)
+	register(server)
+	// v2 limits reads to 4 MiB per message by default, v1 was unlimited.
+	// keep v1 behavior
+	connecthttp.Mount(s.mux, server, connecthttp.WithReadMaxBytes(0))
+}
+
 func (s *grpcServer) registerHealthServer() {
-	checker := grpchealth.NewStaticChecker()
-	s.mux.Handle(grpchealth.NewHandler(checker))
+	s.mount(func(server *connect.Server) {
+		grpchealth.Register(server, grpchealth.NewStaticChecker())
+	})
 }
 
 func (s *grpcServer) registerReflectionServer() {
-	checker := grpcreflect.NewStaticReflector(
+	// the services are spread over multiple connect servers (different
+	// interceptors), so we need to provide the service names explicitly
+	names := []string{
 		analysisv1connect.AnalysisServiceName,
 		eventv1connect.EventServiceName,
 		livedatav1connect.LiveDataServiceName,
@@ -622,9 +645,11 @@ func (s *grpcServer) registerReflectionServer() {
 		racestatev1connect.RaceStateServiceName,
 		trackv1connect.TrackServiceName,
 		tenantv1connect.TenantServiceName,
-	)
-	s.mux.Handle(grpcreflect.NewHandlerV1(checker))
-	s.mux.Handle(grpcreflect.NewHandlerV1Alpha(checker))
+	}
+	s.mount(func(server *connect.Server) {
+		grpcreflect.Register(server,
+			grpcreflect.WithNamer(grpcreflect.NamerFunc(func() []string { return names })))
+	})
 }
 
 func (s *grpcServer) registerAuthServer() {
@@ -647,17 +672,15 @@ func (s *grpcServer) registerAuthServer() {
 		authServer.WithOIDCParams(s.oidcParam),
 		authServer.WithPendingAuthStateCache(s.pendingAuthStateCache),
 	)
-	path, handler := authv1connect.NewAuthServiceHandler(
-		authServerImpl,
-		connect.WithInterceptors(
-			s.otel,
-			s.traceIDInterceptor,
-			s.configInterceptor,
-			s.sessionInterceptor,
-			s.authInterceptor,
-		),
+	s.mount(func(server *connect.Server) {
+		authv1connect.RegisterAuthServiceHandler(server, authServerImpl)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.configInterceptor,
+		s.sessionInterceptor,
+		s.authInterceptor,
 	)
-	s.mux.Handle(path, handler)
 	callbackURL, callbackHandler := authServerImpl.CallbackHandler()
 	s.mux.Handle(callbackURL, callbackHandler)
 }
@@ -671,18 +694,15 @@ func (s *grpcServer) registerUserServer() {
 		user.WithSessionStore(s.sessionStore),
 		user.WithTracer(s.tracer), // Added
 	)
-	path, handler := userv1connect.NewUserServiceHandler(
-		userService,
-		connect.WithInterceptors(
-			s.otel,
-			s.traceIDInterceptor,
-			s.configInterceptor,
-			s.sessionInterceptor,
-			s.authInterceptor,
-		),
+	s.mount(func(server *connect.Server) {
+		userv1connect.RegisterUserServiceHandler(server, userService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.configInterceptor,
+		s.sessionInterceptor,
+		s.authInterceptor,
 	)
-
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerSettingsServer() {
@@ -690,18 +710,15 @@ func (s *grpcServer) registerSettingsServer() {
 		settings.WithTracer(s.tracer),
 		settings.WithSupportsLogin(appConfig.SupportIDP),
 	)
-	path, handler := settingsv1connect.NewSettingsServiceHandler(
-		settingsService,
-		connect.WithInterceptors(
-			s.otel,
-			s.traceIDInterceptor,
-			s.configInterceptor,
-			s.sessionInterceptor,
-			s.authInterceptor,
-		),
+	s.mount(func(server *connect.Server) {
+		settingsv1connect.RegisterSettingsServiceHandler(server, settingsService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.configInterceptor,
+		s.sessionInterceptor,
+		s.authInterceptor,
 	)
-
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerEventServer() {
@@ -715,17 +732,15 @@ func (s *grpcServer) registerEventServer() {
 		event.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 		event.WithTracer(s.tracer), // Added
 	)
-	path, handler := eventv1connect.NewEventServiceHandler(
-		eventServerImpl,
-		connect.WithInterceptors(
-			s.otel,
-			s.traceIDInterceptor,
-			s.configInterceptor,
-			s.sessionInterceptor,
-			s.authInterceptor,
-		),
+	s.mount(func(server *connect.Server) {
+		eventv1connect.RegisterEventServiceHandler(server, eventServerImpl)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.configInterceptor,
+		s.sessionInterceptor,
+		s.authInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerAnalysisServer() {
@@ -735,14 +750,14 @@ func (s *grpcServer) registerAnalysisServer() {
 		analysis.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 		analysis.WithTracer(s.tracer), // Added
 	)
-	path, handler := analysisv1connect.NewAnalysisServiceHandler(
-		analysisService,
-		connect.WithInterceptors(
-			s.otel, s.traceIDInterceptor, s.configInterceptor, s.authInterceptor,
-		),
+	s.mount(func(server *connect.Server) {
+		analysisv1connect.RegisterAnalysisServiceHandler(server, analysisService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.configInterceptor,
+		s.authInterceptor,
 	)
-
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerProviderServer() {
@@ -754,17 +769,15 @@ func (s *grpcServer) registerProviderServer() {
 		provider.WithTracer(s.tracer),
 		provider.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 	)
-	path, handler := providerv1connect.NewProviderServiceHandler(
-		providerService,
-		connect.WithInterceptors(
-			s.otel,
-			s.traceIDInterceptor,
-			s.configInterceptor,
-			s.sessionInterceptor,
-			s.authInterceptor,
-		),
+	s.mount(func(server *connect.Server) {
+		providerv1connect.RegisterProviderServiceHandler(server, providerService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.configInterceptor,
+		s.sessionInterceptor,
+		s.authInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerStateServer() {
@@ -776,11 +789,13 @@ func (s *grpcServer) registerStateServer() {
 		state.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 		state.WithTracer(s.tracer), // Added
 	)
-	path, handler := racestatev1connect.NewRaceStateServiceHandler(
-		stateService,
-		connect.WithInterceptors(s.otel, s.traceIDInterceptor, s.authInterceptor),
+	s.mount(func(server *connect.Server) {
+		racestatev1connect.RegisterRaceStateServiceHandler(server, stateService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.authInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerLiveDataServer() {
@@ -788,11 +803,12 @@ func (s *grpcServer) registerLiveDataServer() {
 		livedata.WithEventLookup(s.eventLookup), // to be removed?
 		livedata.WithDataProxy(s.dataProxy),
 	)
-	path, handler := livedatav1connect.NewLiveDataServiceHandler(
-		liveDataService,
-		connect.WithInterceptors(s.otel, s.traceIDInterceptor),
+	s.mount(func(server *connect.Server) {
+		livedatav1connect.RegisterLiveDataServiceHandler(server, liveDataService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerTrackServer() {
@@ -801,11 +817,13 @@ func (s *grpcServer) registerTrackServer() {
 		track.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 		track.WithTracer(s.tracer), // Added
 	)
-	path, handler := trackv1connect.NewTrackServiceHandler(
-		trackService,
-		connect.WithInterceptors(s.otel, s.traceIDInterceptor, s.authInterceptor),
+	s.mount(func(server *connect.Server) {
+		trackv1connect.RegisterTrackServiceHandler(server, trackService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.authInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerTenantServer() {
@@ -815,11 +833,13 @@ func (s *grpcServer) registerTenantServer() {
 		tenant.WithPermissionEvaluator(permission.NewPermissionEvaluator()),
 		tenant.WithTracer(s.tracer), // Added
 	)
-	path, handler := tenantv1connect.NewTenantServiceHandler(
-		tenantService,
-		connect.WithInterceptors(s.otel, s.traceIDInterceptor, s.authInterceptor),
+	s.mount(func(server *connect.Server) {
+		tenantv1connect.RegisterTenantServiceHandler(server, tenantService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
+		s.authInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func (s *grpcServer) registerPredictServer() {
@@ -828,11 +848,12 @@ func (s *grpcServer) registerPredictServer() {
 		predict.WithEventLookup(s.eventLookup), // to be removed?
 		predict.WithTracer(s.tracer),           // Added
 	)
-	path, handler := predictv1connect.NewPredictServiceHandler(
-		predictService,
-		connect.WithInterceptors(s.otel, s.traceIDInterceptor),
+	s.mount(func(server *connect.Server) {
+		predictv1connect.RegisterPredictServiceHandler(server, predictService)
+	},
+		s.otel,
+		s.traceIDInterceptor,
 	)
-	s.mux.Handle(path, handler)
 }
 
 func setupGoRoutinesDump() {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/predict/v1/predictv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/predict/v1/predictv1connect"
 	commonv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/common/v1"
 	eventv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/event/v1"
 	predictv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/predict/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -64,28 +64,27 @@ type predictServer struct {
 //nolint:whitespace // by design
 func (s *predictServer) GetPredictParam(
 	ctx context.Context,
-	req *connect.Request[predictv1.GetPredictParamRequest]) (
-	*connect.Response[predictv1.GetPredictParamResponse], error,
-) {
+	req *predictv1.GetPredictParamRequest,
+) (*predictv1.GetPredictParamResponse, error) {
 	s.log.Debug("GetPredictParam called",
-		log.Any("arg", req.Msg),
-		log.Int32("id", req.Msg.EventSelector.GetId()))
+		log.Any("arg", req),
+		log.Int32("id", req.EventSelector.GetId()))
 	var e *eventv1.Event
 	var err error
-	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.Msg.EventSelector)
+	e, err = util.ResolveEvent(ctx, s.repos.Event(), req.EventSelector)
 	if err != nil {
 		s.log.Error("error resolving event",
-			log.Any("selector", req.Msg.EventSelector),
+			log.Any("selector", req.EventSelector),
 			log.ErrorField(err))
 		return nil, err
 	}
 
-	if req.Msg.StartSelector == nil {
+	if req.StartSelector == nil {
 		return nil, util.ErrInvalidStartSelector
 	}
 
 	var param *predictv1.PredictParam
-	switch req.Msg.StartSelector.Arg.(type) {
+	switch req.StartSelector.Arg.(type) {
 	case *commonv1.StartSelector_RecordStamp:
 		return nil, util.ErrUnsupportedStartSelector
 	case *commonv1.StartSelector_SessionTime:
@@ -93,9 +92,9 @@ func (s *predictServer) GetPredictParam(
 			ctx,
 			s.repos,
 			int(e.Id),
-			time.Duration(req.Msg.StartSelector.GetSessionTime()*float32(time.Second)),
-			req.Msg.CarNum,
-			req.Msg.LaptimeSelector,
+			time.Duration(req.StartSelector.GetSessionTime()*float32(time.Second)),
+			req.CarNum,
+			req.LaptimeSelector,
 		)
 
 	default:
@@ -104,49 +103,47 @@ func (s *predictServer) GetPredictParam(
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&predictv1.GetPredictParamResponse{
+	return &predictv1.GetPredictParamResponse{
 		Param: param,
-	}), nil
+	}, nil
 }
 
 //nolint:whitespace // by design
 func (s *predictServer) GetLivePredictParam(
 	ctx context.Context,
-	req *connect.Request[predictv1.GetLivePredictParamRequest]) (
-	*connect.Response[predictv1.GetLivePredictParamResponse], error,
-) {
+	req *predictv1.GetLivePredictParamRequest,
+) (*predictv1.GetLivePredictParamResponse, error) {
 	// get the epd
 	var epd *utils.EventProcessingData
 	var param *predictv1.PredictParam
 	var err error
-	epd, err = s.lookup.GetEvent(req.Msg.EventSelector)
+	epd, err = s.lookup.GetEvent(req.EventSelector)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
+		return nil, connect.NewError(connect.CodeNotFound, err.Error()).WithCause(err)
 	}
 
 	param, err = GetLivePredictParam(
 		epd,
-		req.Msg.CarNum,
-		req.Msg.LaptimeSelector,
+		req.CarNum,
+		req.LaptimeSelector,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&predictv1.GetLivePredictParamResponse{
+	return &predictv1.GetLivePredictParamResponse{
 		Param: param,
-	}), nil
+	}, nil
 }
 
 func (s *predictServer) PredictRace(ctx context.Context,
-	req *connect.Request[predictv1.PredictRaceRequest]) (
-	*connect.Response[predictv1.PredictRaceResponse], error,
-) {
+	req *predictv1.PredictRaceRequest,
+) (*predictv1.PredictRaceResponse, error) {
 	// TODO: validate vital parameters
-	result, err := racestints.Calc(req.Msg.Param)
+	result, err := racestints.Calc(req.Param)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&predictv1.PredictRaceResponse{
+	return &predictv1.PredictRaceResponse{
 		Result: result,
-	}), nil
+	}, nil
 }

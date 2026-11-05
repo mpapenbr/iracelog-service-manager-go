@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/iracelog/auth/v1/authv1connect"
+	x "buf.build/gen/go/mpapenbr/iracelog/connectrpc/go/v2/iracelog/auth/v1/authv1connect"
 	authv1 "buf.build/gen/go/mpapenbr/iracelog/protocolbuffers/go/iracelog/auth/v1"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
@@ -131,8 +131,8 @@ type (
 //nolint:whitespace // can't make both editor and linter happy
 func (s *authServer) Login(
 	ctx context.Context,
-	req *connect.Request[authv1.LoginRequest],
-) (*connect.Response[authv1.LoginResponse], error) {
+	req *authv1.LoginRequest,
+) (*authv1.LoginResponse, error) {
 	s.log.Debug("Login called")
 	state := randStringURL(32)
 	verifierStr := oauth2.GenerateVerifier()
@@ -140,11 +140,11 @@ func (s *authServer) Login(
 	if err := s.pendingAuthStateCache.Save(&ownOidc.PendingAuthState{
 		State:             state,
 		CodeVerifier:      verifierStr,
-		ClientRedirectURI: req.Msg.GetRedirectUrl(),
+		ClientRedirectURI: req.GetRedirectUrl(),
 		CreatedAt:         time.Now(),
 	}); err != nil {
 		s.log.Error("failed to save pending auth state", log.ErrorField(err))
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeInternal, err.Error()).WithCause(err)
 
 	}
 
@@ -153,9 +153,9 @@ func (s *authServer) Login(
 		oauth2.S256ChallengeOption(verifierStr),
 	)
 
-	resp := connect.NewResponse(&authv1.LoginResponse{
+	resp := &authv1.LoginResponse{
 		LoginUrl: authURL,
-	})
+	}
 
 	return resp, nil
 }
@@ -163,14 +163,15 @@ func (s *authServer) Login(
 //nolint:whitespace // can't make both editor and linter happy
 func (s *authServer) Logout(
 	ctx context.Context,
-	req *connect.Request[authv1.LogoutRequest],
-) (*connect.Response[authv1.LogoutResponse], error) {
+	req *authv1.LogoutRequest,
+) (*authv1.LogoutResponse, error) {
+	info, _ := connect.CallInfoForServerContext(ctx)
 	s.log.Debug("Logout called")
 	sessionData := session.SessionFromContext(ctx)
 	if sessionData == nil {
 		return nil, ErrAuthNotFound
 	}
-	resp := connect.NewResponse(&authv1.LogoutResponse{})
+	resp := &authv1.LogoutResponse{}
 	if idToken := sImpl.GetIDToken(sessionData); idToken != "" {
 		if loErr := s.oidcSessionLogout(
 			idToken,
@@ -196,7 +197,7 @@ func (s *authServer) Logout(
 	cookie.Value = ""
 	cookie.MaxAge = -1 // delete cookie
 
-	resp.Header().Set("Set-Cookie", cookie.String())
+	info.ResponseHeader().Set("Set-Cookie", cookie.String())
 	return resp, nil
 }
 
